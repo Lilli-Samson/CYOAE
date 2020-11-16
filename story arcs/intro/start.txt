@@ -1,1 +1,4 @@
-This is a demo to test the functionality of CYOAE. [img https://cdn.discordapp.com/emojis/667255820383289364.png?v=1] <br>
+This is a demo to test the functionality of CYOAE.
+[img https://cdn.discordapp.com/emojis/667255820383289364.png?v=1]
+[choice headpat Looking good!]
+[choice shit Looks like shit.]
