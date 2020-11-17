@@ -1,12 +1,11 @@
 "use strict";
-console.log("Started");
 
-let current_arc_path = "";
+let current_arc = "";
+let current_scene = "";
 
 //executes [] tags
 async function execute_tag(/** @type {String} */ code) {
     const [, tag, params] = code.match(/\s*(\S*)\s*(.*)/s);
-    console.log(`Executing tag "${tag}" with parameters "${params}".`);
     switch (tag.toLowerCase()) {
         case "img":
         case "image":
@@ -15,7 +14,7 @@ async function execute_tag(/** @type {String} */ code) {
             const [, scene, text] = params.match(/\s*(\S*)\s*(.*)/s);
             try {
                 await get(scene + ".txt");
-                return `<input id="choice" type="button" value="${text}" onclick="goto_scene('${scene}');" />`
+                return `<input id="choice" type="button" value="${text}" onclick="window.location.hash = '#${current_arc}/${scene}'" />`
             }
             catch (err) {
                 return `<input id="dead_end" type="button" value="${text}" disabled />`
@@ -26,24 +25,32 @@ async function execute_tag(/** @type {String} */ code) {
 
 // plays through a story arc
 async function play_arc(/** @type {String} */ name) {
-    current_arc_path = `story arcs/${name}/`
-    await goto_scene("start");
+    window.location.hash = `#${name}/start`;
 }
 
 //display a scene based on a source .txt file and the current arc
-async function goto_scene(/** @type {String} */ scene) {
+async function update_current_scene() {
+    console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
-        const data = await get(`${scene}.txt`);
-        document.body.innerHTML = await parse_source_text(data, `${scene}.txt`);
+        const data = await get(`${current_scene}.txt`);
+        document.body.innerHTML = await parse_source_text(data, `${current_scene}.txt`);
     }
     catch (err) {
         display_error_document(`${err}`);
     }
 }
 
+async function hash_change() {
+    const [, arc, scene] = window.location.hash.match(/#([^\/]*)\/(.*)/);
+    current_arc = arc;
+    current_scene = scene;
+    await update_current_scene();
+}
+
+window.onhashchange = hash_change;
+
 // escapes HTML tags
 function escape(/** @type {String} */ string) {
-    console.log(`Escaping string ${string}`);
     let element = document.createElement('p');
     element.innerText = string;
     return element.innerHTML;
@@ -51,8 +58,8 @@ function escape(/** @type {String} */ string) {
 
 // downloads a local resource given its path/filename
 async function get(/** @type {String} */ url) {
-    const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`);
-    const filepath = `${current_url}${current_arc_path}${url}`;
+    const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
+    const filepath = `${current_url}story arcs/${current_arc}/${url}`;
     try {
         const request = await fetch(filepath);
         if (request.ok) {
@@ -76,7 +83,6 @@ async function parse_source_text(/** @type {String} */ source, /** @type {String
         return `In ${source_name} line ${line}:`;
     }
     for (const character of source) {
-        const prev_char = current_text.slice(-1);
         //handle escaping
         if (currently_escaping) {
             switch (character) {
@@ -147,6 +153,7 @@ function display_error_document(/** @type {String} */ error) {
 async function main() {
     try {
         await play_arc("intro");
+        await hash_change();
     }
     catch (err) {
         display_error_document(`${err}`);
