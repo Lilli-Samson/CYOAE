@@ -17,7 +17,7 @@ async function execute_tag(/** @type {String} */ code) {
                 return `<a class="choice" href="#${current_arc}/${scene}">${text}</a>`;
             }
             catch (err) {
-                return `<a class="dead_choice" title="Dead end. Sorry.">${text}</a>`;
+                return `<a class="dead_choice" title="Failed loading ${current_arc}/${scene}\n${err}">${text}</a>`;
             }
     }
     throw `Unknown tag "${tag}"`;
@@ -40,7 +40,7 @@ async function update_current_scene() {
     }
 }
 
-window.onhashchange = () => {
+window.onhashchange = async () => {
     const [, arc, scene] = window.location.hash.match(/#([^\/]*)\/(.*)/);
     if (arc && scene) {
         current_arc = arc;
