@@ -14,10 +14,10 @@ async function execute_tag(/** @type {String} */ code) {
             const [, scene, text] = params.match(/\s*(\S*)\s*(.*)/s);
             try {
                 await get(scene + ".txt");
-                return `<input id="choice" type="button" value="${text}" onclick="window.location.hash = '#${current_arc}/${scene}'" />`
+                return `<a class="choice" href="#${current_arc}/${scene}">${text}</a>`;
             }
             catch (err) {
-                return `<input id="dead_end" type="button" value="${text}" disabled />`
+                return `<a class="dead_choice" title="Dead end. Sorry.">${text}</a>`;
             }
     }
     throw `Unknown tag "${tag}"`;
@@ -40,14 +40,14 @@ async function update_current_scene() {
     }
 }
 
-async function hash_change() {
+window.onhashchange = () => {
     const [, arc, scene] = window.location.hash.match(/#([^\/]*)\/(.*)/);
-    current_arc = arc;
-    current_scene = scene;
-    await update_current_scene();
+    if (arc && scene) {
+        current_arc = arc;
+        current_scene = scene;
+        await update_current_scene();
+    }
 }
-
-window.onhashchange = hash_change;
 
 // escapes HTML tags
 function escape(/** @type {String} */ string) {
@@ -153,7 +153,7 @@ function display_error_document(/** @type {String} */ error) {
 async function main() {
     try {
         await play_arc("intro");
-        await hash_change();
+        await window.onhashchange();
     }
     catch (err) {
         display_error_document(`${err}`);

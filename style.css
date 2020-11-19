@@ -1,0 +1,11 @@
+.dead_choice {
+    color: darkred;
+}
+img {
+    margin: 1em;
+}
+
+.choice, .dead_choice {
+    line-height: 125%;
+    margin: 1em;
+}
