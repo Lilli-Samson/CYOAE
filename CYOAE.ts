@@ -1,8 +1,10 @@
 "use strict";
+
 let current_arc = "";
 let current_scene = "";
+
 //executes [] tags
-async function execute_tag(code) {
+async function execute_tag(code: string) {
     const [, tag, params] = code.match(/\s*(\S+)(?:\s+(.*))?/s) || [];
     //\s*(\S+)=((?:(?!\s+\S+=).)+)
     switch (tag.toLowerCase()) {
@@ -23,13 +25,17 @@ async function execute_tag(code) {
     }
     throw `Unknown tag "${tag}"`;
 }
+
 //parses tag parameters
-function parse_tags(code) {
+function parse_tags(code: string) {
+    
 }
+
 // plays through a story arc
-async function play_arc(name) {
+async function play_arc(name: string) {
     window.location.hash = `#${name}/start`;
 }
+
 //display a scene based on a source .txt file and the current arc
 async function update_current_scene() {
     console.log(`updating scene to ${current_arc}/${current_scene}`);
@@ -41,7 +47,8 @@ async function update_current_scene() {
         display_error_document(`${err}`);
     }
 }
-async function url_hash_change() {
+
+async function url_hash_change () {
     const [, arc, scene] = window.location.hash.match(/#([^\/]*)\/(.*)/) || [];
     if (arc && scene) {
         current_arc = arc;
@@ -49,15 +56,18 @@ async function url_hash_change() {
         await update_current_scene();
     }
 }
+
 window.onhashchange = url_hash_change;
+
 // escapes HTML tags
-function escape_html(str) {
+function escape_html(str: string) {
     let element = document.createElement('p');
     element.innerText = str;
     return element.innerHTML;
 }
+
 // downloads a local resource given its path/filename
-async function get(url) {
+async function get(url: string) {
     const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
     const filepath = `${current_url}story arcs/${current_arc}/${url}`;
     try {
@@ -71,14 +81,15 @@ async function get(url) {
         throw `Failed loading resource ${filepath}: ${err}`;
     }
 }
+
 //parses source text files
-async function parse_source_text(source, source_name) {
+async function parse_source_text(source: string, source_name: string) {
     let line = 1;
     let current_text = "";
     let tag_depth = 0; //number of encountered [s
     let result = "";
     let currently_escaping = false; //if we have just read a \
-    function get_source_text(line) {
+    function get_source_text(line: number) {
         return `In ${source_name} line ${line}:`;
     }
     for (const character of source) {
@@ -146,9 +157,11 @@ async function parse_source_text(source, source_name) {
     }
     return result;
 }
-function display_error_document(error) {
+
+function display_error_document(error: string) {
     document.body.innerHTML = escape_html(`Error: ${error}`);
 }
+
 // script entry point, loading the correct state and displays errors
 async function main() {
     try {
