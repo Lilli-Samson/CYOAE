@@ -5,7 +5,8 @@ let current_scene = "";
 
 //executes [] tags
 async function execute_tag(/** @type {String} */ code) {
-    const [, tag, params] = code.match(/\s*(\S*)\s*(.*)/s);
+    const [, tag, params] = code.match(/\s*(\S+)(?:\s+(.*))?/s);
+    //\s*(\S+)=((?:(?!\s+\S+=).)+)
     switch (tag.toLowerCase()) {
         case "img":
         case "image":
@@ -19,8 +20,15 @@ async function execute_tag(/** @type {String} */ code) {
             catch (err) {
                 return `<a class="dead_choice" title="Failed loading ${current_arc}/${scene}\n${err}">${text}</a>`;
             }
+        case "source":
+            return `<h3><a href="story arcs/${current_arc}/${current_scene}.txt">Source</a></h3><p class="source">${escape(await get(current_scene + ".txt"))}</p>`;
     }
     throw `Unknown tag "${tag}"`;
+}
+
+//parses tag parameters
+function parse_tags(/** @type {String} */ code) {
+    
 }
 
 // plays through a story arc
@@ -76,7 +84,7 @@ async function get(/** @type {String} */ url) {
 async function parse_source_text(/** @type {String} */ source, /** @type {String} */ source_name) {
     let line = 1;
     let current_text = "";
-    let currently_parsing_text = true; //as opposed to a [tag]
+    let tag_depth = 0; //number of encountered [s
     let result = "";
     let currently_escaping = false; //if we have just read a \
     function get_source_text(/** @type {Number} */ line) {
@@ -101,13 +109,13 @@ async function parse_source_text(/** @type {String} */ source, /** @type {String
             continue;
         }
         //handle parsing of regular text
-        if (currently_parsing_text) {
+        if (tag_depth === 0) {
             if (character === "[") {
                 if (current_text) {
                     result += escape(current_text);
                     current_text = "";
                 }
-                currently_parsing_text = false;
+                tag_depth++;
                 continue;
             }
             else if (character === "]") {
@@ -116,8 +124,12 @@ async function parse_source_text(/** @type {String} */ source, /** @type {String
         }
         //handle parsing of [] tags
         else {
-            if (character === "]") {
-                if (current_text) {
+            if (character === "[") {
+                tag_depth++;
+            }
+            else if (character === "]") {
+                tag_depth--;
+                if (tag_depth === 0) {
                     try {
                         result += await execute_tag(current_text);
                     }
@@ -126,7 +138,6 @@ async function parse_source_text(/** @type {String} */ source, /** @type {String
                     }
                     current_text = "";
                 }
-                currently_parsing_text = true;
                 continue;
             }
         }
@@ -136,7 +147,7 @@ async function parse_source_text(/** @type {String} */ source, /** @type {String
             line++;
         }
     }
-    if (currently_parsing_text === false) {
+    if (tag_depth !== 0) {
         throw `${get_source_text(line)} Opened tag with "[" but didn't close it with "]".`;
     }
     if (current_text) {

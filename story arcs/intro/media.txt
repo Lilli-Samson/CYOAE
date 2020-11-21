@@ -1,0 +1,4 @@
+You can also embed image using the \[img url\] syntax like so:
+
+[img https://cdn.discordapp.com/emojis/667255820383289364.png?v=1]
+

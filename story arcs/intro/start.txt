@@ -1,4 +1,19 @@
-This is a demo to test the functionality of CYOAE.
-[img https://cdn.discordapp.com/emojis/667255820383289364.png?v=1]
-[choice headpat Looking good!]
-[choice shit Looks like shit.]
+This is a demo to test the functionality of CYOAE which stands for Choose Your Own Adventure Engine. The basic idea is that you write descriptions after which the reader gets to make a choice, thus creating an interactive story. This engine is focused on writers, not programmers, trying to make it easy to focus on the story.
+
+The stories (and this page) are based on text files, one per page. You can see the source text of this page below. As you can see, you can just type text and it appears. Amazing!
+You don't need to worry about HTML tags like <a href="github.com"> to accidentally screw up your text. Everything is automatically escaped, except the special characters "\[", "\]" and "\\". If you want to just type one of those prefix them with a "\\" and they appear as regular text.
+
+The most basic and arguably most important functionality is adding choices. The syntax is \[choice next=goblin smash text=I smash the goblin\] which appears like so:
+[choice next=goblin smash text=I smash the goblin]
+Currently it's a dead end because goblin smash.txt doesn't exist, but you can add it and the choice will become active.
+
+What do you think so far?
+
+[choice next=variables text=Looks reasonable. Show me how you handle variables next.]
+[choice next=media text=Looks pretty plain. How do you add media?]
+[choice next=text_styling text=Looks very plain. Can you style the text?]
+[choice next=error_handling text=What happens when I screw up the syntax?]
+[choice next=final text=I'm not convinced it's worth getting into. Show me what you can do.]
+[choice next=start text=How do I get started writing my own story?]
+
+[source]
