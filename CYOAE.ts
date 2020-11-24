@@ -4,7 +4,7 @@ let current_arc = "";
 let current_scene = "";
 
 // executes [] tags
-async function execute_tag(code: string) {
+let execute_tag = async function execute_tag(code: string) {
     const [, tag, params] = code.match(/\s*(\S+)(?:\s+(.*))?/s) || [];
     const attributes = parse_attributes(params || "");
     function assert_correct_attributes(tag: string, valid_attributes: {required: string[], optional: string[]}) {
@@ -35,7 +35,7 @@ async function execute_tag(code: string) {
             }
             return result + ">";
         case "choice":
-            assert_correct_attributes(tag, {required: ["next", "text"], optional: []});
+            assert_correct_attributes(tag, {required: ["next", "text"], optional: ["var"]});
             try {
                 await get(attributes.next + ".txt");
                 return `<a class="choice" href="#${current_arc}/${attributes.next}">${attributes.text}</a>`;
@@ -46,6 +46,10 @@ async function execute_tag(code: string) {
         case "source":
             assert_correct_attributes(tag, {required: [], optional: []});
             return `<hr><h3><a href="story arcs/${current_arc}/${current_scene}.txt">Source</a></h3><p class="source">${escape_html(await get(current_scene + ".txt"))}</p>`;
+        case "code":
+            assert_correct_attributes(tag, {required: ["text"], optional: []});
+            console.log(`Code text: ${attributes.text}`);
+            return `<a class="code">${escape_html(attributes.text)}</a>`;
     }
     throw `Unknown tag "${tag}"`;
 }
@@ -218,8 +222,8 @@ async function parse_source_text(source: string, source_name: string) {
                         throw `${get_source_text(line)} ${err}`;
                     }
                     current_text = "";
+                    continue;
                 }
-                continue;
             }
         }
         //keep track of file position and content
@@ -253,24 +257,65 @@ function assert(predicate: any, explanation: string = "") {
 // tests
 async function run_tests() {
     function parse_tags_tests() {
-        const empty = parse_attributes("");
-        assert(Object.keys(empty).length === 0, "Failed parsing empty list");
-
-        const whitespace = parse_attributes(" \t\n");
-        assert(Object.keys(whitespace).length === 0, "Failed parsing whitespace list");
-
-        const basic = parse_attributes("test=value");
-        assert(Object.keys(basic).length === 1 && basic.test === "value", "Failed parsing basic argument");
-
-        const whitespace_text = parse_attributes("test= \t\nvalue");
-        assert(Object.keys(whitespace_text).length === 1 && whitespace_text.test === " \t\nvalue", "Failed parsing whitespace values");
-
-        const inner_tag = parse_attributes("attribute=test [if a=42 b else c] bla bar=10");
-        assert(Object.keys(inner_tag).length === 2, `Failed parsing inner tag values, expected 2, got ${inner_tag.size}`);
-        assert(inner_tag.attribute === "test [if a=42 b else c] bla", "Failed parsing inner tag values 2");
-        assert(inner_tag.bar === "10", "Failed parsing inner tag values 4");
+        function assert_params(test_case: string, tags: {[key: string]: string}) {
+            const attributes = parse_attributes(test_case);
+            let details = "Expected:\n";
+            for (const key of Object.keys(tags)) {
+                details += `${key}: ${tags[key]}\n`;
+            }
+            details += "Actually:\n";
+            for (const key of Object.keys(attributes)) {
+                details += `${key}: ${attributes[key]}\n`;
+            }
+            for (const key of Object.keys(tags)) {
+                if (!(key in attributes)) {
+                    throw `Error in parsing test case\n${test_case}\n. Expected to find attribute "${key}" but didn't.\n${details}`;
+                }
+                if (tags[key] !== attributes[key]) {
+                    throw `Error in parsing test case\n${test_case}\n. Value mismatch in tag "${key}".\n${details}`;
+                }
+            }
+        }
+        assert_params("", {});
+        assert_params(" \t\n", {});
+        assert_params("test=value", {test: "value"});
+        assert_params("test= \t\nvalue", {test: " \t\nvalue"});
+        assert_params("attribute=test [if a=42 b else c] bla bar=10", {attribute: "test [if a=42 b else c] bla", bar: "10"});
+        assert_params("text=[choice next=travel text=Take the sword var=weapon=herosword]\n[choice next=travel text=Leave the sword]",
+            {text: "[choice next=travel text=Take the sword var=weapon=herosword]\n[choice next=travel text=Leave the sword]"});
+        console.log(parse_attributes("text=[choice next=travel text=Take the sword var=weapon=herosword]\n[choice next=travel text=Leave the sword]"));
     }
     parse_tags_tests();
+    async function parse_source_text_test() {
+        const old_execute_tag = execute_tag;
+        let tags: string[];
+        execute_tag = async (str: string) => {
+            tags.push(str);
+            return "";
+        }
+        function test(source: string, ...expected_tags: string[]) {
+            tags = [];
+            parse_source_text(source, "test.txt");
+            for (const index in tags) {
+                if (arguments[Number(index) + 1] !== tags[Number(index)]) {
+                    let err = `Failed parsing source "${source}" into appropriate tags.\n`;
+                    err += `Expected:\n`;
+                    for (const expected_tag of expected_tags) {
+                        err += expected_tag + "\n";
+                    }
+                    err += `Actual:\n`;
+                    for (const tag of tags) {
+                        err += tag + "\n";
+                    }
+                    throw err;
+                }
+            }
+        }
+        test("[choice next=travel text=Leave the sword]", "choice next=travel text=Leave the sword");
+        test("[code text=[choice next=travel text=Leave the sword]]", "code text=[choice next=travel text=Leave the sword]");
+        execute_tag = old_execute_tag;
+    }
+    await parse_source_text_test();
 }
 
 // script entry point, loading the correct state and displays errors

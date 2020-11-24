@@ -1,3 +1,25 @@
+In interactive stories the choices made should matter. Therefore the text will need to reflect the choices. However, writing a new branch for every combination of choises quickly results in a ridiculous number of pages to write, most of them very similar.
+To cut down on the clutter you can read and write variables. Say the character passes by a grave of a fallen hero, adorned by his sword. The character gets the choice to pick up the sword or leave it be. You can express that like this:
 
+[code text=[choice next=travel text=Take the sword var=weapon=herosword]
+[choice next=travel text=Leave the sword]]
 
-[choice next=headpat text=Done!]
+which renders like
+
+[choice next=travel text=Take the sword var=weapon=herosword]
+[choice next=travel text=Leave the sword]
+
+Eventually the scene with the goblin comes up which you write like so:
+
+Before you stands an ugly vicious goblin, malice in its eyes, ready to devour you.
+
+[code text=[select
+[weapon=herosword]
+You grip your sword tightly, hoping the spirit of the fallen hero lends you some strength and courage because you really need it right now.
+[weapon]
+You grip your [var weapon] tightly, ready to attack.
+[]
+You stand there unarmed and afraid, regretting not having picked up a weapon on the way.
+]]
+
+[choice next=media text=Let's move on to media]
