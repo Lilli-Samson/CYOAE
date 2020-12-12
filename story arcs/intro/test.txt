@@ -1,0 +1,4 @@
+\[test bla=blup\]
+[choice text=Run away next=flee]
+[source]text
+[           test    blablup        ]
