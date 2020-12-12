@@ -8,6 +8,19 @@
 #include <string>
 #include <vector>
 
+static constexpr auto html_intro = R"(<!doctype html>
+<html lang="en">
+<head>
+   <meta charset="utf-8">
+   <title>CYOAE</title>
+   <link rel="stylesheet" type="text/css" href="style.css"/>
+</head>
+<body>
+)";
+static constexpr auto html_outro = R"(</body>
+</html>
+)";
+
 static auto &log_stream = std::cout;
 
 class ParserErrorListener : public antlr4::BaseErrorListener {
@@ -26,12 +39,18 @@ class ParserErrorListener : public antlr4::BaseErrorListener {
 };
 
 class ParseTreeListener : public antlr4::tree::ParseTreeListener {
+	public:
+	ParseTreeListener(std::ostream &out)
+		: output{out} {}
+
+	private:
 	void visitTerminal(antlr4::tree::TerminalNode *node) override {}
 	void visitErrorNode(antlr4::tree::ErrorNode *node) override {}
 	void enterEveryRule(antlr4::ParserRuleContext *ctx) override {}
 	void exitEveryRule(antlr4::ParserRuleContext *ctx) override {
 		if (const auto text = dynamic_cast<cyoaeParser::TextContext *>(ctx)) {
 			log_stream << "Text: [" << text->getText() << "]\n";
+			output << "<a class=\"text\">" << text->getText() << "</a>";
 		} else if (const auto tag = dynamic_cast<cyoaeParser::TagContext *>(ctx)) {
 			log_stream << "Tag: [\n";
 			for (const auto &child : tag->children) {
@@ -47,9 +66,10 @@ class ParseTreeListener : public antlr4::tree::ParseTreeListener {
 			log_stream << "]\n";
 		}
 	}
+	std::ostream &output;
 };
 
-static void compile_scene(std::filesystem::path scene_path) {
+static void compile_scene(std::filesystem::path scene_path, std::ostream &output) {
 	log_stream << "Compiling scene " << scene_path.c_str() << '\n';
 	std::ifstream input_file{scene_path};
 	antlr4::ANTLRInputStream input(input_file);
@@ -58,13 +78,13 @@ static void compile_scene(std::filesystem::path scene_path) {
 	tokens.fill();
 	cyoaeParser parser(&tokens);
 	ParserErrorListener error_listener{scene_path.c_str()};
-	ParseTreeListener parser_listener;
+	ParseTreeListener parser_listener{output};
 	parser.addErrorListener(&error_listener);
 	parser.addParseListener(&parser_listener);
 	parser.start();
 }
 
-static void compile_story(std::filesystem::path story_path) {
+static void compile_story(const std::filesystem::path &story_path, std::filesystem::path output_path = ".") {
 	const auto arcs_path = story_path / "story arcs";
 	try {
 		std::filesystem::directory_iterator{arcs_path};
@@ -73,11 +93,28 @@ static void compile_story(std::filesystem::path story_path) {
 	}
 
 	log_stream << "entering story " << story_path.c_str() << '\n';
+	output_path /= story_path.filename();
 	for (auto &arc_path : std::filesystem::directory_iterator(arcs_path)) {
+		output_path /= arc_path.path().filename();
+		std::filesystem::create_directories(output_path);
 		log_stream << "entering arc " << arc_path.path().c_str() << '\n';
-		for (auto &scene_path : std::filesystem::directory_iterator(arc_path)) {
-			compile_scene(scene_path);
+		for (auto &scene_filepath : std::filesystem::directory_iterator(arc_path)) {
+			const auto extension = scene_filepath.path().extension();
+			if (extension != "txt") {
+				log_stream << "Skipping file " << scene_filepath << " because it's not a .txt file\n";
+			}
+			output_path /= scene_filepath.path().filename();
+			output_path.replace_extension("html");
+			std::ofstream output{output_path};
+			if (not output.is_open()) {
+				throw std::runtime_error{std::string{} + "Failed opening output file" + output_path.c_str()};
+			}
+			output << html_intro;
+			compile_scene(scene_filepath, output);
+			output << html_outro;
+			output_path.remove_filename();
 		}
+		output_path.remove_filename();
 	}
 }
 
