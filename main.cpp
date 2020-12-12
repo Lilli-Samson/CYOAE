@@ -42,17 +42,69 @@ static std::string get_position(antlr4::ParserRuleContext *ctx) {
 	return "unknown";
 }
 
-static void execute_tag(const Tag &tag) {
+static std::string escape_html(std::string_view input);
+
+static std::string html_comment(std::string content) {
+	return "<!--" + content + "-->\n";
+}
+
+static void execute_tag(const Tag &tag, std::ostream &output) {
 	if (tag.name == "img") {
+		std::string_view url;
+		std::string_view alt = "image";
+		if (not tag.value.empty()) {
+			url = tag.value;
+		}
+		for (const auto &[attribute, value] : tag.attributes) {
+			if (attribute == "alt") {
+				alt = value;
+			} else if (attribute == "url") {
+				url = value;
+			} else {
+				output << html_comment("Unknown attribute " + attribute + " in tag " + tag.name);
+			}
+		}
+		if (url.empty()) {
+			output << html_comment("No url specified for img tag");
+			return;
+		}
+		//todo: make the image adapt in size and maybe provide the size
+		output << "<img src=\"" << url << "\" alt=\"" << escape_html(alt) << "\">\n";
 	} else if (tag.name == "src") {
 	} else {
 		warning_stream << "Warning in " << get_position(tag.ctx) << ": ignoring unknown tag " << tag.name << '\n';
+		output << html_comment("Unknown tag " + tag.name);
 	}
 }
 
-static std::string escape_html(std::string input) {
-	//todo
-	return input;
+static std::string escape_html(std::string_view input) {
+	std::string result;
+	result.reserve(input.size());
+	for (char c : input) {
+		switch (c) {
+			case '&':
+				result += "&amp;";
+				break;
+			case '<':
+				result += "&lt;";
+				break;
+			case '>':
+				result += "&gt;";
+				break;
+			case '"':
+				result += "&quot;";
+				break;
+			case '\'':
+				result += "&#39;";
+				break;
+			case '\n':
+				result += "<br>\n";
+				break;
+			default:
+				result += c;
+		}
+	}
+	return result;
 }
 
 class ParserErrorListener : public antlr4::BaseErrorListener {
@@ -104,7 +156,7 @@ class ParseTreeListener : public antlr4::tree::ParseTreeListener {
 				}
 			}
 			info_stream << "]\n";
-			execute_tag(tag_values);
+			execute_tag(tag_values, output);
 		}
 	}
 	std::ostream &output;

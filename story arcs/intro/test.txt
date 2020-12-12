@@ -1,4 +1,3 @@
-\[test bla=blup\]
-[choice text=Run away next=flee]
-[source]text
-[           test    blablup        ]
+test
+test2
+[img https://cdn.discordapp.com/attachments/688748292271636598/787064466453037066/131218936_10220505805687588_913217271984119807_n.png alt=The new world order]
