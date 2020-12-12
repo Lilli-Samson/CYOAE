@@ -13,7 +13,7 @@ static constexpr auto html_intro = R"(<!doctype html>
 <head>
    <meta charset="utf-8">
    <title>CYOAE</title>
-   <link rel="stylesheet" type="text/css" href="style.css"/>
+   <link rel="stylesheet" type="text/css" href="../style.css"/>
 </head>
 <body>
 )";
@@ -44,11 +44,15 @@ static std::string get_position(antlr4::ParserRuleContext *ctx) {
 
 static std::string escape_html(std::string_view input);
 
-static std::string html_comment(std::string content) {
-	return "<!--" + content + "-->\n";
+static std::string html_comment(std::string_view content) {
+	return "<!--" + escape_html(content) + "-->\n";
 }
 
 static void execute_tag(const Tag &tag, std::ostream &output) {
+	auto fail = [&output](std::string_view text) {
+		output << html_comment(text);
+		warning_stream << text << '\n';
+	};
 	if (tag.name == "img") {
 		std::string_view url;
 		std::string_view alt = "image";
@@ -61,19 +65,34 @@ static void execute_tag(const Tag &tag, std::ostream &output) {
 			} else if (attribute == "url") {
 				url = value;
 			} else {
-				output << html_comment("Unknown attribute " + attribute + " in tag " + tag.name);
+				fail("Unknown attribute " + attribute + " in tag " + tag.name);
 			}
 		}
 		if (url.empty()) {
-			output << html_comment("No url specified for img tag");
+			fail("No url specified for img tag");
 			return;
 		}
 		//todo: make the image adapt in size and maybe provide the size
 		output << "<img src=\"" << url << "\" alt=\"" << escape_html(alt) << "\">\n";
-	} else if (tag.name == "src") {
+	} else if (tag.name == "code") {
+		output << "<a class=\"code\">" << escape_html(tag.value) << "</a>\n";
+	} else if (tag.name == "choice") {
+		std::string_view next;
+		std::string_view text;
+		for (const auto &[attribute, value] : tag.attributes) {
+			if (attribute == "next") {
+				next = value;
+			} else if (attribute == "text") {
+				text = value;
+			} else {
+				fail("Unknown attribute " + attribute + " in tag " + tag.name);
+			}
+		}
+		if (next.empty()) {
+		}
+		output << "<a class=\"choice\" href=\"" << next << ".html\">" << escape_html(text) << "</a>\n";
 	} else {
-		warning_stream << "Warning in " << get_position(tag.ctx) << ": ignoring unknown tag " << tag.name << '\n';
-		output << html_comment("Unknown tag " + tag.name);
+		fail("Unknown tag " + tag.name);
 	}
 }
 
@@ -129,7 +148,9 @@ class ParseTreeListener : public antlr4::tree::ParseTreeListener {
 
 	private:
 	void visitTerminal(antlr4::tree::TerminalNode *node) override {}
-	void visitErrorNode(antlr4::tree::ErrorNode *node) override {}
+	void visitErrorNode(antlr4::tree::ErrorNode *node) override {
+		error_stream << node->toStringTree(true);
+	}
 	void enterEveryRule(antlr4::ParserRuleContext *ctx) override {}
 	void exitEveryRule(antlr4::ParserRuleContext *ctx) override {
 		if (const auto text = dynamic_cast<cyoaeParser::TextContext *>(ctx)) {
@@ -193,8 +214,9 @@ static void compile_story(const std::filesystem::path &story_path, std::filesyst
 		info_stream << "entering arc " << arc_path.path().c_str() << '\n';
 		for (auto &scene_filepath : std::filesystem::directory_iterator(arc_path)) {
 			const auto extension = scene_filepath.path().extension();
-			if (extension != "txt") {
+			if (extension != ".txt") {
 				info_stream << "Skipping file " << scene_filepath << " because it's not a .txt file\n";
+				continue;
 			}
 			output_path /= scene_filepath.path().filename();
 			output_path.replace_extension("html");
