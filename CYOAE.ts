@@ -1,5 +1,13 @@
 "use strict";
 
+requirejs.config({
+    baseUrl: 'antlr4',
+});
+
+    //const antlr4 = await require(["antlr4/index"], function(antlr4_index) {});
+    //const parser = await require(["grammar/cyoaeParser"]);
+require(["antlr4/index"]);
+
 let current_arc = "";
 let current_scene = "";
 
@@ -35,7 +43,7 @@ let execute_tag = async function execute_tag(code: string) {
             }
             return result + ">";
         case "choice":
-            assert_correct_attributes(tag, {required: ["next", "text"], optional: ["var"]});
+            assert_correct_attributes(tag, {required: ["next", "text"], optional: ["onselect"]});
             try {
                 await get(attributes.next + ".txt");
                 return `<a class="choice" href="#${current_arc}/${attributes.next}">${attributes.text}</a>`;
@@ -47,9 +55,11 @@ let execute_tag = async function execute_tag(code: string) {
             assert_correct_attributes(tag, {required: [], optional: []});
             return `<hr><h3><a href="story arcs/${current_arc}/${current_scene}.txt">Source</a></h3><p class="source">${escape_html(await get(current_scene + ".txt"))}</p>`;
         case "code":
-            assert_correct_attributes(tag, {required: ["text"], optional: []});
-            console.log(`Code text: ${attributes.text}`);
-            return `<a class="code">${escape_html(attributes.text)}</a>`;
+            assert_correct_attributes(tag, {required: [], optional: ["text"]});
+            if ("text" in attributes && "" in attributes) {
+                throw `Cannot have tag and default text in code tag.\nDefault text:\n${attributes[""]}\nText attribute:\n${attributes.text}`;
+            }
+            return `<a class="code">${escape_html(attributes.text || attributes[""])}</a>`;
     }
     throw `Unknown tag "${tag}"`;
 }
@@ -96,6 +106,20 @@ interface Tag_attribute {
 
 // parses tag parameters
 function parse_attributes(code: string): {[key: string]: string} {
+    if (/\s*[^\s=]+=/.test(code)) {
+        //started out with an attribute
+        return parse_following_attributes(code);
+    }
+    //started out with the default value
+    const split = split_attribute_value(code);
+    let result = split.rest ? parse_following_attributes(split.rest) : {};
+    if (split.value) {
+        result[""] = split.value;
+    }
+    return result;
+}
+
+function parse_following_attributes(code: string): {[key: string]: string} {
     code = code.trimLeft();
     if (code === "") {
         return {};
@@ -106,7 +130,7 @@ function parse_attributes(code: string): {[key: string]: string} {
     }
     attribute = attribute.toLowerCase();
     const split = split_attribute_value(rest);
-    let result = parse_attributes(split.rest);
+    let result = parse_following_attributes(split.rest);
     if (attribute in result) {
         throw `Found duplicate attribute "${attribute}"`;
     }
@@ -313,6 +337,8 @@ async function run_tests() {
         }
         test("[choice next=travel text=Leave the sword]", "choice next=travel text=Leave the sword");
         test("[code text=[choice next=travel text=Leave the sword]]", "code text=[choice next=travel text=Leave the sword]");
+        test("[code bla test 42]", "code bla test 42");
+        test("[code [inner tag=valid]]", "code [inner tag=valid]");
         execute_tag = old_execute_tag;
     }
     await parse_source_text_test();
