@@ -86,8 +86,8 @@ static const Tag_replacement replacements[] = {
 		.tag_name = "choice",
 		.attributes =
 			{
-				{.name = "text", .replacement = "{text}"},
 				{.name = "next", .replacement = " href=\"{next}.html\">"},
+				{.name = "text", .replacement = "{text}"},
 			},
 		.intro = "<a class=\"choice\"",
 		.outro = "</a>\n",
