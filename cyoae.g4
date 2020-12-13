@@ -1,6 +1,6 @@
 grammar cyoae;
 
-start: (text | tag)*;
+start: (text | tag)* EOF;
 text: (escaped_text | WORD | WS | '=')+;
 tag: '[' WS? tag_name  WS? value? WS? (attribute '=' value WS?)* ']';
 tag_name: WORD;

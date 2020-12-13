@@ -49,7 +49,7 @@ static std::string html_comment(std::string_view content) {
 }
 
 struct Attribute_replacement {
-	std::string_view attribute;
+	std::string_view name;
 	std::string_view replacement;
 	std::string_view default_value = "";
 	bool html_escape = true;
@@ -57,7 +57,6 @@ struct Attribute_replacement {
 
 struct Tag_replacement {
 	std::string_view tag_name;
-	std::string_view default_attribute;
 	std::vector<Attribute_replacement> attributes;
 	std::string_view intro;
 	std::string_view outro;
@@ -66,32 +65,29 @@ struct Tag_replacement {
 static const Tag_replacement replacements[] = {
 	{
 		.tag_name = "img",
-		.default_attribute = "url",
 		.attributes =
 			{
-				{.attribute = "url", .replacement = " src=\"{url}\""},
-				{.attribute = "alt", .replacement = " alt=\"{alt}\"", .default_value = "image"},
+				{.name = "url", .replacement = " src=\"{url}\""},
+				{.name = "alt", .replacement = " alt=\"{alt}\"", .default_value = "image"},
 			},
 		.intro = "<img",
 		.outro = "/>\n",
 	},
 	{
 		.tag_name = "code",
-		.default_attribute = "text",
 		.attributes =
 			{
-				{.attribute = "text", .replacement = "{text}"},
+				{.name = "text", .replacement = "{text}"},
 			},
 		.intro = "<a class=\"code\">",
 		.outro = "</a>\n",
 	},
 	{
 		.tag_name = "choice",
-		.default_attribute = "",
 		.attributes =
 			{
-				{.attribute = "next", .replacement = " href=\"{next}.html\">"},
-				{.attribute = "text", .replacement = "{text}"},
+				{.name = "text", .replacement = "{text}"},
+				{.name = "next", .replacement = " href=\"{next}.html\">"},
 			},
 		.intro = "<a class=\"choice\"",
 		.outro = "</a>\n",
@@ -127,7 +123,7 @@ static void execute_tag(Tag tag, std::ostream &output) {
 		//Todo: check if all required attributes are there
 		//Todo: check if there are no duplicate attributes
 		if (not tag.value.empty()) {
-			tag.attributes.push_back({std::string{} + replacement.default_attribute, tag.value});
+			tag.attributes.push_back({std::string{} + replacement.attributes.front().name, tag.value});
 		}
 		std::string tag_replacement;
 		tag_replacement += replacement.intro;
@@ -135,12 +131,12 @@ static void execute_tag(Tag tag, std::ostream &output) {
 		for (const auto &attribute_replacement : replacement.attributes) {
 			const auto attribute_value_pos =
 				std::find_if(std::begin(tag.attributes), std::end(tag.attributes),
-							 [&attribute_replacement](const Attribute &attribute) { return attribute.name == attribute_replacement.attribute; });
+							 [&attribute_replacement](const Attribute &attribute) { return attribute.name == attribute_replacement.name; });
 			if (attribute_value_pos == std::end(tag.attributes)) {
-				return fail(std::string{} + "Missing attribute " + attribute_replacement.attribute + " in tag " + tag.name);
+				return fail(std::string{} + "Missing attribute " + attribute_replacement.name + " in tag " + tag.name);
 			}
 			tag_replacement +=
-				replace_text(std::string{} + attribute_replacement.replacement, "{" + attribute_replacement.attribute + "}", attribute_value_pos->value);
+				replace_text(std::string{} + attribute_replacement.replacement, "{" + attribute_replacement.name + "}", attribute_value_pos->value);
 		}
 
 		tag_replacement += replacement.outro;
@@ -292,7 +288,7 @@ int main(int argc, const char *argv[]) {
 		} catch (const std::exception &error) {
 			std::cout << "Failed compiling story in current directory. Pass the story directory as an argument. It should contain a \"story arcs\" directory. "
 						 "Reason: "
-					  << error.what();
+					  << error.what() << '\n';
 		}
 	} else {
 		for (int i = 1; i < argc; i++) {
