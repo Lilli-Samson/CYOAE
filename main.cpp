@@ -48,52 +48,106 @@ static std::string html_comment(std::string_view content) {
 	return "<!--" + escape_html(content) + "-->\n";
 }
 
-static void execute_tag(const Tag &tag, std::ostream &output) {
+struct Attribute_replacement {
+	std::string_view attribute;
+	std::string_view replacement;
+	std::string_view default_value = "";
+	bool html_escape = true;
+};
+
+struct Tag_replacement {
+	std::string_view tag_name;
+	std::string_view default_attribute;
+	std::vector<Attribute_replacement> attributes;
+	std::string_view intro;
+	std::string_view outro;
+};
+
+static const Tag_replacement replacements[] = {
+	{
+		.tag_name = "img",
+		.default_attribute = "url",
+		.attributes =
+			{
+				{.attribute = "url", .replacement = " src=\"{url}\""},
+				{.attribute = "alt", .replacement = " alt=\"{alt}\"", .default_value = "image"},
+			},
+		.intro = "<img",
+		.outro = "/>\n",
+	},
+	{
+		.tag_name = "code",
+		.default_attribute = "text",
+		.attributes =
+			{
+				{.attribute = "text", .replacement = "{text}"},
+			},
+		.intro = "<a class=\"code\">",
+		.outro = "</a>\n",
+	},
+	{
+		.tag_name = "choice",
+		.default_attribute = "",
+		.attributes =
+			{
+				{.attribute = "next", .replacement = " href=\"{next}.html\">"},
+				{.attribute = "text", .replacement = "{text}"},
+			},
+		.intro = "<a class=\"choice\"",
+		.outro = "</a>\n",
+	},
+};
+
+static std::string operator+(std::string s, std::string_view sv) {
+	s += sv;
+	return s;
+}
+
+static std::string replace_text(std::string fulltext, std::string_view searchtext, std::string_view replacement) {
+	if (searchtext.empty())
+		return fulltext;
+	size_t start_pos = 0;
+	while ((start_pos = fulltext.find(searchtext, start_pos)) != std::string::npos) {
+		fulltext.replace(start_pos, searchtext.length(), replacement);
+		start_pos += replacement.length();
+	}
+	return fulltext;
+}
+
+static void execute_tag(Tag tag, std::ostream &output) {
 	auto fail = [&output](std::string_view text) {
 		output << html_comment(text);
 		warning_stream << text << '\n';
 	};
-	if (tag.name == "img") {
-		std::string_view url;
-		std::string_view alt = "image";
+
+	for (const auto &replacement : replacements) {
+		if (replacement.tag_name != tag.name) {
+			continue;
+		}
+		//Todo: check if all required attributes are there
+		//Todo: check if there are no duplicate attributes
 		if (not tag.value.empty()) {
-			url = tag.value;
+			tag.attributes.push_back({std::string{} + replacement.default_attribute, tag.value});
 		}
-		for (const auto &[attribute, value] : tag.attributes) {
-			if (attribute == "alt") {
-				alt = value;
-			} else if (attribute == "url") {
-				url = value;
-			} else {
-				fail("Unknown attribute " + attribute + " in tag " + tag.name);
+		std::string tag_replacement;
+		tag_replacement += replacement.intro;
+
+		for (const auto &attribute_replacement : replacement.attributes) {
+			const auto attribute_value_pos =
+				std::find_if(std::begin(tag.attributes), std::end(tag.attributes),
+							 [&attribute_replacement](const Attribute &attribute) { return attribute.name == attribute_replacement.attribute; });
+			if (attribute_value_pos == std::end(tag.attributes)) {
+				return fail(std::string{} + "Missing attribute " + attribute_replacement.attribute + " in tag " + tag.name);
 			}
+			tag_replacement +=
+				replace_text(std::string{} + attribute_replacement.replacement, "{" + attribute_replacement.attribute + "}", attribute_value_pos->value);
 		}
-		if (url.empty()) {
-			fail("No url specified for img tag");
-			return;
-		}
-		//todo: make the image adapt in size and maybe provide the size
-		output << "<img src=\"" << url << "\" alt=\"" << escape_html(alt) << "\">\n";
-	} else if (tag.name == "code") {
-		output << "<a class=\"code\">" << escape_html(tag.value) << "</a>\n";
-	} else if (tag.name == "choice") {
-		std::string_view next;
-		std::string_view text;
-		for (const auto &[attribute, value] : tag.attributes) {
-			if (attribute == "next") {
-				next = value;
-			} else if (attribute == "text") {
-				text = value;
-			} else {
-				fail("Unknown attribute " + attribute + " in tag " + tag.name);
-			}
-		}
-		if (next.empty()) {
-		}
-		output << "<a class=\"choice\" href=\"" << next << ".html\">" << escape_html(text) << "</a>\n";
-	} else {
-		fail("Unknown tag " + tag.name);
+
+		tag_replacement += replacement.outro;
+		output << tag_replacement;
+		return;
 	}
+	return fail("Unknown tag " + tag.name);
 }
 
 static std::string escape_html(std::string_view input) {
@@ -148,9 +202,7 @@ class ParseTreeListener : public antlr4::tree::ParseTreeListener {
 
 	private:
 	void visitTerminal(antlr4::tree::TerminalNode *node) override {}
-	void visitErrorNode(antlr4::tree::ErrorNode *node) override {
-		error_stream << node->toStringTree(true);
-	}
+	void visitErrorNode(antlr4::tree::ErrorNode *node) override {}
 	void enterEveryRule(antlr4::ParserRuleContext *ctx) override {}
 	void exitEveryRule(antlr4::ParserRuleContext *ctx) override {
 		if (const auto text = dynamic_cast<cyoaeParser::TextContext *>(ctx)) {
