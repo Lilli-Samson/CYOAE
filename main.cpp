@@ -37,7 +37,7 @@ struct Tag {
 	std::vector<Attribute> attributes;
 };
 
-static std::string get_position(antlr4::ParserRuleContext *ctx) {
+[[maybe_unused]] static std::string get_position([[maybe_unused]] antlr4::ParserRuleContext *ctx) {
 	//todo
 	return "unknown";
 }
@@ -182,8 +182,8 @@ class ParserErrorListener : public antlr4::BaseErrorListener {
 		: filename{filename} {}
 
 	private:
-	void syntaxError(antlr4::Recognizer *recognizer, antlr4::Token *offendingSymbol, size_t line, size_t charPositionInLine, const std::string &msg,
-					 std::exception_ptr e) override {
+	void syntaxError([[maybe_unused]] antlr4::Recognizer *recognizer, [[maybe_unused]] antlr4::Token *offendingSymbol, size_t line, size_t charPositionInLine,
+					 const std::string &msg, std::exception_ptr e) override {
 		std::ostringstream oss;
 		oss << "In " << filename << " line " << line << " character " << charPositionInLine << ": Error " << msg;
 		throw std::runtime_error(oss.str());
@@ -197,9 +197,9 @@ class ParseTreeListener : public antlr4::tree::ParseTreeListener {
 		: output{out} {}
 
 	private:
-	void visitTerminal(antlr4::tree::TerminalNode *node) override {}
-	void visitErrorNode(antlr4::tree::ErrorNode *node) override {}
-	void enterEveryRule(antlr4::ParserRuleContext *ctx) override {}
+	void visitTerminal([[maybe_unused]] antlr4::tree::TerminalNode *node) override {}
+	void visitErrorNode([[maybe_unused]] antlr4::tree::ErrorNode *node) override {}
+	void enterEveryRule([[maybe_unused]] antlr4::ParserRuleContext *ctx) override {}
 	void exitEveryRule(antlr4::ParserRuleContext *ctx) override {
 		if (const auto text = dynamic_cast<cyoaeParser::TextContext *>(ctx)) {
 			info_stream << "Text: [" << text->getText() << "]\n";
