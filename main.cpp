@@ -21,9 +21,12 @@ static constexpr auto html_outro = R"(</body>
 </html>
 )";
 
+static constexpr auto source_template = "<hr><h3><a href=\"{current_scene}.txt\">Source</a></h3><p class=\"source\">{source}</p>\n";
+
 static auto &info_stream = std::clog;
 static auto &warning_stream = std::cout;
-static auto &error_stream = std::cerr;
+[[maybe_unused]] static auto &error_stream = std::cerr;
+static std::filesystem::path current_scene_path;
 
 struct Attribute {
 	std::string name;
@@ -43,6 +46,7 @@ struct Tag {
 }
 
 static std::string escape_html(std::string_view input);
+static std::string replace_text(std::string fulltext, std::string_view searchtext, std::string_view replacement);
 
 static std::string html_comment(std::string_view content) {
 	return "<!--" + escape_html(content) + "-->\n";
@@ -60,6 +64,7 @@ struct Tag_replacement {
 	std::vector<Attribute_replacement> attributes;
 	std::string_view intro;
 	std::string_view outro;
+	std::function<std::string(const Tag &)> generator;
 };
 
 static const Tag_replacement replacements[] = {
@@ -91,6 +96,15 @@ static const Tag_replacement replacements[] = {
 			},
 		.intro = "<a class=\"choice\"",
 		.outro = "</a>\n",
+	},
+	{
+		.tag_name = "source",
+		.generator =
+			[](const Tag &) {
+				std::ifstream source{current_scene_path};
+				return replace_text(source_template, "{source}",
+									escape_html(std::string{std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()}));
+			},
 	},
 };
 
@@ -125,8 +139,8 @@ static void execute_tag(Tag tag, std::ostream &output) {
 		if (not tag.value.empty()) {
 			tag.attributes.push_back({std::string{} + replacement.attributes.front().name, tag.value});
 		}
-		std::string tag_replacement;
-		tag_replacement += replacement.intro;
+		std::string tag_replacement_text;
+		tag_replacement_text += replacement.intro;
 
 		for (const auto &attribute_replacement : replacement.attributes) {
 			const auto attribute_value_pos =
@@ -135,12 +149,14 @@ static void execute_tag(Tag tag, std::ostream &output) {
 			if (attribute_value_pos == std::end(tag.attributes)) {
 				return fail(std::string{} + "Missing attribute " + attribute_replacement.name + " in tag " + tag.name);
 			}
-			tag_replacement +=
+			tag_replacement_text +=
 				replace_text(std::string{} + attribute_replacement.replacement, "{" + attribute_replacement.name + "}", attribute_value_pos->value);
 		}
-
-		tag_replacement += replacement.outro;
-		output << tag_replacement;
+		if (replacement.generator) {
+			tag_replacement_text += replacement.generator(tag);
+		}
+		tag_replacement_text += replacement.outro;
+		output << tag_replacement_text;
 		return;
 	}
 	return fail("Unknown tag " + tag.name);
@@ -233,6 +249,7 @@ class ParseTreeListener : public antlr4::tree::ParseTreeListener {
 
 static void compile_scene(std::filesystem::path scene_path, std::ostream &output) {
 	info_stream << "Compiling scene " << scene_path.c_str() << '\n';
+	current_scene_path = scene_path;
 	std::ifstream input_file{scene_path};
 	antlr4::ANTLRInputStream input(input_file);
 	cyoaeLexer lexer(&input);
