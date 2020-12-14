@@ -192,9 +192,26 @@ static std::string escape_html(std::string_view input) {
 	return result;
 }
 
-class ParserErrorListener : public antlr4::BaseErrorListener {
+static std::string &remove_escapes(std::string &text) {
+	char *out = text.data();
+	for (char *in = text.data(); in - text.data() < text.size(); in++, out++) {
+		if (*in == '\\') {
+			in++;
+		}
+		*out = *in;
+	}
+	text.resize(out - text.data());
+	return text;
+}
+
+static std::string remove_escapes(std::string &&text) {
+	remove_escapes(text);
+	return std::move(text);
+}
+
+class Error_listener : public antlr4::BaseErrorListener {
 	public:
-	ParserErrorListener(const char *filename)
+	Error_listener(const char *filename)
 		: filename{filename} {}
 
 	private:
@@ -219,9 +236,9 @@ class ParseTreeListener : public antlr4::tree::ParseTreeListener {
 	void exitEveryRule(antlr4::ParserRuleContext *ctx) override {
 		if (const auto text = dynamic_cast<cyoaeParser::TextContext *>(ctx)) {
 			info_stream << "Text: [" << text->getText() << "]\n";
-			output << "<a class=\"text\">" << escape_html(text->getText()) << "</a>\n";
+			output << "<a class=\"text\">" << remove_escapes(escape_html(text->getText())) << "</a>\n";
 		} else if (const auto tag = dynamic_cast<cyoaeParser::TagContext *>(ctx)) {
-			Tag tag_values{ctx};
+			Tag tag_values{ctx, {}, {}, {}};
 			info_stream << "Tag: [\n";
 			for (const auto &child : tag->children) {
 				if (const auto tag_name = dynamic_cast<cyoaeParser::Tag_nameContext *>(child)) {
@@ -232,11 +249,11 @@ class ParseTreeListener : public antlr4::tree::ParseTreeListener {
 					tag_values.attributes.push_back({attribute->getText(), {}});
 
 				} else if (const auto value = dynamic_cast<cyoaeParser::ValueContext *>(child)) {
-					info_stream << "\tvalue: " << value->getText() << '\n';
+					info_stream << "\tvalue: " << remove_escapes(value->getText()) << '\n';
 					if (tag_values.attributes.empty()) {
-						tag_values.value = value->getText();
+						tag_values.value = remove_escapes(value->getText());
 					} else {
-						tag_values.attributes.back().value = value->getText();
+						tag_values.attributes.back().value = remove_escapes(value->getText());
 					}
 				}
 			}
@@ -253,10 +270,11 @@ static void compile_scene(std::filesystem::path scene_path, std::ostream &output
 	std::ifstream input_file{scene_path};
 	antlr4::ANTLRInputStream input(input_file);
 	cyoaeLexer lexer(&input);
+	Error_listener error_listener{scene_path.c_str()};
+	lexer.addErrorListener(&error_listener);
 	antlr4::CommonTokenStream tokens(&lexer);
 	tokens.fill();
 	cyoaeParser parser(&tokens);
-	ParserErrorListener error_listener{scene_path.c_str()};
 	ParseTreeListener parser_listener{output};
 	parser.addErrorListener(&error_listener);
 	parser.addParseListener(&parser_listener);
