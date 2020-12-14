@@ -149,8 +149,8 @@ static void execute_tag(Tag tag, std::ostream &output) {
 			if (attribute_value_pos == std::end(tag.attributes)) {
 				return fail(std::string{} + "Missing attribute " + attribute_replacement.name + " in tag " + tag.name);
 			}
-			tag_replacement_text +=
-				replace_text(std::string{} + attribute_replacement.replacement, "{" + attribute_replacement.name + "}", attribute_value_pos->value);
+			tag_replacement_text += replace_text(std::string{} + attribute_replacement.replacement, "{" + attribute_replacement.name + "}",
+												 escape_html(attribute_value_pos->value));
 		}
 		if (replacement.generator) {
 			tag_replacement_text += replacement.generator(tag);
