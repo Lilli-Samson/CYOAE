@@ -47,9 +47,10 @@ struct Tag {
 
 static std::string escape_html(std::string_view input);
 static std::string replace_text(std::string fulltext, std::string_view searchtext, std::string_view replacement);
+static std::string operator+(std::string s, std::string_view sv);
 
 static std::string html_comment(std::string_view content) {
-	return "<!--" + escape_html(content) + "-->\n";
+	return "<!--" + replace_text(std::string{} + content, "-->", "~~>") + "-->\n";
 }
 
 struct Attribute_replacement {
@@ -134,7 +135,6 @@ static void execute_tag(Tag tag, std::ostream &output) {
 		if (replacement.tag_name != tag.name) {
 			continue;
 		}
-		//Todo: check if all required attributes are there
 		//Todo: check if there are no duplicate attributes
 		if (not tag.value.empty()) {
 			tag.attributes.push_back({std::string{} + replacement.attributes.front().name, tag.value});
@@ -151,12 +151,16 @@ static void execute_tag(Tag tag, std::ostream &output) {
 			}
 			tag_replacement_text += replace_text(std::string{} + attribute_replacement.replacement, "{" + attribute_replacement.name + "}",
 												 escape_html(attribute_value_pos->value));
+			tag.attributes.erase(attribute_value_pos);
 		}
 		if (replacement.generator) {
 			tag_replacement_text += replacement.generator(tag);
 		}
 		tag_replacement_text += replacement.outro;
 		output << tag_replacement_text;
+		for (const auto &leftover_attribute : tag.attributes) {
+			fail("Unknown attribute \"" + leftover_attribute.name + "\" in tag \"" + tag.name + "\"");
+		}
 		return;
 	}
 	return fail("Unknown tag " + tag.name);
@@ -321,16 +325,14 @@ int main(int argc, const char *argv[]) {
 		try {
 			compile_story(".");
 		} catch (const std::exception &error) {
-			std::cout << "Failed compiling story in current directory. Pass the story directory as an argument. It should contain a \"story arcs\" directory. "
-						 "Reason: "
-					  << error.what() << '\n';
+			std::cout << "Failed compiling story in current directory because " << error.what() << '\n';
 		}
 	} else {
 		for (int i = 1; i < argc; i++) {
 			try {
 				compile_story(argv[i]);
 			} catch (const std::exception &error) {
-				std::cout << "Failed compiling story in " << std::filesystem::absolute(argv[i]) << ".\nReason: " << error.what() << '\n';
+				std::cout << "Failed compiling story in " << std::filesystem::absolute(argv[i]) << " because " << error.what() << '\n';
 			}
 		}
 	}
