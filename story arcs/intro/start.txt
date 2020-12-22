@@ -1,19 +1,29 @@
-]This is a demo to test the functionality of CYOAE which stands for Choose Your Own Adventure Engine. The basic idea is that you write descriptions after which the reader gets to make a choice, thus creating an interactive story. This engine is focused on writers, not programmers, trying to make it easy to focus on the story.
+In interactive stories the choices made should matter. Therefore the text will need to reflect the choices. However, writing a new branch for every combination of choises quickly results in a ridiculous number of pages to write, most of them very similar.
+To cut down on the clutter you can read and write variables. Say the character passes by a grave of a fallen hero, adorned by his sword. The character gets the choice to pick up the sword or leave it be. You can express that like this:
 
-The stories (and this page) are based on text files, one per page. You can see the source text of this page below. As you can see, you can just type text and it appears. Amazing!
-You don't need to worry about HTML tags like <a href="github.com"> to accidentally screw up your text. Everything is automatically escaped, except the special characters "\[", "\]" and "\\". If you want to just type one of those, prefix them with a "\\" and they appear as regular text.
+[code \[choice next\=travel text\=Take the sword onselect\=set(weapon, "herosword")\]
+\[choice next\=travel text\=Leave the sword\]]
 
-The most basic and arguably most important functionality is adding choices. The syntax is \[choice next=goblin smash text=I smash the goblin\] which appears like so:
-[choice next=goblin smash text=I smash the goblin]
-Currently it's a dead end because goblin smash.txt doesn't exist, but you can add it and the choice will become active.
+which renders like this:
 
-What do you think so far?
+[choice next=travel text=Take the sword onselect=set(weapon, "herosword")]
+[choice next=travel text=Leave the sword]
 
-[choice next=variables text=Looks reasonable. Show me how you handle variables next.]
-[choice next=media text=Looks pretty plain. How do you add media?]
-[choice next=text_styling text=Looks very plain. Can you style the text?]
-[choice next=error_handling text=What happens when I make a mistake with the tags?]
-[choice next=final text=I'm not convinced it's worth getting into. Show me what you can do.]
-[choice next=start text=How do I get started writing my own story?]
+Eventually the scene with the goblin comes up which you write like so:
 
-[source]
+Before you stands an ugly vicious goblin, malice in its eyes, ready to devour you.
+
+[code \[select
+\[weapon\="herosword"\]
+You grip your sword tightly, hoping the spirit of the fallen hero lends you some strength and courage because you really need it right now.
+\[weapon\]
+You grip your \[exec\=print(weapon)\] tightly, ready to attack.
+\[\]
+You stand there unarmed and afraid, regretting not having picked up a weapon on the way.
+\]]
+
+Let's go through the text line by line. First there is the [code select] tag which means one of the specified options will be selected. Following that are the conditions when to select the option and the result of the option. The first condition is [code text=set(weapon, "herosword")]. That means this option can activate when the variable [code text=weapon] is set to value [code "herosword"]. Following that is what will appear in case this option is selected, a description in which the sword is used.
+Next is another option that can trigger when the variable [code weapon] is set. This allows you to write appropriate text for whatever other weapon the character happens to have picked up.
+Lastly there is an option without any conditions. The way that [code select] will choose its options to first discard all options where the conditions are not met. Then the resulting options are ranked by the number of conditions. Assuming the character picked up the hero sword, all 3 options have their condition met.
+
+[choice next=media text=Let's move on to media]

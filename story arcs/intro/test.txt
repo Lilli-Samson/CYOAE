@@ -1,3 +1,30 @@
-test
-test2
-[img https://cdn.discordapp.com/attachments/688748292271636598/787064466453037066/131218936_10220505805687588_913217271984119807_n.png alt=The new world order]
+In interactive stories the choices made should matter. Therefore the text will need to reflect the choices. However, writing a new branch for every combination of choises quickly results in a ridiculous number of pages to write, most of them very similar.
+To cut down on the clutter you can read and write variables. Say the character passes by a grave of a fallen hero, adorned by his sword. The character gets the choice to pick up the sword or leave it be. You can express that like this:
+
+[code \[choice next\=travel text\=Take the sword onselect\=set(weapon, "herosword")\]
+\[choice next\=travel text\=Leave the sword\]]
+
+which renders like this:
+
+[choice next=travel text=Take the sword onselect=set(weapon, "herosword")]
+[choice next=travel text=Leave the sword]
+
+Eventually a scene with a goblin comes up which you write like so:
+
+Before you stands an ugly vicious goblin, malice in its eyes, ready to devour you.
+
+[code \[select
+\[conditions\=equals(weapon, "herosword")
+text\=You grip your sword tightly, hoping the spirit of the fallen hero lends you some 	strength and courage because you really need it right now.\]
+\[conditions weapon
+text\=You grip your \[exec\=print(weapon)\] tightly, ready to attack.\]
+\[conditions
+text\=You stand there unarmed and afraid, regretting not having picked up a weapon on the way.\]
+\]]
+
+Let's go through the text line by line. First there is the [code select] tag which means one of the specified options will be selected. Following that are the conditions when to select the option and the result of the option. The first condition is [code weapon\="herosword"]. That means this option can activate when the variable [code text=weapon] is set to value [code "herosword"]. Following that is what will appear in case this option is selected, a description in which the sword is used.
+Next is another option that can trigger when the variable [code weapon] is set. This allows you to write appropriate text for whatever other weapon the character happens to have picked up.
+Lastly there is an option without any conditions. The way that [code select] chooses its options is to first discard all options where the conditions are not met. Then the resulting options are ranked by the number of conditions. Assuming the character picked up the hero sword, all 3 options have their condition met, but the first condition is the most specific, so that will be shown. Should there be a tie, one of the lines is chosen randomly.
+This may seem complicated at first, but it's much easier than an if/else chain to cover all the combinations of items and you will soon be able to think of a specific line for a specific situation and simply add it in the appropriate place.
+
+[choice next=media text=Let's move on to media]
