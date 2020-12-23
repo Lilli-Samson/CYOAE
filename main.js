@@ -37,146 +37,9 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 var antlr4 = require("antlr4/index");
-var parser = require("grammar/cyoaeParser");
+var parser = require("cyoaeParser");
 var current_arc = "";
 var current_scene = "";
-// executes [] tags
-var execute_tag = function execute_tag(code) {
-    return __awaiter(this, void 0, void 0, function () {
-        function assert_correct_attributes(tag, valid_attributes) {
-            for (var _i = 0, _a = Object.keys(attributes); _i < _a.length; _i++) {
-                var attribute = _a[_i];
-                if (!new Set(valid_attributes.required).has(attribute) && !new Set(valid_attributes.optional).has(attribute)) {
-                    throw "Invalid attribute \"" + attribute + "\" in tag \"" + tag + "\"";
-                }
-            }
-            for (var _b = 0, _c = valid_attributes.required; _b < _c.length; _b++) {
-                var required = _c[_b];
-                if (!(required in attributes)) {
-                    throw "Missing required attribute \"" + required + "\" in tag \"" + tag + "\"";
-                }
-            }
-        }
-        var _a, tag, params, attributes, result, _b, _i, _c, attribute, value, err_1, _d, _e;
-        return __generator(this, function (_f) {
-            switch (_f.label) {
-                case 0:
-                    _a = code.match(/\s*(\S+)(?:\s+(.*))?/s) || [], tag = _a[1], params = _a[2];
-                    attributes = parse_attributes(params || "");
-                    result = "";
-                    _b = tag.toLowerCase();
-                    switch (_b) {
-                        case "img": return [3 /*break*/, 1];
-                        case "image": return [3 /*break*/, 1];
-                        case "choice": return [3 /*break*/, 2];
-                        case "source": return [3 /*break*/, 6];
-                        case "code": return [3 /*break*/, 8];
-                    }
-                    return [3 /*break*/, 9];
-                case 1:
-                    assert_correct_attributes(tag, { required: ["url"], optional: [] });
-                    result += "<img";
-                    for (_i = 0, _c = Object.keys(attributes); _i < _c.length; _i++) {
-                        attribute = _c[_i];
-                        value = attributes[attribute];
-                        switch (attribute) {
-                            case "url":
-                                result += " src=\"" + value + "\"";
-                                break;
-                        }
-                    }
-                    return [2 /*return*/, result + ">"];
-                case 2:
-                    assert_correct_attributes(tag, { required: ["next", "text"], optional: ["onselect"] });
-                    _f.label = 3;
-                case 3:
-                    _f.trys.push([3, 5, , 6]);
-                    return [4 /*yield*/, get(attributes.next + ".txt")];
-                case 4:
-                    _f.sent();
-                    return [2 /*return*/, "<a class=\"choice\" href=\"#" + current_arc + "/" + attributes.next + "\">" + attributes.text + "</a>"];
-                case 5:
-                    err_1 = _f.sent();
-                    return [2 /*return*/, "<a class=\"dead_choice\" title=\"Failed loading " + current_arc + "/" + attributes.next + "\n" + err_1 + "\">" + attributes.text + "</a>"];
-                case 6:
-                    assert_correct_attributes(tag, { required: [], optional: [] });
-                    _d = "<hr><h3><a href=\"story arcs/" + current_arc + "/" + current_scene + ".txt\">Source</a></h3><p class=\"source\">";
-                    _e = escape_html;
-                    return [4 /*yield*/, get(current_scene + ".txt")];
-                case 7: return [2 /*return*/, _d + _e.apply(void 0, [_f.sent()]) + "</p>"];
-                case 8:
-                    assert_correct_attributes(tag, { required: [], optional: ["text"] });
-                    if ("text" in attributes && "" in attributes) {
-                        throw "Cannot have tag and default text in code tag.\nDefault text:\n" + attributes[""] + "\nText attribute:\n" + attributes.text;
-                    }
-                    return [2 /*return*/, "<a class=\"code\">" + escape_html(attributes.text || attributes[""]) + "</a>"];
-                case 9: throw "Unknown tag \"" + tag + "\"";
-            }
-        });
-    });
-};
-// parses attribute values, returning the value and the rest
-function split_attribute_value(code) {
-    var depth = 0;
-    var value = "";
-    for (var _i = 0, code_1 = code; _i < code_1.length; _i++) {
-        var character = code_1[_i];
-        switch (character) {
-            case "[":
-                depth++;
-                break;
-            case "]":
-                if (depth === 0) {
-                    throw "found unescaped \"]\" in attribute value";
-                }
-                depth--;
-                break;
-            case "=":
-                if (depth === 0) {
-                    var match = value.match(/^(.*)\s\S+$/s) || [];
-                    if (match.length !== 0) {
-                        //found the next attribute
-                        return { value: match[1], rest: code.slice(match[1].length + 1) };
-                    }
-                }
-                break;
-        }
-        value += character;
-    }
-    return { value: value, rest: "" };
-}
-// parses tag parameters
-function parse_attributes(code) {
-    if (/\s*[^\s=]+=/.test(code)) {
-        //started out with an attribute
-        return parse_following_attributes(code);
-    }
-    //started out with the default value
-    var split = split_attribute_value(code);
-    var result = split.rest ? parse_following_attributes(split.rest) : {};
-    if (split.value) {
-        result[""] = split.value;
-    }
-    return result;
-}
-function parse_following_attributes(code) {
-    code = code.trimLeft();
-    if (code === "") {
-        return {};
-    }
-    var _a = code.match(/([^\s=]+)=(.*)/s) || [], attribute = _a[1], rest = _a[2];
-    if (!attribute) {
-        throw "Failed finding attribute name of the form \"attribute=value\"";
-    }
-    attribute = attribute.toLowerCase();
-    var split = split_attribute_value(rest);
-    var result = parse_following_attributes(split.rest);
-    if (attribute in result) {
-        throw "Found duplicate attribute \"" + attribute + "\"";
-    }
-    result[attribute] = split.value;
-    return result;
-}
 // plays through a story arc
 function play_arc(name) {
     return __awaiter(this, void 0, void 0, function () {
@@ -189,27 +52,23 @@ function play_arc(name) {
 // display a scene based on a source .txt file and the current arc
 function update_current_scene() {
     return __awaiter(this, void 0, void 0, function () {
-        var data, _a, err_2;
-        return __generator(this, function (_b) {
-            switch (_b.label) {
+        var data, err_1;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
                 case 0:
                     console.log("updating scene to " + current_arc + "/" + current_scene);
-                    _b.label = 1;
+                    _a.label = 1;
                 case 1:
-                    _b.trys.push([1, 4, , 5]);
+                    _a.trys.push([1, 3, , 4]);
                     return [4 /*yield*/, get(current_scene + ".txt")];
                 case 2:
-                    data = _b.sent();
-                    _a = document.body;
-                    return [4 /*yield*/, parse_source_text(data, current_scene + ".txt")];
+                    data = _a.sent();
+                    return [3 /*break*/, 4];
                 case 3:
-                    _a.innerHTML = _b.sent();
-                    return [3 /*break*/, 5];
-                case 4:
-                    err_2 = _b.sent();
-                    display_error_document("" + err_2);
-                    return [3 /*break*/, 5];
-                case 5: return [2 /*return*/];
+                    err_1 = _a.sent();
+                    display_error_document("" + err_1);
+                    return [3 /*break*/, 4];
+                case 4: return [2 /*return*/];
             }
         });
     });
@@ -243,7 +102,7 @@ function escape_html(str) {
 // downloads a local resource given its path/filename
 function get(url) {
     return __awaiter(this, void 0, void 0, function () {
-        var current_url, filepath, request, err_3;
+        var current_url, filepath, request, err_2;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
@@ -260,103 +119,9 @@ function get(url) {
                 case 3: return [2 /*return*/, _a.sent()];
                 case 4: throw request.statusText;
                 case 5:
-                    err_3 = _a.sent();
-                    throw "Failed loading resource " + filepath + ": " + err_3;
+                    err_2 = _a.sent();
+                    throw "Failed loading resource " + filepath + ": " + err_2;
                 case 6: return [2 /*return*/];
-            }
-        });
-    });
-}
-// parses source text files
-function parse_source_text(source, source_name) {
-    return __awaiter(this, void 0, void 0, function () {
-        function get_source_text(line) {
-            return "In " + source_name + " line " + line + ":";
-        }
-        var line, current_text, tag_depth, result, currently_escaping, _i, source_1, character, _a, err_4;
-        return __generator(this, function (_b) {
-            switch (_b.label) {
-                case 0:
-                    line = 1;
-                    current_text = "";
-                    tag_depth = 0;
-                    result = "";
-                    currently_escaping = false;
-                    _i = 0, source_1 = source;
-                    _b.label = 1;
-                case 1:
-                    if (!(_i < source_1.length)) return [3 /*break*/, 10];
-                    character = source_1[_i];
-                    //handle escaping
-                    if (currently_escaping) {
-                        switch (character) {
-                            case "[":
-                            case "]":
-                            case "\\":
-                                current_text += character;
-                                currently_escaping = false;
-                                return [3 /*break*/, 9];
-                            default:
-                                throw get_source_text(line) + " Unexpected escape sequence \"" + ("\\" + character) + "\"";
-                        }
-                    }
-                    else if (character === "\\") {
-                        currently_escaping = true;
-                        return [3 /*break*/, 9];
-                    }
-                    if (!(tag_depth === 0)) return [3 /*break*/, 2];
-                    if (character === "[") {
-                        if (current_text) {
-                            result += escape_html(current_text);
-                            current_text = "";
-                        }
-                        tag_depth++;
-                        return [3 /*break*/, 9];
-                    }
-                    else if (character === "]") {
-                        throw get_source_text(line) + " Unexpected closing tag \"]\". If you meant a literal \"]\" use \"\\]\".";
-                    }
-                    return [3 /*break*/, 8];
-                case 2:
-                    if (!(character === "[")) return [3 /*break*/, 3];
-                    tag_depth++;
-                    return [3 /*break*/, 8];
-                case 3:
-                    if (!(character === "]")) return [3 /*break*/, 8];
-                    tag_depth--;
-                    if (!(tag_depth === 0)) return [3 /*break*/, 8];
-                    _b.label = 4;
-                case 4:
-                    _b.trys.push([4, 6, , 7]);
-                    _a = result;
-                    return [4 /*yield*/, execute_tag(current_text)];
-                case 5:
-                    result = _a + _b.sent();
-                    return [3 /*break*/, 7];
-                case 6:
-                    err_4 = _b.sent();
-                    throw get_source_text(line) + " " + err_4;
-                case 7:
-                    current_text = "";
-                    return [3 /*break*/, 9];
-                case 8:
-                    //keep track of file position and content
-                    current_text += character;
-                    if (character === "\n") {
-                        line++;
-                    }
-                    _b.label = 9;
-                case 9:
-                    _i++;
-                    return [3 /*break*/, 1];
-                case 10:
-                    if (tag_depth !== 0) {
-                        throw get_source_text(line) + " Opened tag with \"[\" but didn't close it with \"]\".";
-                    }
-                    if (current_text) {
-                        result += escape_html(current_text);
-                    }
-                    return [2 /*return*/, result];
             }
         });
     });
@@ -373,127 +138,33 @@ function assert(predicate, explanation) {
         throw "Assertion fail";
     }
 }
-// tests
-function run_tests() {
-    return __awaiter(this, void 0, void 0, function () {
-        function parse_tags_tests() {
-            function assert_params(test_case, tags) {
-                var attributes = parse_attributes(test_case);
-                var details = "Expected:\n";
-                for (var _i = 0, _a = Object.keys(tags); _i < _a.length; _i++) {
-                    var key = _a[_i];
-                    details += key + ": " + tags[key] + "\n";
-                }
-                details += "Actually:\n";
-                for (var _b = 0, _c = Object.keys(attributes); _b < _c.length; _b++) {
-                    var key = _c[_b];
-                    details += key + ": " + attributes[key] + "\n";
-                }
-                for (var _d = 0, _e = Object.keys(tags); _d < _e.length; _d++) {
-                    var key = _e[_d];
-                    if (!(key in attributes)) {
-                        throw "Error in parsing test case\n" + test_case + "\n. Expected to find attribute \"" + key + "\" but didn't.\n" + details;
-                    }
-                    if (tags[key] !== attributes[key]) {
-                        throw "Error in parsing test case\n" + test_case + "\n. Value mismatch in tag \"" + key + "\".\n" + details;
-                    }
-                }
-            }
-            assert_params("", {});
-            assert_params(" \t\n", {});
-            assert_params("test=value", { test: "value" });
-            assert_params("test= \t\nvalue", { test: " \t\nvalue" });
-            assert_params("attribute=test [if a=42 b else c] bla bar=10", { attribute: "test [if a=42 b else c] bla", bar: "10" });
-            assert_params("text=[choice next=travel text=Take the sword var=weapon=herosword]\n[choice next=travel text=Leave the sword]", { text: "[choice next=travel text=Take the sword var=weapon=herosword]\n[choice next=travel text=Leave the sword]" });
-            console.log(parse_attributes("text=[choice next=travel text=Take the sword var=weapon=herosword]\n[choice next=travel text=Leave the sword]"));
-        }
-        function parse_source_text_test() {
-            return __awaiter(this, void 0, void 0, function () {
-                function test(source) {
-                    var expected_tags = [];
-                    for (var _i = 1; _i < arguments.length; _i++) {
-                        expected_tags[_i - 1] = arguments[_i];
-                    }
-                    tags = [];
-                    parse_source_text(source, "test.txt");
-                    for (var index in tags) {
-                        if (arguments[Number(index) + 1] !== tags[Number(index)]) {
-                            var err = "Failed parsing source \"" + source + "\" into appropriate tags.\n";
-                            err += "Expected:\n";
-                            for (var _a = 0, expected_tags_1 = expected_tags; _a < expected_tags_1.length; _a++) {
-                                var expected_tag = expected_tags_1[_a];
-                                err += expected_tag + "\n";
-                            }
-                            err += "Actual:\n";
-                            for (var _b = 0, tags_1 = tags; _b < tags_1.length; _b++) {
-                                var tag = tags_1[_b];
-                                err += tag + "\n";
-                            }
-                            throw err;
-                        }
-                    }
-                }
-                var old_execute_tag, tags;
-                var _this = this;
-                return __generator(this, function (_a) {
-                    old_execute_tag = execute_tag;
-                    execute_tag = function (str) { return __awaiter(_this, void 0, void 0, function () {
-                        return __generator(this, function (_a) {
-                            tags.push(str);
-                            return [2 /*return*/, ""];
-                        });
-                    }); };
-                    test("[choice next=travel text=Leave the sword]", "choice next=travel text=Leave the sword");
-                    test("[code text=[choice next=travel text=Leave the sword]]", "code text=[choice next=travel text=Leave the sword]");
-                    test("[code bla test 42]", "code bla test 42");
-                    test("[code [inner tag=valid]]", "code [inner tag=valid]");
-                    execute_tag = old_execute_tag;
-                    return [2 /*return*/];
-                });
-            });
-        }
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    parse_tags_tests();
-                    return [4 /*yield*/, parse_source_text_test()];
-                case 1:
-                    _a.sent();
-                    return [2 /*return*/];
-            }
-        });
-    });
-}
 // script entry point, loading the correct state and displays errors
 function main() {
     return __awaiter(this, void 0, void 0, function () {
-        var err_5;
+        var err_3;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    _a.trys.push([0, 4, , 5]);
-                    return [4 /*yield*/, run_tests()];
+                    _a.trys.push([0, 3, , 4]);
+                    return [4 /*yield*/, play_arc("intro")];
                 case 1:
                     _a.sent();
-                    return [4 /*yield*/, play_arc("intro")];
+                    return [4 /*yield*/, url_hash_change()];
                 case 2:
                     _a.sent();
-                    return [4 /*yield*/, url_hash_change()];
+                    return [3 /*break*/, 4];
                 case 3:
-                    _a.sent();
-                    return [3 /*break*/, 5];
-                case 4:
-                    err_5 = _a.sent();
-                    display_error_document("" + err_5);
-                    return [3 /*break*/, 5];
-                case 5: return [2 /*return*/];
+                    err_3 = _a.sent();
+                    display_error_document("" + err_3);
+                    return [3 /*break*/, 4];
+                case 4: return [2 /*return*/];
             }
         });
     });
 }
 main();
 
-},{"antlr4/index":43,"grammar/cyoaeParser":50}],2:[function(require,module,exports){
+},{"antlr4/index":43,"cyoaeParser":50}],2:[function(require,module,exports){
 /* Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
  * Use of this file is governed by the BSD 3-clause license that
  * can be found in the LICENSE.txt file in the project root.
@@ -12764,6 +12435,15 @@ cyoaeListener.prototype.exitValue = function(ctx) {
 };
 
 
+// Enter a parse tree produced by cyoaeParser#escaped_text.
+cyoaeListener.prototype.enterEscaped_text = function(ctx) {
+};
+
+// Exit a parse tree produced by cyoaeParser#escaped_text.
+cyoaeListener.prototype.exitEscaped_text = function(ctx) {
+};
+
+
 
 exports.cyoaeListener = cyoaeListener;
 },{"antlr4/index":43}],50:[function(require,module,exports){
@@ -12774,48 +12454,56 @@ var cyoaeListener = require('./cyoaeListener').cyoaeListener;
 var grammarFileName = "cyoae.g4";
 
 var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
-    "\u0003\bB\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004\t\u0004",
-    "\u0004\u0005\t\u0005\u0004\u0006\t\u0006\u0004\u0007\t\u0007\u0003\u0002",
-    "\u0003\u0002\u0007\u0002\u0011\n\u0002\f\u0002\u000e\u0002\u0014\u000b",
-    "\u0002\u0003\u0003\u0006\u0003\u0017\n\u0003\r\u0003\u000e\u0003\u0018",
-    "\u0003\u0004\u0003\u0004\u0005\u0004\u001d\n\u0004\u0003\u0004\u0003",
-    "\u0004\u0005\u0004!\n\u0004\u0003\u0004\u0005\u0004$\n\u0004\u0003\u0004",
-    "\u0005\u0004\'\n\u0004\u0003\u0004\u0003\u0004\u0003\u0004\u0003\u0004",
-    "\u0005\u0004-\n\u0004\u0007\u0004/\n\u0004\f\u0004\u000e\u00042\u000b",
+    "\u0003\u000bQ\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004\t",
+    "\u0004\u0004\u0005\t\u0005\u0004\u0006\t\u0006\u0004\u0007\t\u0007\u0004",
+    "\b\t\b\u0003\u0002\u0003\u0002\u0007\u0002\u0013\n\u0002\f\u0002\u000e",
+    "\u0002\u0016\u000b\u0002\u0003\u0002\u0003\u0002\u0003\u0003\u0003\u0003",
+    "\u0003\u0003\u0003\u0003\u0006\u0003\u001e\n\u0003\r\u0003\u000e\u0003",
+    "\u001f\u0003\u0004\u0003\u0004\u0005\u0004$\n\u0004\u0003\u0004\u0003",
+    "\u0004\u0005\u0004(\n\u0004\u0003\u0004\u0005\u0004+\n\u0004\u0003\u0004",
+    "\u0005\u0004.\n\u0004\u0003\u0004\u0003\u0004\u0003\u0004\u0003\u0004",
+    "\u0005\u00044\n\u0004\u0007\u00046\n\u0004\f\u0004\u000e\u00049\u000b",
     "\u0004\u0003\u0004\u0003\u0004\u0003\u0005\u0003\u0005\u0003\u0006\u0003",
-    "\u0006\u0003\u0007\u0005\u0007;\n\u0007\u0003\u0007\u0006\u0007>\n\u0007",
-    "\r\u0007\u000e\u0007?\u0003\u0007\u0002\u0002\b\u0002\u0004\u0006\b",
-    "\n\f\u0002\u0004\u0004\u0002\u0003\u0003\u0006\b\u0003\u0002\u0006\u0007",
-    "\u0002F\u0002\u0012\u0003\u0002\u0002\u0002\u0004\u0016\u0003\u0002",
-    "\u0002\u0002\u0006\u001a\u0003\u0002\u0002\u0002\b5\u0003\u0002\u0002",
-    "\u0002\n7\u0003\u0002\u0002\u0002\f=\u0003\u0002\u0002\u0002\u000e\u0011",
-    "\u0005\u0004\u0003\u0002\u000f\u0011\u0005\u0006\u0004\u0002\u0010\u000e",
-    "\u0003\u0002\u0002\u0002\u0010\u000f\u0003\u0002\u0002\u0002\u0011\u0014",
-    "\u0003\u0002\u0002\u0002\u0012\u0010\u0003\u0002\u0002\u0002\u0012\u0013",
-    "\u0003\u0002\u0002\u0002\u0013\u0003\u0003\u0002\u0002\u0002\u0014\u0012",
-    "\u0003\u0002\u0002\u0002\u0015\u0017\t\u0002\u0002\u0002\u0016\u0015",
-    "\u0003\u0002\u0002\u0002\u0017\u0018\u0003\u0002\u0002\u0002\u0018\u0016",
-    "\u0003\u0002\u0002\u0002\u0018\u0019\u0003\u0002\u0002\u0002\u0019\u0005",
-    "\u0003\u0002\u0002\u0002\u001a\u001c\u0007\u0004\u0002\u0002\u001b\u001d",
-    "\u0007\b\u0002\u0002\u001c\u001b\u0003\u0002\u0002\u0002\u001c\u001d",
-    "\u0003\u0002\u0002\u0002\u001d\u001e\u0003\u0002\u0002\u0002\u001e ",
-    "\u0005\b\u0005\u0002\u001f!\u0007\b\u0002\u0002 \u001f\u0003\u0002\u0002",
-    "\u0002 !\u0003\u0002\u0002\u0002!#\u0003\u0002\u0002\u0002\"$\u0005",
-    "\f\u0007\u0002#\"\u0003\u0002\u0002\u0002#$\u0003\u0002\u0002\u0002",
-    "$&\u0003\u0002\u0002\u0002%\'\u0007\b\u0002\u0002&%\u0003\u0002\u0002",
-    "\u0002&\'\u0003\u0002\u0002\u0002\'0\u0003\u0002\u0002\u0002()\u0005",
-    "\n\u0006\u0002)*\u0007\u0003\u0002\u0002*,\u0005\f\u0007\u0002+-\u0007",
-    "\b\u0002\u0002,+\u0003\u0002\u0002\u0002,-\u0003\u0002\u0002\u0002-",
-    "/\u0003\u0002\u0002\u0002.(\u0003\u0002\u0002\u0002/2\u0003\u0002\u0002",
-    "\u00020.\u0003\u0002\u0002\u000201\u0003\u0002\u0002\u000213\u0003\u0002",
-    "\u0002\u000220\u0003\u0002\u0002\u000234\u0007\u0005\u0002\u00024\u0007",
-    "\u0003\u0002\u0002\u000256\u0007\u0007\u0002\u00026\t\u0003\u0002\u0002",
-    "\u000278\u0007\u0007\u0002\u00028\u000b\u0003\u0002\u0002\u00029;\u0007",
-    "\b\u0002\u0002:9\u0003\u0002\u0002\u0002:;\u0003\u0002\u0002\u0002;",
-    "<\u0003\u0002\u0002\u0002<>\t\u0003\u0002\u0002=:\u0003\u0002\u0002",
-    "\u0002>?\u0003\u0002\u0002\u0002?=\u0003\u0002\u0002\u0002?@\u0003\u0002",
-    "\u0002\u0002@\r\u0003\u0002\u0002\u0002\r\u0010\u0012\u0018\u001c #",
-    "&,0:?"].join("");
+    "\u0006\u0003\u0007\u0007\u0007B\n\u0007\f\u0007\u000e\u0007E\u000b\u0007",
+    "\u0003\u0007\u0003\u0007\u0005\u0007I\n\u0007\u0006\u0007K\n\u0007\r",
+    "\u0007\u000e\u0007L\u0003\b\u0003\b\u0003\b\u0002\u0002\t\u0002\u0004",
+    "\u0006\b\n\f\u000e\u0002\u0003\u0003\u0002\u0006\t\u0002X\u0002\u0014",
+    "\u0003\u0002\u0002\u0002\u0004\u001d\u0003\u0002\u0002\u0002\u0006!",
+    "\u0003\u0002\u0002\u0002\b<\u0003\u0002\u0002\u0002\n>\u0003\u0002\u0002",
+    "\u0002\fJ\u0003\u0002\u0002\u0002\u000eN\u0003\u0002\u0002\u0002\u0010",
+    "\u0013\u0005\u0004\u0003\u0002\u0011\u0013\u0005\u0006\u0004\u0002\u0012",
+    "\u0010\u0003\u0002\u0002\u0002\u0012\u0011\u0003\u0002\u0002\u0002\u0013",
+    "\u0016\u0003\u0002\u0002\u0002\u0014\u0012\u0003\u0002\u0002\u0002\u0014",
+    "\u0015\u0003\u0002\u0002\u0002\u0015\u0017\u0003\u0002\u0002\u0002\u0016",
+    "\u0014\u0003\u0002\u0002\u0002\u0017\u0018\u0007\u0002\u0002\u0003\u0018",
+    "\u0003\u0003\u0002\u0002\u0002\u0019\u001e\u0005\u000e\b\u0002\u001a",
+    "\u001e\u0007\n\u0002\u0002\u001b\u001e\u0007\u000b\u0002\u0002\u001c",
+    "\u001e\u0007\u0003\u0002\u0002\u001d\u0019\u0003\u0002\u0002\u0002\u001d",
+    "\u001a\u0003\u0002\u0002\u0002\u001d\u001b\u0003\u0002\u0002\u0002\u001d",
+    "\u001c\u0003\u0002\u0002\u0002\u001e\u001f\u0003\u0002\u0002\u0002\u001f",
+    "\u001d\u0003\u0002\u0002\u0002\u001f \u0003\u0002\u0002\u0002 \u0005",
+    "\u0003\u0002\u0002\u0002!#\u0007\u0004\u0002\u0002\"$\u0007\u000b\u0002",
+    "\u0002#\"\u0003\u0002\u0002\u0002#$\u0003\u0002\u0002\u0002$%\u0003",
+    "\u0002\u0002\u0002%\'\u0005\b\u0005\u0002&(\u0007\u000b\u0002\u0002",
+    "\'&\u0003\u0002\u0002\u0002\'(\u0003\u0002\u0002\u0002(*\u0003\u0002",
+    "\u0002\u0002)+\u0005\f\u0007\u0002*)\u0003\u0002\u0002\u0002*+\u0003",
+    "\u0002\u0002\u0002+-\u0003\u0002\u0002\u0002,.\u0007\u000b\u0002\u0002",
+    "-,\u0003\u0002\u0002\u0002-.\u0003\u0002\u0002\u0002.7\u0003\u0002\u0002",
+    "\u0002/0\u0005\n\u0006\u000201\u0007\u0003\u0002\u000213\u0005\f\u0007",
+    "\u000224\u0007\u000b\u0002\u000232\u0003\u0002\u0002\u000234\u0003\u0002",
+    "\u0002\u000246\u0003\u0002\u0002\u00025/\u0003\u0002\u0002\u000269\u0003",
+    "\u0002\u0002\u000275\u0003\u0002\u0002\u000278\u0003\u0002\u0002\u0002",
+    "8:\u0003\u0002\u0002\u000297\u0003\u0002\u0002\u0002:;\u0007\u0005\u0002",
+    "\u0002;\u0007\u0003\u0002\u0002\u0002<=\u0007\n\u0002\u0002=\t\u0003",
+    "\u0002\u0002\u0002>?\u0007\n\u0002\u0002?\u000b\u0003\u0002\u0002\u0002",
+    "@B\u0007\u000b\u0002\u0002A@\u0003\u0002\u0002\u0002BE\u0003\u0002\u0002",
+    "\u0002CA\u0003\u0002\u0002\u0002CD\u0003\u0002\u0002\u0002DH\u0003\u0002",
+    "\u0002\u0002EC\u0003\u0002\u0002\u0002FI\u0005\u000e\b\u0002GI\u0007",
+    "\n\u0002\u0002HF\u0003\u0002\u0002\u0002HG\u0003\u0002\u0002\u0002I",
+    "K\u0003\u0002\u0002\u0002JC\u0003\u0002\u0002\u0002KL\u0003\u0002\u0002",
+    "\u0002LJ\u0003\u0002\u0002\u0002LM\u0003\u0002\u0002\u0002M\r\u0003",
+    "\u0002\u0002\u0002NO\t\u0002\u0002\u0002O\u000f\u0003\u0002\u0002\u0002",
+    "\u000f\u0012\u0014\u001d\u001f#\'*-37CHL"].join("");
 
 
 var atn = new antlr4.atn.ATNDeserializer().deserialize(serializedATN);
@@ -12824,11 +12512,14 @@ var decisionsToDFA = atn.decisionToState.map( function(ds, index) { return new a
 
 var sharedContextCache = new antlr4.PredictionContextCache();
 
-var literalNames = [ null, "'='", "'['", "']'" ];
+var literalNames = [ null, "'='", "'['", "']'", "'\\\\'", "'\\['", "'\\]'", 
+                     "'\\='" ];
 
-var symbolicNames = [ null, null, null, null, "ESCAPED_TEXT", "WORD", "WS" ];
+var symbolicNames = [ null, null, null, null, null, null, null, null, "WORD", 
+                      "WS" ];
 
-var ruleNames =  [ "start", "text", "tag", "tag_name", "attribute", "value" ];
+var ruleNames =  [ "start", "text", "tag", "tag_name", "attribute", "value", 
+                   "escaped_text" ];
 
 function cyoaeParser (input) {
 	antlr4.Parser.call(this, input);
@@ -12852,9 +12543,12 @@ cyoaeParser.EOF = antlr4.Token.EOF;
 cyoaeParser.T__0 = 1;
 cyoaeParser.T__1 = 2;
 cyoaeParser.T__2 = 3;
-cyoaeParser.ESCAPED_TEXT = 4;
-cyoaeParser.WORD = 5;
-cyoaeParser.WS = 6;
+cyoaeParser.T__3 = 4;
+cyoaeParser.T__4 = 5;
+cyoaeParser.T__5 = 6;
+cyoaeParser.T__6 = 7;
+cyoaeParser.WORD = 8;
+cyoaeParser.WS = 9;
 
 cyoaeParser.RULE_start = 0;
 cyoaeParser.RULE_text = 1;
@@ -12862,6 +12556,7 @@ cyoaeParser.RULE_tag = 2;
 cyoaeParser.RULE_tag_name = 3;
 cyoaeParser.RULE_attribute = 4;
 cyoaeParser.RULE_value = 5;
+cyoaeParser.RULE_escaped_text = 6;
 
 function StartContext(parser, parent, invokingState) {
 	if(parent===undefined) {
@@ -12878,6 +12573,10 @@ function StartContext(parser, parent, invokingState) {
 
 StartContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);
 StartContext.prototype.constructor = StartContext;
+
+StartContext.prototype.EOF = function() {
+    return this.getToken(cyoaeParser.EOF, 0);
+};
 
 StartContext.prototype.text = function(i) {
     if(i===undefined) {
@@ -12925,31 +12624,36 @@ cyoaeParser.prototype.start = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 16;
+        this.state = 18;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
-        while((((_la) & ~0x1f) == 0 && ((1 << _la) & ((1 << cyoaeParser.T__0) | (1 << cyoaeParser.T__1) | (1 << cyoaeParser.ESCAPED_TEXT) | (1 << cyoaeParser.WORD) | (1 << cyoaeParser.WS))) !== 0)) {
-            this.state = 14;
+        while((((_la) & ~0x1f) == 0 && ((1 << _la) & ((1 << cyoaeParser.T__0) | (1 << cyoaeParser.T__1) | (1 << cyoaeParser.T__3) | (1 << cyoaeParser.T__4) | (1 << cyoaeParser.T__5) | (1 << cyoaeParser.T__6) | (1 << cyoaeParser.WORD) | (1 << cyoaeParser.WS))) !== 0)) {
+            this.state = 16;
             this._errHandler.sync(this);
             switch(this._input.LA(1)) {
             case cyoaeParser.T__0:
-            case cyoaeParser.ESCAPED_TEXT:
+            case cyoaeParser.T__3:
+            case cyoaeParser.T__4:
+            case cyoaeParser.T__5:
+            case cyoaeParser.T__6:
             case cyoaeParser.WORD:
             case cyoaeParser.WS:
-                this.state = 12;
+                this.state = 14;
                 this.text();
                 break;
             case cyoaeParser.T__1:
-                this.state = 13;
+                this.state = 15;
                 this.tag();
                 break;
             default:
                 throw new antlr4.error.NoViableAltException(this);
             }
-            this.state = 18;
+            this.state = 20;
             this._errHandler.sync(this);
             _la = this._input.LA(1);
         }
+        this.state = 21;
+        this.match(cyoaeParser.EOF);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
 	        localctx.exception = re;
@@ -12980,17 +12684,16 @@ function TextContext(parser, parent, invokingState) {
 TextContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);
 TextContext.prototype.constructor = TextContext;
 
-TextContext.prototype.ESCAPED_TEXT = function(i) {
-	if(i===undefined) {
-		i = null;
-	}
+TextContext.prototype.escaped_text = function(i) {
+    if(i===undefined) {
+        i = null;
+    }
     if(i===null) {
-        return this.getTokens(cyoaeParser.ESCAPED_TEXT);
+        return this.getTypedRuleContexts(Escaped_textContext);
     } else {
-        return this.getToken(cyoaeParser.ESCAPED_TEXT, i);
+        return this.getTypedRuleContext(Escaped_textContext,i);
     }
 };
-
 
 TextContext.prototype.WORD = function(i) {
 	if(i===undefined) {
@@ -13037,31 +12740,46 @@ cyoaeParser.prototype.text = function() {
 
     var localctx = new TextContext(this, this._ctx, this.state);
     this.enterRule(localctx, 2, cyoaeParser.RULE_text);
-    var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 20; 
+        this.state = 27; 
         this._errHandler.sync(this);
         var _alt = 1;
         do {
         	switch (_alt) {
         	case 1:
-        		this.state = 19;
-        		_la = this._input.LA(1);
-        		if(!((((_la) & ~0x1f) == 0 && ((1 << _la) & ((1 << cyoaeParser.T__0) | (1 << cyoaeParser.ESCAPED_TEXT) | (1 << cyoaeParser.WORD) | (1 << cyoaeParser.WS))) !== 0))) {
-        		this._errHandler.recoverInline(this);
-        		}
-        		else {
-        			this._errHandler.reportMatch(this);
-        		    this.consume();
+        		this.state = 27;
+        		this._errHandler.sync(this);
+        		switch(this._input.LA(1)) {
+        		case cyoaeParser.T__3:
+        		case cyoaeParser.T__4:
+        		case cyoaeParser.T__5:
+        		case cyoaeParser.T__6:
+        		    this.state = 23;
+        		    this.escaped_text();
+        		    break;
+        		case cyoaeParser.WORD:
+        		    this.state = 24;
+        		    this.match(cyoaeParser.WORD);
+        		    break;
+        		case cyoaeParser.WS:
+        		    this.state = 25;
+        		    this.match(cyoaeParser.WS);
+        		    break;
+        		case cyoaeParser.T__0:
+        		    this.state = 26;
+        		    this.match(cyoaeParser.T__0);
+        		    break;
+        		default:
+        		    throw new antlr4.error.NoViableAltException(this);
         		}
         		break;
         	default:
         		throw new antlr4.error.NoViableAltException(this);
         	}
-        	this.state = 22; 
+        	this.state = 29; 
         	this._errHandler.sync(this);
-        	_alt = this._interp.adaptivePredict(this._input,2, this._ctx);
+        	_alt = this._interp.adaptivePredict(this._input,3, this._ctx);
         } while ( _alt!=2 && _alt!=antlr4.atn.ATN.INVALID_ALT_NUMBER );
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -13155,65 +12873,65 @@ cyoaeParser.prototype.tag = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 24;
+        this.state = 31;
         this.match(cyoaeParser.T__1);
-        this.state = 26;
+        this.state = 33;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         if(_la===cyoaeParser.WS) {
-            this.state = 25;
+            this.state = 32;
             this.match(cyoaeParser.WS);
         }
 
-        this.state = 28;
+        this.state = 35;
         this.tag_name();
-        this.state = 30;
-        this._errHandler.sync(this);
-        var la_ = this._interp.adaptivePredict(this._input,4,this._ctx);
-        if(la_===1) {
-            this.state = 29;
-            this.match(cyoaeParser.WS);
-
-        }
-        this.state = 33;
+        this.state = 37;
         this._errHandler.sync(this);
         var la_ = this._interp.adaptivePredict(this._input,5,this._ctx);
         if(la_===1) {
-            this.state = 32;
+            this.state = 36;
+            this.match(cyoaeParser.WS);
+
+        }
+        this.state = 40;
+        this._errHandler.sync(this);
+        var la_ = this._interp.adaptivePredict(this._input,6,this._ctx);
+        if(la_===1) {
+            this.state = 39;
             this.value();
 
         }
-        this.state = 36;
+        this.state = 43;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         if(_la===cyoaeParser.WS) {
-            this.state = 35;
+            this.state = 42;
             this.match(cyoaeParser.WS);
         }
 
-        this.state = 46;
+        this.state = 53;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         while(_la===cyoaeParser.WORD) {
-            this.state = 38;
+            this.state = 45;
             this.attribute();
-            this.state = 39;
+            this.state = 46;
             this.match(cyoaeParser.T__0);
-            this.state = 40;
+            this.state = 47;
             this.value();
-            this.state = 42;
+            this.state = 49;
             this._errHandler.sync(this);
             _la = this._input.LA(1);
             if(_la===cyoaeParser.WS) {
-                this.state = 41;
+                this.state = 48;
                 this.match(cyoaeParser.WS);
             }
 
-            this.state = 48;
+            this.state = 55;
             this._errHandler.sync(this);
             _la = this._input.LA(1);
         }
-        this.state = 49;
+        this.state = 56;
         this.match(cyoaeParser.T__2);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -13272,7 +12990,7 @@ cyoaeParser.prototype.tag_name = function() {
     this.enterRule(localctx, 6, cyoaeParser.RULE_tag_name);
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 51;
+        this.state = 58;
         this.match(cyoaeParser.WORD);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -13331,7 +13049,7 @@ cyoaeParser.prototype.attribute = function() {
     this.enterRule(localctx, 8, cyoaeParser.RULE_attribute);
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 53;
+        this.state = 60;
         this.match(cyoaeParser.WORD);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -13363,17 +13081,16 @@ function ValueContext(parser, parent, invokingState) {
 ValueContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);
 ValueContext.prototype.constructor = ValueContext;
 
-ValueContext.prototype.ESCAPED_TEXT = function(i) {
-	if(i===undefined) {
-		i = null;
-	}
+ValueContext.prototype.escaped_text = function(i) {
+    if(i===undefined) {
+        i = null;
+    }
     if(i===null) {
-        return this.getTokens(cyoaeParser.ESCAPED_TEXT);
+        return this.getTypedRuleContexts(Escaped_textContext);
     } else {
-        return this.getToken(cyoaeParser.ESCAPED_TEXT, i);
+        return this.getTypedRuleContext(Escaped_textContext,i);
     }
 };
-
 
 ValueContext.prototype.WORD = function(i) {
 	if(i===undefined) {
@@ -13423,37 +13140,111 @@ cyoaeParser.prototype.value = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 59; 
+        this.state = 72; 
         this._errHandler.sync(this);
         var _alt = 1;
         do {
         	switch (_alt) {
         	case 1:
-        		this.state = 56;
+        		this.state = 65;
         		this._errHandler.sync(this);
         		_la = this._input.LA(1);
-        		if(_la===cyoaeParser.WS) {
-        		    this.state = 55;
+        		while(_la===cyoaeParser.WS) {
+        		    this.state = 62;
         		    this.match(cyoaeParser.WS);
+        		    this.state = 67;
+        		    this._errHandler.sync(this);
+        		    _la = this._input.LA(1);
         		}
-
-        		this.state = 58;
-        		_la = this._input.LA(1);
-        		if(!(_la===cyoaeParser.ESCAPED_TEXT || _la===cyoaeParser.WORD)) {
-        		this._errHandler.recoverInline(this);
-        		}
-        		else {
-        			this._errHandler.reportMatch(this);
-        		    this.consume();
+        		this.state = 70;
+        		this._errHandler.sync(this);
+        		switch(this._input.LA(1)) {
+        		case cyoaeParser.T__3:
+        		case cyoaeParser.T__4:
+        		case cyoaeParser.T__5:
+        		case cyoaeParser.T__6:
+        		    this.state = 68;
+        		    this.escaped_text();
+        		    break;
+        		case cyoaeParser.WORD:
+        		    this.state = 69;
+        		    this.match(cyoaeParser.WORD);
+        		    break;
+        		default:
+        		    throw new antlr4.error.NoViableAltException(this);
         		}
         		break;
         	default:
         		throw new antlr4.error.NoViableAltException(this);
         	}
-        	this.state = 61; 
+        	this.state = 74; 
         	this._errHandler.sync(this);
-        	_alt = this._interp.adaptivePredict(this._input,10, this._ctx);
+        	_alt = this._interp.adaptivePredict(this._input,12, this._ctx);
         } while ( _alt!=2 && _alt!=antlr4.atn.ATN.INVALID_ALT_NUMBER );
+    } catch (re) {
+    	if(re instanceof antlr4.error.RecognitionException) {
+	        localctx.exception = re;
+	        this._errHandler.reportError(this, re);
+	        this._errHandler.recover(this, re);
+	    } else {
+	    	throw re;
+	    }
+    } finally {
+        this.exitRule();
+    }
+    return localctx;
+};
+
+function Escaped_textContext(parser, parent, invokingState) {
+	if(parent===undefined) {
+	    parent = null;
+	}
+	if(invokingState===undefined || invokingState===null) {
+		invokingState = -1;
+	}
+	antlr4.ParserRuleContext.call(this, parent, invokingState);
+    this.parser = parser;
+    this.ruleIndex = cyoaeParser.RULE_escaped_text;
+    return this;
+}
+
+Escaped_textContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);
+Escaped_textContext.prototype.constructor = Escaped_textContext;
+
+
+Escaped_textContext.prototype.enterRule = function(listener) {
+    if(listener instanceof cyoaeListener ) {
+        listener.enterEscaped_text(this);
+	}
+};
+
+Escaped_textContext.prototype.exitRule = function(listener) {
+    if(listener instanceof cyoaeListener ) {
+        listener.exitEscaped_text(this);
+	}
+};
+
+
+
+
+cyoaeParser.Escaped_textContext = Escaped_textContext;
+
+cyoaeParser.prototype.escaped_text = function() {
+
+    var localctx = new Escaped_textContext(this, this._ctx, this.state);
+    this.enterRule(localctx, 12, cyoaeParser.RULE_escaped_text);
+    var _la = 0; // Token type
+    try {
+        this.enterOuterAlt(localctx, 1);
+        this.state = 76;
+        _la = this._input.LA(1);
+        if(!((((_la) & ~0x1f) == 0 && ((1 << _la) & ((1 << cyoaeParser.T__3) | (1 << cyoaeParser.T__4) | (1 << cyoaeParser.T__5) | (1 << cyoaeParser.T__6))) !== 0))) {
+        this._errHandler.recoverInline(this);
+        }
+        else {
+        	this._errHandler.reportMatch(this);
+            this.consume();
+        }
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
 	        localctx.exception = re;
