@@ -1,12 +1,7 @@
 "use strict";
 
-requirejs.config({
-    baseUrl: 'antlr4',
-});
-
-    //const antlr4 = await require(["antlr4/index"], function(antlr4_index) {});
-    //const parser = await require(["grammar/cyoaeParser"]);
-require(["antlr4/index"]);
+const antlr4 = require("antlr4/index");
+const parser = require("grammar/cyoaeParser");
 
 let current_arc = "";
 let current_scene = "";

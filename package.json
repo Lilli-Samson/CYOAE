@@ -1,8 +1,9 @@
 {
     "scripts": {
-        "build": "tsc --pretty -p ."
+        "build": "tsc --pretty -p . && NODE_PATH=. `npm config get prefix`/bin/browserify CYOAE.js > main.js"
     },
-    "dependencies": {
-        "@types/node": "^14.14.10"
+    "dependencies": {},
+    "devDependencies": {
+        "@types/node": "^14.14.14"
     }
 }
