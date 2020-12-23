@@ -1,1 +1,9 @@
 CMakeLists.txt.user
+cyoae.interp
+cyoae.tokens
+cyoaeLexer.interp
+cyoaeLexer.js
+cyoaeLexer.tokens
+cyoaeListener.js
+cyoaeParser.js
+package-lock.json
