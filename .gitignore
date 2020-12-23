@@ -7,3 +7,4 @@ cyoaeLexer.tokens
 cyoaeListener.js
 cyoaeParser.js
 package-lock.json
+node_modules
