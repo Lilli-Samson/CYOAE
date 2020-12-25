@@ -1,10 +1,33 @@
 "use strict";
 
 const antlr4 = require("antlr4/index");
-const parser = require("cyoaeParser");
+const cyoaeLexer = require("./cyoaeLexer");
+const cyoaeParser = require("./cyoaeParser");
+let cyoaeListener = require("./cyoaeListener").cyoaeListener;
 
 let current_arc = "";
 let current_scene = "";
+
+function output(text: string) {
+    document.body.innerHTML += text;
+}
+
+class Listener extends cyoaeListener {
+    exitTag(ctx: any) {
+        console.log("Exited Tag");
+    }
+}
+
+async function parse_source_text(data: string, filename: string) {
+    console.log(`Starting parsing source text ${filename}`);
+    const input = new antlr4.InputStream(data);
+    const lexer = new cyoaeLexer.cyoaeLexer(input);
+    const tokens = new antlr4.CommonTokenStream(lexer);
+    const parser = new cyoaeParser.cyoaeParser(tokens);
+    const tree = parser.start();
+    const listener = new(Listener as any)();
+    antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
+}
 
 // plays through a story arc
 async function play_arc(name: string) {
@@ -16,7 +39,7 @@ async function update_current_scene() {
     console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
         const data = await get(`${current_scene}.txt`);
-        //document.body.innerHTML = await parse_source_text(data, `${current_scene}.txt`);
+        await parse_source_text(data, `${current_scene}.txt`);
     }
     catch (err) {
         display_error_document(`${err}`);
