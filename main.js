@@ -58,6 +58,44 @@ var current_scene = "";
 function output(text) {
     document.body.innerHTML += text;
 }
+;
+var replacements = [
+    {
+        tag_name: "img",
+        attributes: [
+            { name: "url", replacement: " src=\"{url}\"" },
+            { name: "alt", replacement: " alt=\"{alt}\"", default_value: "image" },
+        ],
+        intro: "<img",
+        outro: "/>\n",
+    },
+    {
+        tag_name: "code",
+        attributes: [
+            { name: "text", replacement: "{text}" },
+        ],
+        intro: "<a class=\"code\">",
+        outro: "</a>\n",
+    },
+    {
+        tag_name: "choice",
+        attributes: [
+            { name: "next", replacement: " href=\"{next}.html\">" },
+            { name: "text", replacement: "{text}" },
+        ],
+        intro: "<a class=\"choice\"",
+        outro: "</a>\n",
+    },
+    {
+        tag_name: "source",
+        generator: function (tag) {
+            //std::ifstream source{current_scene_path};
+            //return replace_text(source_template, "{source}",
+            //					escape_html(std::string{std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()}));
+            return "";
+        },
+    },
+];
 var Listener = /** @class */ (function (_super) {
     __extends(Listener, _super);
     function Listener() {

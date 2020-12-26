@@ -12,6 +12,60 @@ function output(text: string) {
     document.body.innerHTML += text;
 }
 
+interface Attribute_replacement {
+	name: string;
+	replacement: string;
+	default_value?: string;
+	html_escape?: boolean;
+};
+
+interface Tag_replacement {
+    tag_name: string;
+    attributes?: Attribute_replacement[];
+    intro?: string;
+	outro?: string;
+	generator?(tag: any): string;
+}
+
+const replacements: Tag_replacement[] = [
+	{
+		tag_name: "img",
+		attributes:
+			[
+				{name: "url", replacement: " src=\"{url}\""},
+				{name: "alt", replacement: " alt=\"{alt}\"", default_value: "image"},
+            ],
+		intro: "<img",
+		outro: "/>\n",
+	},
+	{
+		tag_name: "code",
+		attributes:
+			[
+				{name: "text", replacement: "{text}"},
+            ],
+		intro: "<a class=\"code\">",
+		outro: "</a>\n",
+	},
+	{
+		tag_name: "choice",
+		attributes:
+			[
+				{name: "next", replacement: " href=\"{next}.html\">"},
+				{name: "text", replacement: "{text}"},
+            ],
+		intro: "<a class=\"choice\"",
+		outro: "</a>\n",
+	},
+	{
+		tag_name: "source",
+		generator: function(tag: any) {
+				//TODO: Use current_arc and current_scene to get the .txt URL, download it with get and return the HTML code for it
+                return "";
+		    },
+	},
+];
+
 class Listener extends cyoaeListener {
     exitTag(ctx: any) {
         console.log("Exited Tag");
