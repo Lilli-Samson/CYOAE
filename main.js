@@ -80,7 +80,7 @@ var replacements = [
     {
         tag_name: "choice",
         attributes: [
-            { name: "next", replacement: " href=\"{next}.html\">" },
+            { name: "next", replacement: " href=\"#{current_arc}/{next}\">" },
             { name: "text", replacement: "{text}" },
         ],
         intro: "<a class=\"choice\"",
@@ -88,21 +88,115 @@ var replacements = [
     },
     {
         tag_name: "source",
+        attributes: [],
         generator: function (tag) {
-            //std::ifstream source{current_scene_path};
-            //return replace_text(source_template, "{source}",
-            //					escape_html(std::string{std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()}));
+            //TODO: Use current_arc and current_scene to get the .txt URL, download it with get and return the HTML code for it
             return "";
         },
     },
 ];
+;
+;
+function remove_escapes(text) {
+    return text.replace(/\\(.)/g, '$1');
+}
+function html_comment(content) {
+    return "<!-- " + content.replace(/-->/g, "~~>") + " -->\n";
+}
+function apply_global_replacements(text) {
+    return text.replace(/\{current_arc\}/g, current_arc);
+}
+function execute_tag(tag) {
+    console.log("Executing tag " + tag.name + " with value \"" + tag.value + "\" and attributes\n" + tag.attributes.reduce(function (curr, attribute) { return curr + "\n\t" + attribute.name + "=\"" + attribute.value + "\""; }, ""));
+    function fail(text) {
+        output(html_comment(text));
+        console.log(text);
+    }
+    ;
+    for (var _i = 0, replacements_1 = replacements; _i < replacements_1.length; _i++) {
+        var replacement = replacements_1[_i];
+        if (replacement.tag_name !== tag.name) {
+            continue;
+        }
+        //Todo: check if there are no duplicate attributes
+        if (tag.value !== "") {
+            tag.attributes.push({ name: replacement.attributes[0].name, value: tag.value });
+        }
+        var tag_replacement_text = replacement.intro || "";
+        var _loop_1 = function (attribute_replacement) {
+            var attribute_value_pos = tag.attributes.findIndex(function (attribute) { return attribute.name === attribute_replacement.name; });
+            var attribute_value = tag.attributes[attribute_value_pos];
+            if (!attribute_value) {
+                return { value: fail("Missing attribute \"" + attribute_replacement.name + "\" in tag \"" + tag.name + "\"") };
+            }
+            tag_replacement_text += apply_global_replacements(attribute_replacement.replacement.replace(new RegExp("{" + attribute_replacement.name + "}", "g"), escape_html(attribute_value.value)));
+            tag.attributes.splice(attribute_value_pos, 1);
+        };
+        for (var _a = 0, _b = replacement.attributes; _a < _b.length; _a++) {
+            var attribute_replacement = _b[_a];
+            var state_1 = _loop_1(attribute_replacement);
+            if (typeof state_1 === "object")
+                return state_1.value;
+        }
+        if (replacement.generator) {
+            tag_replacement_text += replacement.generator(tag);
+        }
+        tag_replacement_text += replacement.outro;
+        output(tag_replacement_text);
+        for (var _c = 0, _d = tag.attributes; _c < _d.length; _c++) {
+            var leftover_attribute = _d[_c];
+            fail("Unknown attribute \"" + leftover_attribute.name + "\" in tag \"" + tag.name + "\"");
+        }
+        return;
+    }
+    fail("Unknown tag " + tag.name);
+}
 var Listener = /** @class */ (function (_super) {
     __extends(Listener, _super);
     function Listener() {
-        return _super !== null && _super.apply(this, arguments) || this;
+        return _super.call(this) || this;
     }
-    Listener.prototype.exitTag = function (ctx) {
-        console.log("Exited Tag");
+    Listener.prototype.exitText = function (ctx) {
+        output("<a class=\"text\">" + escape_html(remove_escapes(ctx.getText())) + "</a>");
+    };
+    Listener.prototype.enterTag = function (ctx) {
+        //console.log(`Tag child count: ${ctx.getChildCount()}`);
+        var tag = {
+            ctx: ctx,
+            name: "",
+            value: "",
+            attributes: []
+        };
+        for (var i = 0; i < ctx.getChildCount(); i++) {
+            var child = ctx.getChild(i);
+            //console.log(`Tag child ${i}`);
+            if (child === null) {
+                //console.log(`Got premature null child`);
+                continue;
+            }
+            else if (child instanceof cyoaeParser.cyoaeParser.Tag_nameContext) {
+                //console.log(`Got a tag name "${child.getText()}"`);
+                tag.name = child.getText();
+            }
+            else if (child instanceof cyoaeParser.cyoaeParser.AttributeContext) {
+                //console.log(`Got a tag attribute name "${child.getText()}"`);
+                tag.attributes.push({ name: child.getText(), value: "" });
+            }
+            else if (child instanceof cyoaeParser.cyoaeParser.ValueContext) {
+                if (tag.attributes.length === 0) {
+                    //console.log(`Got a tag value "${child.getText()}"`);
+                    tag.value = remove_escapes(child.getText());
+                }
+                else {
+                    //console.log(`Got a tag attribute value "${child.getText()}"`);
+                    tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.getText());
+                }
+            }
+            else {
+                //console.log(`Skipping child of type "${typeof child}" with value "${child.getText()}"`);
+            }
+        }
+        execute_tag(tag);
     };
     return Listener;
 }(cyoaeListener));
@@ -145,6 +239,7 @@ function update_current_scene() {
                     return [4 /*yield*/, get(current_scene + ".txt")];
                 case 2:
                     data = _a.sent();
+                    document.body.innerHTML = "";
                     return [4 /*yield*/, parse_source_text(data, current_scene + ".txt")];
                 case 3:
                     _a.sent();

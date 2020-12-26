@@ -21,10 +21,10 @@ interface Attribute_replacement {
 
 interface Tag_replacement {
     tag_name: string;
-    attributes?: Attribute_replacement[];
+    attributes: Attribute_replacement[];
     intro?: string;
 	outro?: string;
-	generator?(tag: any): string;
+	generator?(tag: Tag): string;
 }
 
 const replacements: Tag_replacement[] = [
@@ -51,24 +51,166 @@ const replacements: Tag_replacement[] = [
 		tag_name: "choice",
 		attributes:
 			[
-				{name: "next", replacement: " href=\"{next}.html\">"},
+				{name: "next", replacement: ` href="#{current_arc}/{next}">`},
 				{name: "text", replacement: "{text}"},
             ],
 		intro: "<a class=\"choice\"",
 		outro: "</a>\n",
 	},
 	{
-		tag_name: "source",
-		generator: function(tag: any) {
-				//TODO: Use current_arc and current_scene to get the .txt URL, download it with get and return the HTML code for it
-                return "";
-		    },
+        tag_name: "source",
+        attributes: [],
+		generator: function(tag: Tag) {
+            //TODO: Use current_arc and current_scene to get the .txt URL, download it with get and return the HTML code for it
+            return "";
+        },
 	},
 ];
 
+interface Parse_context {
+    getText (): string;
+    invokingState: number;
+    ruleIndex: number;
+    //children: ?;
+    //start: ?;
+    //stop: ?;
+    //exception: ?;
+    //parser: ?;
+    constructor(parser: any, parent: any, invokingState: any): Parse_context;
+    tag_name(): string;
+    enterRule(listener: any): void;
+    exitRule(listener: any): void;
+    copyFrom(ctx: Parse_context): void;
+    //addChild: ?;
+    //removeLastChild: ?;
+    //addTokenNode: ?;
+    //addErrorNode: ?;
+    getChild(i: number, type?: string): Parse_context | null;
+    //getToken: ?;
+    //getTokens: ?;
+    //getTypedRuleContext: ?;
+    //getTypedRuleContexts: ?;
+    getChildCount(): number;
+    //getSourceInterval: ?;
+    depth(): number;
+    isEmpty(): boolean;
+    getRuleContext(): Parse_context;
+    getPayload(): Parse_context;
+    getText(): string;
+    //getAltNumber: ?;
+    //setAltNumber: ?;
+    //accept: ?;
+    //toStringTree: ?;
+    //toString: ?;
+    text: string;
+}
+
+interface Attribute {
+	name: string;
+	value: string;
+};
+
+interface Tag {
+	ctx: Parse_context;
+	name: string;
+	value: string;
+	attributes: Attribute[];
+};
+
+function remove_escapes(text: string) {
+    return text.replace(/\\(.)/g, '$1');
+}
+
+function html_comment(content: string) {
+	return `<!-- ${content.replace(/-->/g, "~~>")} -->\n`;
+}
+
+function apply_global_replacements(text: string) {
+    return text.replace(/\{current_arc\}/g, current_arc);
+}
+
+function execute_tag(tag: Tag) {
+    console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes\n${tag.attributes.reduce((curr, attribute) => `${curr}\n\t${attribute.name}="${attribute.value}"`, "")}`)
+    function fail(text: string) {
+		output(html_comment(text));
+		console.log(text);
+	};
+    for (const replacement of replacements) {
+        if (replacement.tag_name !== tag.name) {
+            continue;
+        }
+        //Todo: check if there are no duplicate attributes
+        if (tag.value !== "") {
+			tag.attributes.push({name: replacement.attributes[0].name, value: tag.value});
+        }
+        let tag_replacement_text = replacement.intro || "";
+
+		for (const attribute_replacement of replacement.attributes) {
+            const attribute_value_pos = tag.attributes.findIndex((attribute) => attribute.name === attribute_replacement.name);
+            const attribute_value = tag.attributes[attribute_value_pos];
+			if (!attribute_value) {
+				return fail(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`);
+			}
+			tag_replacement_text += apply_global_replacements(attribute_replacement.replacement.replace(new RegExp(`{${attribute_replacement.name}}`, "g"), escape_html(attribute_value.value)));
+			tag.attributes.splice(attribute_value_pos, 1);
+		}
+		if (replacement.generator) {
+			tag_replacement_text += replacement.generator(tag);
+		}
+		tag_replacement_text += replacement.outro;
+		output(tag_replacement_text);
+		for (const leftover_attribute of tag.attributes) {
+			fail(`Unknown attribute "${leftover_attribute.name}" in tag "${tag.name}"`);
+		}
+		return;
+    }
+    fail("Unknown tag " + tag.name);
+}
+
 class Listener extends cyoaeListener {
-    exitTag(ctx: any) {
-        console.log("Exited Tag");
+    constructor() {
+        super();
+    }
+    exitText(ctx: Parse_context) {
+        output(`<a class="text">${escape_html(remove_escapes(ctx.getText()))}</a>`);
+    }
+    enterTag(ctx: Parse_context) {
+        //console.log(`Tag child count: ${ctx.getChildCount()}`);
+        let tag: Tag = {
+            ctx: ctx,
+            name: "",
+            value: "",
+            attributes: []
+        };
+        for (let i = 0; i < ctx.getChildCount(); i++) {
+            const child = ctx.getChild(i);
+            //console.log(`Tag child ${i}`);
+            if (child === null) {
+                //console.log(`Got premature null child`);
+                continue;
+            }
+            else if (child instanceof cyoaeParser.cyoaeParser.Tag_nameContext) {
+                //console.log(`Got a tag name "${child.getText()}"`);
+                tag.name = child.getText();
+            }
+            else if (child instanceof cyoaeParser.cyoaeParser.AttributeContext) {
+                //console.log(`Got a tag attribute name "${child.getText()}"`);
+                tag.attributes.push({name: child.getText(), value: ""});
+            }
+            else if (child instanceof cyoaeParser.cyoaeParser.ValueContext) {
+                if (tag.attributes.length === 0) {
+                    //console.log(`Got a tag value "${child.getText()}"`);
+                    tag.value = remove_escapes(child.getText());
+                } else {
+                    //console.log(`Got a tag attribute value "${child.getText()}"`);
+                    tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.getText());
+                }
+            }
+            else {
+                //console.log(`Skipping child of type "${typeof child}" with value "${child.getText()}"`);
+            }
+        }
+        execute_tag(tag);
     }
 }
 
@@ -93,6 +235,7 @@ async function update_current_scene() {
     console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
         const data = await get(`${current_scene}.txt`);
+        document.body.innerHTML = "";
         await parse_source_text(data, `${current_scene}.txt`);
     }
     catch (err) {
