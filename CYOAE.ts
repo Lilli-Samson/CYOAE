@@ -147,9 +147,14 @@ function execute_tag(tag: Tag) {
 
 		for (const attribute_replacement of replacement.attributes) {
             const attribute_value_pos = tag.attributes.findIndex((attribute) => attribute.name === attribute_replacement.name);
-            const attribute_value = tag.attributes[attribute_value_pos];
+            let attribute_value = tag.attributes[attribute_value_pos];
 			if (!attribute_value) {
-				return fail(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`);
+                if (attribute_replacement.default_value) {
+                    attribute_value = {name: attribute_replacement.name, value: attribute_replacement.default_value};
+                }
+                else {
+                    return fail(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`);
+                }
 			}
 			tag_replacement_text += apply_global_replacements(attribute_replacement.replacement.replace(new RegExp(`{${attribute_replacement.name}}`, "g"), escape_html(attribute_value.value)));
 			tag.attributes.splice(attribute_value_pos, 1);
