@@ -7,6 +7,7 @@ let cyoaeListener = require("./cyoaeListener").cyoaeListener;
 
 let current_arc = "";
 let current_scene = "";
+let current_source = "";
 
 function output(text: string) {
     document.body.innerHTML += text;
@@ -60,9 +61,10 @@ const replacements: Tag_replacement[] = [
 	{
         tag_name: "source",
         attributes: [],
+        intro: '<hr>',
 		generator: function(tag: Tag) {
-            //TODO: Use current_arc and current_scene to get the .txt URL, download it with get and return the HTML code for it
-            return "";
+            const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
+            return `<a href="${`${current_url}story arcs/${current_arc}/${current_scene}.txt`}">Source</a><br>\n<p class="source">${escape_html(current_source)}</p>`;
         },
 	},
 ];
@@ -162,7 +164,7 @@ function execute_tag(tag: Tag) {
 		if (replacement.generator) {
 			tag_replacement_text += replacement.generator(tag);
 		}
-		tag_replacement_text += replacement.outro;
+		tag_replacement_text += replacement.outro || "";
 		output(tag_replacement_text);
 		for (const leftover_attribute of tag.attributes) {
 			fail(`Unknown attribute "${leftover_attribute.name}" in tag "${tag.name}"`);
@@ -219,7 +221,7 @@ class Listener extends cyoaeListener {
     }
 }
 
-async function parse_source_text(data: string, filename: string) {
+function parse_source_text(data: string, filename: string) {
     console.log(`Starting parsing source text ${filename}`);
     const input = new antlr4.InputStream(data);
     const lexer = new cyoaeLexer.cyoaeLexer(input);
@@ -239,9 +241,9 @@ async function play_arc(name: string) {
 async function update_current_scene() {
     console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
-        const data = await get(`${current_scene}.txt`);
+        current_source = await get(`${current_scene}.txt`);
         document.body.innerHTML = "";
-        await parse_source_text(data, `${current_scene}.txt`);
+        parse_source_text(current_source, `${current_scene}.txt`);
     }
     catch (err) {
         display_error_document(`${err}`);

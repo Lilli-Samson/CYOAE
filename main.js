@@ -55,6 +55,7 @@ var cyoaeParser = require("./cyoaeParser");
 var cyoaeListener = require("./cyoaeListener").cyoaeListener;
 var current_arc = "";
 var current_scene = "";
+var current_source = "";
 function output(text) {
     document.body.innerHTML += text;
 }
@@ -89,9 +90,10 @@ var replacements = [
     {
         tag_name: "source",
         attributes: [],
+        intro: '<hr>',
         generator: function (tag) {
-            //TODO: Use current_arc and current_scene to get the .txt URL, download it with get and return the HTML code for it
-            return "";
+            var current_url = window.location.toString().replace(/\/[^\/]*$/, "/").replace(/#.*/, "");
+            return "<a href=\"" + (current_url + "story arcs/" + current_arc + "/" + current_scene + ".txt") + "\">Source</a><br>\n<p class=\"source\">" + escape_html(current_source) + "</p>";
         },
     },
 ];
@@ -127,7 +129,12 @@ function execute_tag(tag) {
             var attribute_value_pos = tag.attributes.findIndex(function (attribute) { return attribute.name === attribute_replacement.name; });
             var attribute_value = tag.attributes[attribute_value_pos];
             if (!attribute_value) {
-                return { value: fail("Missing attribute \"" + attribute_replacement.name + "\" in tag \"" + tag.name + "\"") };
+                if (attribute_replacement.default_value) {
+                    attribute_value = { name: attribute_replacement.name, value: attribute_replacement.default_value };
+                }
+                else {
+                    return { value: fail("Missing attribute \"" + attribute_replacement.name + "\" in tag \"" + tag.name + "\"") };
+                }
             }
             tag_replacement_text += apply_global_replacements(attribute_replacement.replacement.replace(new RegExp("{" + attribute_replacement.name + "}", "g"), escape_html(attribute_value.value)));
             tag.attributes.splice(attribute_value_pos, 1);
@@ -141,7 +148,7 @@ function execute_tag(tag) {
         if (replacement.generator) {
             tag_replacement_text += replacement.generator(tag);
         }
-        tag_replacement_text += replacement.outro;
+        tag_replacement_text += replacement.outro || "";
         output(tag_replacement_text);
         for (var _c = 0, _d = tag.attributes; _c < _d.length; _c++) {
             var leftover_attribute = _d[_c];
@@ -201,20 +208,14 @@ var Listener = /** @class */ (function (_super) {
     return Listener;
 }(cyoaeListener));
 function parse_source_text(data, filename) {
-    return __awaiter(this, void 0, void 0, function () {
-        var input, lexer, tokens, parser, tree, listener;
-        return __generator(this, function (_a) {
-            console.log("Starting parsing source text " + filename);
-            input = new antlr4.InputStream(data);
-            lexer = new cyoaeLexer.cyoaeLexer(input);
-            tokens = new antlr4.CommonTokenStream(lexer);
-            parser = new cyoaeParser.cyoaeParser(tokens);
-            tree = parser.start();
-            listener = new Listener();
-            antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
-            return [2 /*return*/];
-        });
-    });
+    console.log("Starting parsing source text " + filename);
+    var input = new antlr4.InputStream(data);
+    var lexer = new cyoaeLexer.cyoaeLexer(input);
+    var tokens = new antlr4.CommonTokenStream(lexer);
+    var parser = new cyoaeParser.cyoaeParser(tokens);
+    var tree = parser.start();
+    var listener = new Listener();
+    antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
 }
 // plays through a story arc
 function play_arc(name) {
@@ -228,27 +229,25 @@ function play_arc(name) {
 // display a scene based on a source .txt file and the current arc
 function update_current_scene() {
     return __awaiter(this, void 0, void 0, function () {
-        var data, err_1;
+        var err_1;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     console.log("updating scene to " + current_arc + "/" + current_scene);
                     _a.label = 1;
                 case 1:
-                    _a.trys.push([1, 4, , 5]);
+                    _a.trys.push([1, 3, , 4]);
                     return [4 /*yield*/, get(current_scene + ".txt")];
                 case 2:
-                    data = _a.sent();
+                    current_source = _a.sent();
                     document.body.innerHTML = "";
-                    return [4 /*yield*/, parse_source_text(data, current_scene + ".txt")];
+                    parse_source_text(current_source, current_scene + ".txt");
+                    return [3 /*break*/, 4];
                 case 3:
-                    _a.sent();
-                    return [3 /*break*/, 5];
-                case 4:
                     err_1 = _a.sent();
                     display_error_document("" + err_1);
-                    return [3 /*break*/, 5];
-                case 5: return [2 /*return*/];
+                    return [3 /*break*/, 4];
+                case 4: return [2 /*return*/];
             }
         });
     });
