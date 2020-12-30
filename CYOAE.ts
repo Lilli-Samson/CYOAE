@@ -15,9 +15,9 @@ function output(text: string) {
 
 interface Attribute_replacement {
 	name: string;
-	replacement: string;
+	replacement(value: string): string;
 	default_value?: string;
-	html_escape?: boolean;
+    html_escape?: boolean;
 };
 
 interface Tag_replacement {
@@ -33,8 +33,8 @@ const replacements: Tag_replacement[] = [
 		tag_name: "img",
 		attributes:
 			[
-				{name: "url", replacement: " src=\"{url}\""},
-				{name: "alt", replacement: " alt=\"{alt}\"", default_value: "image"},
+				{name: "url", replacement: url => ` src="${url}"`},
+				{name: "alt", replacement: alt => ` alt="${escape_html(alt)}"`, default_value: "image"},
             ],
 		intro: "<img",
 		outro: "/>\n",
@@ -43,7 +43,7 @@ const replacements: Tag_replacement[] = [
 		tag_name: "code",
 		attributes:
 			[
-				{name: "text", replacement: "{text}"},
+				{name: "text", replacement: text => escape_html(text)},
             ],
 		intro: "<a class=\"code\">",
 		outro: "</a>\n",
@@ -52,8 +52,9 @@ const replacements: Tag_replacement[] = [
 		tag_name: "choice",
 		attributes:
 			[
-				{name: "next", replacement: ` href="#{current_arc}/{next}">`},
-				{name: "text", replacement: "{text}"},
+				{name: "next", replacement: next => ` href="#${current_arc}/${next}">`},
+                {name: "text", replacement: text => escape_html(text)},
+                {name: "onselect", replacement: onselect => "", default_value: ""},
             ],
 		intro: "<a class=\"choice\"",
 		outro: "</a>\n",
@@ -127,10 +128,6 @@ function html_comment(content: string) {
 	return `<!-- ${content.replace(/-->/g, "~~>")} -->\n`;
 }
 
-function apply_global_replacements(text: string) {
-    return text.replace(/\{current_arc\}/g, current_arc);
-}
-
 function execute_tag(tag: Tag) {
     console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes\n${tag.attributes.reduce((curr, attribute) => `${curr}\n\t${attribute.name}="${attribute.value}"`, "")}`)
     function fail(text: string) {
@@ -151,14 +148,14 @@ function execute_tag(tag: Tag) {
             const attribute_value_pos = tag.attributes.findIndex((attribute) => attribute.name === attribute_replacement.name);
             let attribute_value = tag.attributes[attribute_value_pos];
 			if (!attribute_value) {
-                if (attribute_replacement.default_value) {
+                if (attribute_replacement.default_value !== undefined) {
                     attribute_value = {name: attribute_replacement.name, value: attribute_replacement.default_value};
                 }
                 else {
                     return fail(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`);
                 }
-			}
-			tag_replacement_text += apply_global_replacements(attribute_replacement.replacement.replace(new RegExp(`{${attribute_replacement.name}}`, "g"), escape_html(attribute_value.value)));
+            }
+            tag_replacement_text += attribute_replacement.replacement(attribute_value.value);
 			tag.attributes.splice(attribute_value_pos, 1);
 		}
 		if (replacement.generator) {
