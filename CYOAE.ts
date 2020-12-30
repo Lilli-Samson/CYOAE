@@ -13,6 +13,11 @@ function output(text: string) {
     document.body.innerHTML += text;
 }
 
+function get_executor(text: string) {
+    return "return false;";
+    //return escape_html(text);
+}
+
 interface Attribute_replacement {
 	name: string;
 	replacement(value: string): string;
@@ -31,32 +36,32 @@ interface Tag_replacement {
 const replacements: Tag_replacement[] = [
 	{
 		tag_name: "img",
+		intro: "<img",
 		attributes:
 			[
 				{name: "url", replacement: url => ` src="${url}"`},
-				{name: "alt", replacement: alt => ` alt="${escape_html(alt)}"`, default_value: "image"},
+				{name: "alt", replacement: alt => ` alt="${escape_html(alt)}"`, default_value: " alt='image'"},
             ],
-		intro: "<img",
 		outro: "/>\n",
 	},
 	{
 		tag_name: "code",
+		intro: "<a class='code'>",
 		attributes:
 			[
 				{name: "text", replacement: text => escape_html(text)},
             ],
-		intro: "<a class=\"code\">",
 		outro: "</a>\n",
 	},
 	{
 		tag_name: "choice",
+		intro: "<a class='choice'",
 		attributes:
 			[
-				{name: "next", replacement: next => ` href="#${current_arc}/${next}">`},
-                {name: "text", replacement: text => escape_html(text)},
-                {name: "onselect", replacement: onselect => "", default_value: ""},
+				{name: "next", replacement: next => ` href="#${current_arc}/${next}"`},
+                {name: "onclick", replacement: onclick => ` onclick='${get_executor(onclick)}'`, default_value: ""},
+                {name: "text", replacement: text => '>' + escape_html(text)},
             ],
-		intro: "<a class=\"choice\"",
 		outro: "</a>\n",
 	},
 	{
@@ -156,7 +161,9 @@ function execute_tag(tag: Tag) {
                 }
             }
             tag_replacement_text += attribute_replacement.replacement(attribute_value.value);
-			tag.attributes.splice(attribute_value_pos, 1);
+			if (attribute_value_pos !== -1) {
+                tag.attributes.splice(attribute_value_pos, 1);
+            }
 		}
 		if (replacement.generator) {
 			tag_replacement_text += replacement.generator(tag);
