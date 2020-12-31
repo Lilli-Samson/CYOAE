@@ -1,6 +1,7 @@
 {
     "scripts": {
-        "build": "tsc --pretty -p . && NODE_PATH=. `npm config get prefix`/bin/browserify CYOAE.js > main.js"
+        "build": "tsc --pretty -p . && NODE_PATH=. `npm config get prefix`/bin/browserify CYOAE.js > main.js",
+        "update_grammar": "antlr4 -Dlanguage=JavaScript cyoae.g4"
     },
     "dependencies": {},
     "devDependencies": {
