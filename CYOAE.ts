@@ -14,8 +14,8 @@ function output(text: string) {
 }
 
 function get_executor(text: string) {
-    return "return false;";
-    //return escape_html(text);
+    console.log(`Tag to execute: ${text}`);
+    return escape_html(text);
 }
 
 interface Attribute_replacement {
@@ -23,21 +23,20 @@ interface Attribute_replacement {
 	replacement(value: string): string;
 	default_value?: string;
     html_escape?: boolean;
-};
+}
 
 interface Tag_replacement {
     tag_name: string;
-    attributes: Attribute_replacement[];
     intro?: string;
+    replacements: Attribute_replacement[] | ((tag: Tag) => string);
 	outro?: string;
-	generator?(tag: Tag): string;
 }
 
 const replacements: Tag_replacement[] = [
 	{
 		tag_name: "img",
 		intro: "<img",
-		attributes:
+		replacements:
 			[
 				{name: "url", replacement: url => ` src="${url}"`},
 				{name: "alt", replacement: alt => ` alt="${escape_html(alt)}"`, default_value: " alt='image'"},
@@ -47,7 +46,7 @@ const replacements: Tag_replacement[] = [
 	{
 		tag_name: "code",
 		intro: "<a class='code'>",
-		attributes:
+		replacements:
 			[
 				{name: "text", replacement: text => escape_html(text)},
             ],
@@ -56,23 +55,28 @@ const replacements: Tag_replacement[] = [
 	{
 		tag_name: "choice",
 		intro: "<a class='choice'",
-		attributes:
+		replacements:
 			[
 				{name: "next", replacement: next => ` href="#${current_arc}/${next}"`},
-                {name: "onclick", replacement: onclick => ` onclick='${get_executor(onclick)}'`, default_value: ""},
+                {name: "onclick", replacement: onclick => ` onclick='${"return false;" /*get_executor(onclick)*/}'`, default_value: ""},
                 {name: "text", replacement: text => '>' + escape_html(text)},
             ],
 		outro: "</a>\n",
 	},
 	{
         tag_name: "source",
-        attributes: [],
         intro: '<hr>',
-		generator: function(tag: Tag) {
+		replacements: function(tag: Tag) {
             const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
             return `<a href="${`${current_url}story arcs/${current_arc}/${current_scene}.txt`}">Source</a><br>\n<p class="source">${escape_html(current_source)}</p>`;
         },
-	},
+    },
+    {
+        tag_name: "exec",
+        replacements: function(tag: Tag) {
+            return "TODO: generate exec function";
+        }
+    },
 ];
 
 interface Parse_context {
@@ -115,15 +119,19 @@ interface Parse_context {
 
 interface Attribute {
 	name: string;
-	value: string;
-};
+	value: string | Tag;
+}
 
 interface Tag {
 	ctx: Parse_context;
 	name: string;
 	value: string;
 	attributes: Attribute[];
-};
+}
+
+function is_generator_function(replacements: Attribute_replacement[] | ((tag: Tag) => string)): replacements is (tag: Tag) => string {
+    return typeof(replacements) === "function";
+}
 
 function remove_escapes(text: string) {
     return text.replace(/\\(.)/g, '$1');
@@ -134,48 +142,56 @@ function html_comment(content: string) {
 }
 
 function execute_tag(tag: Tag) {
-    console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes\n${tag.attributes.reduce((curr, attribute) => `${curr}\n\t${attribute.name}="${attribute.value}"`, "")}`)
+    console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes [${tag.attributes.reduce((curr, attribute) => `${curr}\t${attribute.name}="${attribute.value}"\n`, "\n")}]\n`)
     function fail(text: string) {
-		output(html_comment(text));
 		console.log(text);
+        return html_comment(text);
 	};
     for (const replacement of replacements) {
         if (replacement.tag_name !== tag.name) {
             continue;
         }
         //Todo: check if there are no duplicate attributes
-        if (tag.value !== "") {
-			tag.attributes.push({name: replacement.attributes[0].name, value: tag.value});
-        }
-        let tag_replacement_text = replacement.intro || "";
 
-		for (const attribute_replacement of replacement.attributes) {
-            const attribute_value_pos = tag.attributes.findIndex((attribute) => attribute.name === attribute_replacement.name);
-            let attribute_value = tag.attributes[attribute_value_pos];
-			if (!attribute_value) {
-                if (attribute_replacement.default_value !== undefined) {
-                    attribute_value = {name: attribute_replacement.name, value: attribute_replacement.default_value};
+        let result = replacement.intro || "";
+        if (is_generator_function(replacement.replacements)) {
+            result += replacement.replacements(tag);
+        }
+        else {
+            if (tag.value !== "") {
+                tag.attributes.push({name: replacement.replacements[0].name, value: tag.value});
+            }
+    
+            for (const attribute_replacement of replacement.replacements) {
+                const attribute_value_pos = tag.attributes.findIndex((attribute) => attribute.name === attribute_replacement.name);
+                let attribute_value = tag.attributes[attribute_value_pos];
+                if (!attribute_value) {
+                    if (attribute_replacement.default_value !== undefined) {
+                        attribute_value = {name: attribute_replacement.name, value: attribute_replacement.default_value};
+                    }
+                    else {
+                        return fail(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`);
+                    }
+                }
+                if (typeof attribute_value.value === "string") {
+                    result += attribute_replacement.replacement(attribute_value.value);
                 }
                 else {
-                    return fail(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`);
+                    console.log(`Result of executing inner tag: ${execute_tag(attribute_value.value)}`);
+                    //result += execute_tag(attribute_value.value);
+                }
+                if (attribute_value_pos !== -1) {
+                    tag.attributes.splice(attribute_value_pos, 1);
                 }
             }
-            tag_replacement_text += attribute_replacement.replacement(attribute_value.value);
-			if (attribute_value_pos !== -1) {
-                tag.attributes.splice(attribute_value_pos, 1);
-            }
-		}
-		if (replacement.generator) {
-			tag_replacement_text += replacement.generator(tag);
-		}
-		tag_replacement_text += replacement.outro || "";
-		output(tag_replacement_text);
+        }
+		result += replacement.outro || "";
 		for (const leftover_attribute of tag.attributes) {
-			fail(`Unknown attribute "${leftover_attribute.name}" in tag "${tag.name}"`);
+			return fail(`Unknown attribute "${leftover_attribute.name}" in tag "${tag.name}"`);
 		}
-		return;
+		return result;
     }
-    fail("Unknown tag " + tag.name);
+    return fail("Unknown tag " + tag.name);
 }
 
 class Listener extends cyoaeListener {
@@ -186,42 +202,56 @@ class Listener extends cyoaeListener {
         output(`<a class="text">${escape_html(remove_escapes(ctx.getText()))}</a>`);
     }
     enterTag(ctx: Parse_context) {
-        //console.log(`Tag child count: ${ctx.getChildCount()}`);
-        let tag: Tag = {
-            ctx: ctx,
-            name: "",
-            value: "",
-            attributes: []
-        };
-        for (let i = 0; i < ctx.getChildCount(); i++) {
-            const child = ctx.getChild(i);
-            //console.log(`Tag child ${i}`);
-            if (child === null) {
-                //console.log(`Got premature null child`);
-                continue;
-            }
-            else if (child instanceof cyoaeParser.cyoaeParser.Tag_nameContext) {
-                //console.log(`Got a tag name "${child.getText()}"`);
-                tag.name = child.getText();
-            }
-            else if (child instanceof cyoaeParser.cyoaeParser.AttributeContext) {
-                //console.log(`Got a tag attribute name "${child.getText()}"`);
-                tag.attributes.push({name: child.getText(), value: ""});
-            }
-            else if (child instanceof cyoaeParser.cyoaeParser.ValueContext) {
-                if (tag.attributes.length === 0) {
-                    //console.log(`Got a tag value "${child.getText()}"`);
-                    tag.value = remove_escapes(child.getText());
-                } else {
-                    //console.log(`Got a tag attribute value "${child.getText()}"`);
-                    tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.getText());
+        if (ctx.depth() !== 2) {
+            //don't listen to non-toplevel tags
+            console.log(`Skipping tag ${ctx.getText()}`)
+            return;
+        }
+
+        assert(ctx instanceof cyoaeParser.cyoaeParser.TagContext, "Passed non-tag to tak parser");
+
+        function extract_tag(ctx: Parse_context) {
+            let tag: Tag = {
+                ctx: ctx,
+                name: "",
+                value: "",
+                attributes: []
+            };
+            for (let i = 0; i < ctx.getChildCount(); i++) {
+                const child = ctx.getChild(i);
+                //console.log(`Tag child ${i}`);
+                if (child === null) {
+                    //console.log(`Got premature null child`);
+                    continue;
+                }
+                else if (child instanceof cyoaeParser.cyoaeParser.Tag_nameContext) {
+                    //console.log(`Got a tag name "${child.getText()}"`);
+                    tag.name = child.getText();
+                }
+                else if (child instanceof cyoaeParser.cyoaeParser.AttributeContext) {
+                    //console.log(`Got a tag attribute name "${child.getText()}"`);
+                    tag.attributes.push({name: child.getText(), value: ""});
+                }
+                else if (child instanceof cyoaeParser.cyoaeParser.ValueContext) {
+                    if (tag.attributes.length === 0) {
+                        //console.log(`Got a tag value "${child.getText()}"`);
+                        tag.value = remove_escapes(child.getText());
+                    } else {
+                        //console.log(`Got a tag attribute value "${child.getText()}"`);
+                        tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.getText());
+                    }
+                }
+                else if (child instanceof cyoaeParser.cyoaeParser.TagContext) {
+                    //console.log(`Got a tag attribute of type tag`);
+                    tag.attributes[tag.attributes.length - 1].value = extract_tag(child);
+                }
+                else {
+                    //console.log(`Skipping child of type "${typeof child}" with value "${child.getText()}"`);
                 }
             }
-            else {
-                //console.log(`Skipping child of type "${typeof child}" with value "${child.getText()}"`);
-            }
+            return tag;
         }
-        execute_tag(tag);
+        output(execute_tag(extract_tag(ctx)));
     }
 }
 

@@ -59,60 +59,81 @@ var current_source = "";
 function output(text) {
     document.body.innerHTML += text;
 }
-;
+function get_executor(text) {
+    console.log("Tag to execute: " + text);
+    return escape_html(text);
+}
+var Tag_replacer = /** @class */ (function () {
+    function Tag_replacer(generator) {
+        if (typeof (generator) === "function") {
+            this.replacer = generator;
+        }
+        else {
+            this.replacer = function (tag) {
+                var data = generator;
+                return "";
+            };
+        }
+    }
+    return Tag_replacer;
+}());
 var replacements = [
     {
         tag_name: "img",
-        attributes: [
-            { name: "url", replacement: " src=\"{url}\"" },
-            { name: "alt", replacement: " alt=\"{alt}\"", default_value: "image" },
-        ],
         intro: "<img",
+        replacements: [
+            { name: "url", replacement: function (url) { return " src=\"" + url + "\""; } },
+            { name: "alt", replacement: function (alt) { return " alt=\"" + escape_html(alt) + "\""; }, default_value: " alt='image'" },
+        ],
         outro: "/>\n",
     },
     {
         tag_name: "code",
-        attributes: [
-            { name: "text", replacement: "{text}" },
+        intro: "<a class='code'>",
+        replacements: [
+            { name: "text", replacement: function (text) { return escape_html(text); } },
         ],
-        intro: "<a class=\"code\">",
         outro: "</a>\n",
     },
     {
         tag_name: "choice",
-        attributes: [
-            { name: "next", replacement: " href=\"#{current_arc}/{next}\">" },
-            { name: "text", replacement: "{text}" },
+        intro: "<a class='choice'",
+        replacements: [
+            { name: "next", replacement: function (next) { return " href=\"#" + current_arc + "/" + next + "\""; } },
+            { name: "onclick", replacement: function (onclick) { return " onclick='" + "return false;" /*get_executor(onclick)*/ + "'"; }, default_value: "" },
+            { name: "text", replacement: function (text) { return '>' + escape_html(text); } },
         ],
-        intro: "<a class=\"choice\"",
         outro: "</a>\n",
     },
     {
         tag_name: "source",
-        attributes: [],
         intro: '<hr>',
-        generator: function (tag) {
+        replacements: function (tag) {
             var current_url = window.location.toString().replace(/\/[^\/]*$/, "/").replace(/#.*/, "");
             return "<a href=\"" + (current_url + "story arcs/" + current_arc + "/" + current_scene + ".txt") + "\">Source</a><br>\n<p class=\"source\">" + escape_html(current_source) + "</p>";
         },
     },
+    {
+        tag_name: "exec",
+        replacements: function (tag) {
+            return "TODO: generate exec function";
+        }
+    },
 ];
-;
-;
+function is_generator_function(replacements) {
+    return typeof (replacements) === "function";
+}
 function remove_escapes(text) {
     return text.replace(/\\(.)/g, '$1');
 }
 function html_comment(content) {
     return "<!-- " + content.replace(/-->/g, "~~>") + " -->\n";
 }
-function apply_global_replacements(text) {
-    return text.replace(/\{current_arc\}/g, current_arc);
-}
 function execute_tag(tag) {
-    console.log("Executing tag " + tag.name + " with value \"" + tag.value + "\" and attributes\n" + tag.attributes.reduce(function (curr, attribute) { return curr + "\n\t" + attribute.name + "=\"" + attribute.value + "\""; }, ""));
+    console.log("Executing tag " + tag.name + " with value \"" + tag.value + "\" and attributes [" + tag.attributes.reduce(function (curr, attribute) { return curr + "\t" + attribute.name + "=\"" + attribute.value + "\"\n"; }, "\n") + "]\n");
     function fail(text) {
-        output(html_comment(text));
         console.log(text);
+        return html_comment(text);
     }
     ;
     for (var _i = 0, replacements_1 = replacements; _i < replacements_1.length; _i++) {
@@ -121,42 +142,51 @@ function execute_tag(tag) {
             continue;
         }
         //Todo: check if there are no duplicate attributes
-        if (tag.value !== "") {
-            tag.attributes.push({ name: replacement.attributes[0].name, value: tag.value });
+        var result = replacement.intro || "";
+        if (is_generator_function(replacement.replacements)) {
+            result += replacement.replacements(tag);
         }
-        var tag_replacement_text = replacement.intro || "";
-        var _loop_1 = function (attribute_replacement) {
-            var attribute_value_pos = tag.attributes.findIndex(function (attribute) { return attribute.name === attribute_replacement.name; });
-            var attribute_value = tag.attributes[attribute_value_pos];
-            if (!attribute_value) {
-                if (attribute_replacement.default_value) {
-                    attribute_value = { name: attribute_replacement.name, value: attribute_replacement.default_value };
+        else {
+            if (tag.value !== "") {
+                tag.attributes.push({ name: replacement.replacements[0].name, value: tag.value });
+            }
+            var _loop_1 = function (attribute_replacement) {
+                var attribute_value_pos = tag.attributes.findIndex(function (attribute) { return attribute.name === attribute_replacement.name; });
+                var attribute_value = tag.attributes[attribute_value_pos];
+                if (!attribute_value) {
+                    if (attribute_replacement.default_value !== undefined) {
+                        attribute_value = { name: attribute_replacement.name, value: attribute_replacement.default_value };
+                    }
+                    else {
+                        return { value: fail("Missing attribute \"" + attribute_replacement.name + "\" in tag \"" + tag.name + "\"") };
+                    }
+                }
+                if (typeof attribute_value.value === "string") {
+                    result += attribute_replacement.replacement(attribute_value.value);
                 }
                 else {
-                    return { value: fail("Missing attribute \"" + attribute_replacement.name + "\" in tag \"" + tag.name + "\"") };
+                    console.log("Result of executing inner tag: " + execute_tag(attribute_value.value));
+                    //result += execute_tag(attribute_value.value);
                 }
+                if (attribute_value_pos !== -1) {
+                    tag.attributes.splice(attribute_value_pos, 1);
+                }
+            };
+            for (var _a = 0, _b = replacement.replacements; _a < _b.length; _a++) {
+                var attribute_replacement = _b[_a];
+                var state_1 = _loop_1(attribute_replacement);
+                if (typeof state_1 === "object")
+                    return state_1.value;
             }
-            tag_replacement_text += apply_global_replacements(attribute_replacement.replacement.replace(new RegExp("{" + attribute_replacement.name + "}", "g"), escape_html(attribute_value.value)));
-            tag.attributes.splice(attribute_value_pos, 1);
-        };
-        for (var _a = 0, _b = replacement.attributes; _a < _b.length; _a++) {
-            var attribute_replacement = _b[_a];
-            var state_1 = _loop_1(attribute_replacement);
-            if (typeof state_1 === "object")
-                return state_1.value;
         }
-        if (replacement.generator) {
-            tag_replacement_text += replacement.generator(tag);
-        }
-        tag_replacement_text += replacement.outro || "";
-        output(tag_replacement_text);
+        result += replacement.outro || "";
         for (var _c = 0, _d = tag.attributes; _c < _d.length; _c++) {
             var leftover_attribute = _d[_c];
-            fail("Unknown attribute \"" + leftover_attribute.name + "\" in tag \"" + tag.name + "\"");
+            return fail("Unknown attribute \"" + leftover_attribute.name + "\" in tag \"" + tag.name + "\"");
         }
-        return;
+        return result;
     }
-    fail("Unknown tag " + tag.name);
+    return fail("Unknown tag " + tag.name);
 }
 var Listener = /** @class */ (function (_super) {
     __extends(Listener, _super);
@@ -167,43 +197,55 @@ var Listener = /** @class */ (function (_super) {
         output("<a class=\"text\">" + escape_html(remove_escapes(ctx.getText())) + "</a>");
     };
     Listener.prototype.enterTag = function (ctx) {
-        //console.log(`Tag child count: ${ctx.getChildCount()}`);
-        var tag = {
-            ctx: ctx,
-            name: "",
-            value: "",
-            attributes: []
-        };
-        for (var i = 0; i < ctx.getChildCount(); i++) {
-            var child = ctx.getChild(i);
-            //console.log(`Tag child ${i}`);
-            if (child === null) {
-                //console.log(`Got premature null child`);
-                continue;
-            }
-            else if (child instanceof cyoaeParser.cyoaeParser.Tag_nameContext) {
-                //console.log(`Got a tag name "${child.getText()}"`);
-                tag.name = child.getText();
-            }
-            else if (child instanceof cyoaeParser.cyoaeParser.AttributeContext) {
-                //console.log(`Got a tag attribute name "${child.getText()}"`);
-                tag.attributes.push({ name: child.getText(), value: "" });
-            }
-            else if (child instanceof cyoaeParser.cyoaeParser.ValueContext) {
-                if (tag.attributes.length === 0) {
-                    //console.log(`Got a tag value "${child.getText()}"`);
-                    tag.value = remove_escapes(child.getText());
+        if (ctx.depth() !== 2) {
+            //don't listen to non-toplevel tags
+            console.log("Skipping tag " + ctx.getText());
+            return;
+        }
+        assert(ctx instanceof cyoaeParser.cyoaeParser.TagContext, "Passed non-tag to tak parser");
+        function extract_tag(ctx) {
+            var tag = {
+                ctx: ctx,
+                name: "",
+                value: "",
+                attributes: []
+            };
+            for (var i = 0; i < ctx.getChildCount(); i++) {
+                var child = ctx.getChild(i);
+                //console.log(`Tag child ${i}`);
+                if (child === null) {
+                    //console.log(`Got premature null child`);
+                    continue;
+                }
+                else if (child instanceof cyoaeParser.cyoaeParser.Tag_nameContext) {
+                    //console.log(`Got a tag name "${child.getText()}"`);
+                    tag.name = child.getText();
+                }
+                else if (child instanceof cyoaeParser.cyoaeParser.AttributeContext) {
+                    //console.log(`Got a tag attribute name "${child.getText()}"`);
+                    tag.attributes.push({ name: child.getText(), value: "" });
+                }
+                else if (child instanceof cyoaeParser.cyoaeParser.ValueContext) {
+                    if (tag.attributes.length === 0) {
+                        //console.log(`Got a tag value "${child.getText()}"`);
+                        tag.value = remove_escapes(child.getText());
+                    }
+                    else {
+                        //console.log(`Got a tag attribute value "${child.getText()}"`);
+                        tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.getText());
+                    }
+                }
+                else if (child instanceof cyoaeParser.cyoaeParser.TagContext) {
+                    //console.log(`Got a tag attribute of type tag`);
+                    tag.attributes[tag.attributes.length - 1].value = extract_tag(child);
                 }
                 else {
-                    //console.log(`Got a tag attribute value "${child.getText()}"`);
-                    tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.getText());
+                    //console.log(`Skipping child of type "${typeof child}" with value "${child.getText()}"`);
                 }
             }
-            else {
-                //console.log(`Skipping child of type "${typeof child}" with value "${child.getText()}"`);
-            }
+            return tag;
         }
-        execute_tag(tag);
+        output(execute_tag(extract_tag(ctx)));
     };
     return Listener;
 }(cyoaeListener));
@@ -221,7 +263,7 @@ function parse_source_text(data, filename) {
 function play_arc(name) {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
-            window.location.hash = "#" + name + "/start";
+            window.location.hash = "#" + name + "/variables";
             return [2 /*return*/];
         });
     });
@@ -12689,56 +12731,59 @@ var cyoaeListener = require('./cyoaeListener').cyoaeListener;
 var grammarFileName = "cyoae.g4";
 
 var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
-    "\u0003\u000bQ\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004\t",
+    "\u0003\u000bU\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004\t",
     "\u0004\u0004\u0005\t\u0005\u0004\u0006\t\u0006\u0004\u0007\t\u0007\u0004",
     "\b\t\b\u0003\u0002\u0003\u0002\u0007\u0002\u0013\n\u0002\f\u0002\u000e",
     "\u0002\u0016\u000b\u0002\u0003\u0002\u0003\u0002\u0003\u0003\u0003\u0003",
     "\u0003\u0003\u0003\u0003\u0006\u0003\u001e\n\u0003\r\u0003\u000e\u0003",
     "\u001f\u0003\u0004\u0003\u0004\u0005\u0004$\n\u0004\u0003\u0004\u0003",
-    "\u0004\u0005\u0004(\n\u0004\u0003\u0004\u0005\u0004+\n\u0004\u0003\u0004",
-    "\u0005\u0004.\n\u0004\u0003\u0004\u0003\u0004\u0003\u0004\u0003\u0004",
-    "\u0005\u00044\n\u0004\u0007\u00046\n\u0004\f\u0004\u000e\u00049\u000b",
-    "\u0004\u0003\u0004\u0003\u0004\u0003\u0005\u0003\u0005\u0003\u0006\u0003",
-    "\u0006\u0003\u0007\u0007\u0007B\n\u0007\f\u0007\u000e\u0007E\u000b\u0007",
-    "\u0003\u0007\u0003\u0007\u0005\u0007I\n\u0007\u0006\u0007K\n\u0007\r",
-    "\u0007\u000e\u0007L\u0003\b\u0003\b\u0003\b\u0002\u0002\t\u0002\u0004",
-    "\u0006\b\n\f\u000e\u0002\u0003\u0003\u0002\u0006\t\u0002X\u0002\u0014",
-    "\u0003\u0002\u0002\u0002\u0004\u001d\u0003\u0002\u0002\u0002\u0006!",
-    "\u0003\u0002\u0002\u0002\b<\u0003\u0002\u0002\u0002\n>\u0003\u0002\u0002",
-    "\u0002\fJ\u0003\u0002\u0002\u0002\u000eN\u0003\u0002\u0002\u0002\u0010",
-    "\u0013\u0005\u0004\u0003\u0002\u0011\u0013\u0005\u0006\u0004\u0002\u0012",
-    "\u0010\u0003\u0002\u0002\u0002\u0012\u0011\u0003\u0002\u0002\u0002\u0013",
-    "\u0016\u0003\u0002\u0002\u0002\u0014\u0012\u0003\u0002\u0002\u0002\u0014",
-    "\u0015\u0003\u0002\u0002\u0002\u0015\u0017\u0003\u0002\u0002\u0002\u0016",
-    "\u0014\u0003\u0002\u0002\u0002\u0017\u0018\u0007\u0002\u0002\u0003\u0018",
-    "\u0003\u0003\u0002\u0002\u0002\u0019\u001e\u0005\u000e\b\u0002\u001a",
-    "\u001e\u0007\n\u0002\u0002\u001b\u001e\u0007\u000b\u0002\u0002\u001c",
-    "\u001e\u0007\u0003\u0002\u0002\u001d\u0019\u0003\u0002\u0002\u0002\u001d",
-    "\u001a\u0003\u0002\u0002\u0002\u001d\u001b\u0003\u0002\u0002\u0002\u001d",
-    "\u001c\u0003\u0002\u0002\u0002\u001e\u001f\u0003\u0002\u0002\u0002\u001f",
-    "\u001d\u0003\u0002\u0002\u0002\u001f \u0003\u0002\u0002\u0002 \u0005",
-    "\u0003\u0002\u0002\u0002!#\u0007\u0004\u0002\u0002\"$\u0007\u000b\u0002",
-    "\u0002#\"\u0003\u0002\u0002\u0002#$\u0003\u0002\u0002\u0002$%\u0003",
-    "\u0002\u0002\u0002%\'\u0005\b\u0005\u0002&(\u0007\u000b\u0002\u0002",
-    "\'&\u0003\u0002\u0002\u0002\'(\u0003\u0002\u0002\u0002(*\u0003\u0002",
-    "\u0002\u0002)+\u0005\f\u0007\u0002*)\u0003\u0002\u0002\u0002*+\u0003",
-    "\u0002\u0002\u0002+-\u0003\u0002\u0002\u0002,.\u0007\u000b\u0002\u0002",
-    "-,\u0003\u0002\u0002\u0002-.\u0003\u0002\u0002\u0002.7\u0003\u0002\u0002",
-    "\u0002/0\u0005\n\u0006\u000201\u0007\u0003\u0002\u000213\u0005\f\u0007",
-    "\u000224\u0007\u000b\u0002\u000232\u0003\u0002\u0002\u000234\u0003\u0002",
-    "\u0002\u000246\u0003\u0002\u0002\u00025/\u0003\u0002\u0002\u000269\u0003",
-    "\u0002\u0002\u000275\u0003\u0002\u0002\u000278\u0003\u0002\u0002\u0002",
-    "8:\u0003\u0002\u0002\u000297\u0003\u0002\u0002\u0002:;\u0007\u0005\u0002",
-    "\u0002;\u0007\u0003\u0002\u0002\u0002<=\u0007\n\u0002\u0002=\t\u0003",
-    "\u0002\u0002\u0002>?\u0007\n\u0002\u0002?\u000b\u0003\u0002\u0002\u0002",
-    "@B\u0007\u000b\u0002\u0002A@\u0003\u0002\u0002\u0002BE\u0003\u0002\u0002",
-    "\u0002CA\u0003\u0002\u0002\u0002CD\u0003\u0002\u0002\u0002DH\u0003\u0002",
-    "\u0002\u0002EC\u0003\u0002\u0002\u0002FI\u0005\u000e\b\u0002GI\u0007",
-    "\n\u0002\u0002HF\u0003\u0002\u0002\u0002HG\u0003\u0002\u0002\u0002I",
-    "K\u0003\u0002\u0002\u0002JC\u0003\u0002\u0002\u0002KL\u0003\u0002\u0002",
-    "\u0002LJ\u0003\u0002\u0002\u0002LM\u0003\u0002\u0002\u0002M\r\u0003",
-    "\u0002\u0002\u0002NO\t\u0002\u0002\u0002O\u000f\u0003\u0002\u0002\u0002",
-    "\u000f\u0012\u0014\u001d\u001f#\'*-37CHL"].join("");
+    "\u0004\u0005\u0004(\n\u0004\u0003\u0004\u0003\u0004\u0005\u0004,\n\u0004",
+    "\u0003\u0004\u0005\u0004/\n\u0004\u0003\u0004\u0003\u0004\u0003\u0004",
+    "\u0003\u0004\u0005\u00045\n\u0004\u0003\u0004\u0005\u00048\n\u0004\u0007",
+    "\u0004:\n\u0004\f\u0004\u000e\u0004=\u000b\u0004\u0003\u0004\u0003\u0004",
+    "\u0003\u0005\u0003\u0005\u0003\u0006\u0003\u0006\u0003\u0007\u0007\u0007",
+    "F\n\u0007\f\u0007\u000e\u0007I\u000b\u0007\u0003\u0007\u0003\u0007\u0005",
+    "\u0007M\n\u0007\u0006\u0007O\n\u0007\r\u0007\u000e\u0007P\u0003\b\u0003",
+    "\b\u0003\b\u0002\u0002\t\u0002\u0004\u0006\b\n\f\u000e\u0002\u0003\u0003",
+    "\u0002\u0006\t\u0002^\u0002\u0014\u0003\u0002\u0002\u0002\u0004\u001d",
+    "\u0003\u0002\u0002\u0002\u0006!\u0003\u0002\u0002\u0002\b@\u0003\u0002",
+    "\u0002\u0002\nB\u0003\u0002\u0002\u0002\fN\u0003\u0002\u0002\u0002\u000e",
+    "R\u0003\u0002\u0002\u0002\u0010\u0013\u0005\u0004\u0003\u0002\u0011",
+    "\u0013\u0005\u0006\u0004\u0002\u0012\u0010\u0003\u0002\u0002\u0002\u0012",
+    "\u0011\u0003\u0002\u0002\u0002\u0013\u0016\u0003\u0002\u0002\u0002\u0014",
+    "\u0012\u0003\u0002\u0002\u0002\u0014\u0015\u0003\u0002\u0002\u0002\u0015",
+    "\u0017\u0003\u0002\u0002\u0002\u0016\u0014\u0003\u0002\u0002\u0002\u0017",
+    "\u0018\u0007\u0002\u0002\u0003\u0018\u0003\u0003\u0002\u0002\u0002\u0019",
+    "\u001e\u0005\u000e\b\u0002\u001a\u001e\u0007\n\u0002\u0002\u001b\u001e",
+    "\u0007\u000b\u0002\u0002\u001c\u001e\u0007\u0003\u0002\u0002\u001d\u0019",
+    "\u0003\u0002\u0002\u0002\u001d\u001a\u0003\u0002\u0002\u0002\u001d\u001b",
+    "\u0003\u0002\u0002\u0002\u001d\u001c\u0003\u0002\u0002\u0002\u001e\u001f",
+    "\u0003\u0002\u0002\u0002\u001f\u001d\u0003\u0002\u0002\u0002\u001f ",
+    "\u0003\u0002\u0002\u0002 \u0005\u0003\u0002\u0002\u0002!#\u0007\u0004",
+    "\u0002\u0002\"$\u0007\u000b\u0002\u0002#\"\u0003\u0002\u0002\u0002#",
+    "$\u0003\u0002\u0002\u0002$%\u0003\u0002\u0002\u0002%\'\u0005\b\u0005",
+    "\u0002&(\u0007\u000b\u0002\u0002\'&\u0003\u0002\u0002\u0002\'(\u0003",
+    "\u0002\u0002\u0002(+\u0003\u0002\u0002\u0002),\u0005\f\u0007\u0002*",
+    ",\u0005\u0006\u0004\u0002+)\u0003\u0002\u0002\u0002+*\u0003\u0002\u0002",
+    "\u0002+,\u0003\u0002\u0002\u0002,.\u0003\u0002\u0002\u0002-/\u0007\u000b",
+    "\u0002\u0002.-\u0003\u0002\u0002\u0002./\u0003\u0002\u0002\u0002/;\u0003",
+    "\u0002\u0002\u000201\u0005\n\u0006\u000214\u0007\u0003\u0002\u00022",
+    "5\u0005\f\u0007\u000235\u0005\u0006\u0004\u000242\u0003\u0002\u0002",
+    "\u000243\u0003\u0002\u0002\u000257\u0003\u0002\u0002\u000268\u0007\u000b",
+    "\u0002\u000276\u0003\u0002\u0002\u000278\u0003\u0002\u0002\u00028:\u0003",
+    "\u0002\u0002\u000290\u0003\u0002\u0002\u0002:=\u0003\u0002\u0002\u0002",
+    ";9\u0003\u0002\u0002\u0002;<\u0003\u0002\u0002\u0002<>\u0003\u0002\u0002",
+    "\u0002=;\u0003\u0002\u0002\u0002>?\u0007\u0005\u0002\u0002?\u0007\u0003",
+    "\u0002\u0002\u0002@A\u0007\n\u0002\u0002A\t\u0003\u0002\u0002\u0002",
+    "BC\u0007\n\u0002\u0002C\u000b\u0003\u0002\u0002\u0002DF\u0007\u000b",
+    "\u0002\u0002ED\u0003\u0002\u0002\u0002FI\u0003\u0002\u0002\u0002GE\u0003",
+    "\u0002\u0002\u0002GH\u0003\u0002\u0002\u0002HL\u0003\u0002\u0002\u0002",
+    "IG\u0003\u0002\u0002\u0002JM\u0005\u000e\b\u0002KM\u0007\n\u0002\u0002",
+    "LJ\u0003\u0002\u0002\u0002LK\u0003\u0002\u0002\u0002MO\u0003\u0002\u0002",
+    "\u0002NG\u0003\u0002\u0002\u0002OP\u0003\u0002\u0002\u0002PN\u0003\u0002",
+    "\u0002\u0002PQ\u0003\u0002\u0002\u0002Q\r\u0003\u0002\u0002\u0002RS",
+    "\t\u0002\u0002\u0002S\u000f\u0003\u0002\u0002\u0002\u0010\u0012\u0014",
+    "\u001d\u001f#\'+.47;GLP"].join("");
 
 
 var atn = new antlr4.atn.ATNDeserializer().deserialize(serializedATN);
@@ -13073,6 +13118,17 @@ TagContext.prototype.value = function(i) {
     }
 };
 
+TagContext.prototype.tag = function(i) {
+    if(i===undefined) {
+        i = null;
+    }
+    if(i===null) {
+        return this.getTypedRuleContexts(TagContext);
+    } else {
+        return this.getTypedRuleContext(TagContext,i);
+    }
+};
+
 TagContext.prototype.attribute = function(i) {
     if(i===undefined) {
         i = null;
@@ -13128,45 +13184,66 @@ cyoaeParser.prototype.tag = function() {
             this.match(cyoaeParser.WS);
 
         }
-        this.state = 40;
+        this.state = 41;
         this._errHandler.sync(this);
         var la_ = this._interp.adaptivePredict(this._input,6,this._ctx);
         if(la_===1) {
             this.state = 39;
             this.value();
 
+        } else if(la_===2) {
+            this.state = 40;
+            this.tag();
+
         }
-        this.state = 43;
+        this.state = 44;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         if(_la===cyoaeParser.WS) {
-            this.state = 42;
+            this.state = 43;
             this.match(cyoaeParser.WS);
         }
 
-        this.state = 53;
+        this.state = 57;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         while(_la===cyoaeParser.WORD) {
-            this.state = 45;
-            this.attribute();
             this.state = 46;
-            this.match(cyoaeParser.T__0);
+            this.attribute();
             this.state = 47;
-            this.value();
-            this.state = 49;
+            this.match(cyoaeParser.T__0);
+            this.state = 50;
+            this._errHandler.sync(this);
+            switch(this._input.LA(1)) {
+            case cyoaeParser.T__3:
+            case cyoaeParser.T__4:
+            case cyoaeParser.T__5:
+            case cyoaeParser.T__6:
+            case cyoaeParser.WORD:
+            case cyoaeParser.WS:
+                this.state = 48;
+                this.value();
+                break;
+            case cyoaeParser.T__1:
+                this.state = 49;
+                this.tag();
+                break;
+            default:
+                throw new antlr4.error.NoViableAltException(this);
+            }
+            this.state = 53;
             this._errHandler.sync(this);
             _la = this._input.LA(1);
             if(_la===cyoaeParser.WS) {
-                this.state = 48;
+                this.state = 52;
                 this.match(cyoaeParser.WS);
             }
 
-            this.state = 55;
+            this.state = 59;
             this._errHandler.sync(this);
             _la = this._input.LA(1);
         }
-        this.state = 56;
+        this.state = 60;
         this.match(cyoaeParser.T__2);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -13225,7 +13302,7 @@ cyoaeParser.prototype.tag_name = function() {
     this.enterRule(localctx, 6, cyoaeParser.RULE_tag_name);
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 58;
+        this.state = 62;
         this.match(cyoaeParser.WORD);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -13284,7 +13361,7 @@ cyoaeParser.prototype.attribute = function() {
     this.enterRule(localctx, 8, cyoaeParser.RULE_attribute);
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 60;
+        this.state = 64;
         this.match(cyoaeParser.WORD);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -13375,34 +13452,34 @@ cyoaeParser.prototype.value = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 72; 
+        this.state = 76; 
         this._errHandler.sync(this);
         var _alt = 1;
         do {
         	switch (_alt) {
         	case 1:
-        		this.state = 65;
+        		this.state = 69;
         		this._errHandler.sync(this);
         		_la = this._input.LA(1);
         		while(_la===cyoaeParser.WS) {
-        		    this.state = 62;
+        		    this.state = 66;
         		    this.match(cyoaeParser.WS);
-        		    this.state = 67;
+        		    this.state = 71;
         		    this._errHandler.sync(this);
         		    _la = this._input.LA(1);
         		}
-        		this.state = 70;
+        		this.state = 74;
         		this._errHandler.sync(this);
         		switch(this._input.LA(1)) {
         		case cyoaeParser.T__3:
         		case cyoaeParser.T__4:
         		case cyoaeParser.T__5:
         		case cyoaeParser.T__6:
-        		    this.state = 68;
+        		    this.state = 72;
         		    this.escaped_text();
         		    break;
         		case cyoaeParser.WORD:
-        		    this.state = 69;
+        		    this.state = 73;
         		    this.match(cyoaeParser.WORD);
         		    break;
         		default:
@@ -13412,9 +13489,9 @@ cyoaeParser.prototype.value = function() {
         	default:
         		throw new antlr4.error.NoViableAltException(this);
         	}
-        	this.state = 74; 
+        	this.state = 78; 
         	this._errHandler.sync(this);
-        	_alt = this._interp.adaptivePredict(this._input,12, this._ctx);
+        	_alt = this._interp.adaptivePredict(this._input,13, this._ctx);
         } while ( _alt!=2 && _alt!=antlr4.atn.ATN.INVALID_ALT_NUMBER );
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -13471,7 +13548,7 @@ cyoaeParser.prototype.escaped_text = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 76;
+        this.state = 80;
         _la = this._input.LA(1);
         if(!((((_la) & ~0x1f) == 0 && ((1 << _la) & ((1 << cyoaeParser.T__3) | (1 << cyoaeParser.T__4) | (1 << cyoaeParser.T__5) | (1 << cyoaeParser.T__6))) !== 0))) {
         this._errHandler.recoverInline(this);
