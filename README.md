@@ -11,3 +11,5 @@ Inserts an image specified by the `url`. Example: `[img https://pbs.twimg.com/me
 
 ### [choice scene text]
 Adds a choice selection for the given scene with the specified text. The scene should exist as a scene.txt file in the same arc, otherwise it is not available. The text is the text of the choice. Example: `[choice escape Leave the prison]`. This will display an option with title "Leave the prison" and if the user clicks on it it will switch to `escape.txt` in the same arc.
+
+### [Try out the interactive demo!](https://lilli-samson.github.io/CYOAE/)
