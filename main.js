@@ -63,20 +63,7 @@ function get_executor(text) {
     console.log("Tag to execute: " + text);
     return escape_html(text);
 }
-var Tag_replacer = /** @class */ (function () {
-    function Tag_replacer(generator) {
-        if (typeof (generator) === "function") {
-            this.replacer = generator;
-        }
-        else {
-            this.replacer = function (tag) {
-                var data = generator;
-                return "";
-            };
-        }
-    }
-    return Tag_replacer;
-}());
+var game_variables = new Map();
 var replacements = [
     {
         tag_name: "img",
@@ -100,7 +87,7 @@ var replacements = [
         intro: "<a class='choice'",
         replacements: [
             { name: "next", replacement: function (next) { return " href=\"#" + current_arc + "/" + next + "\""; } },
-            { name: "onclick", replacement: function (onclick) { return " onclick='" + "return false;" /*get_executor(onclick)*/ + "'"; }, default_value: "" },
+            { name: "onclick", replacement: function (onclick) { return onclick ? " onclick=\"" + onclick + "\"" : ""; }, default_value: "" },
             { name: "text", replacement: function (text) { return '>' + escape_html(text); } },
         ],
         outro: "</a>\n",
@@ -116,13 +103,19 @@ var replacements = [
     {
         tag_name: "exec",
         replacements: function (tag) {
-            return "TODO: generate exec function";
-        }
+            var result = "";
+            for (var _i = 0, _a = tag.attributes; _i < _a.length; _i++) {
+                var attribute = _a[_i];
+                if (typeof attribute.value === "string") {
+                    game_variables.set(attribute.name, "");
+                }
+                //result += `game_variables.set("${attribute.name}", ${attribute.value});`;
+                result += "alert(typeof game_variables);";
+            }
+            return (result + "foo='bar';return false").replace(/"/g, "&quot;");
+        },
     },
 ];
-function is_generator_function(replacements) {
-    return typeof (replacements) === "function";
-}
 function remove_escapes(text) {
     return text.replace(/\\(.)/g, '$1');
 }
@@ -143,7 +136,7 @@ function execute_tag(tag) {
         }
         //Todo: check if there are no duplicate attributes
         var result = replacement.intro || "";
-        if (is_generator_function(replacement.replacements)) {
+        if (typeof replacement.replacements === "function") {
             result += replacement.replacements(tag);
         }
         else {
@@ -165,8 +158,7 @@ function execute_tag(tag) {
                     result += attribute_replacement.replacement(attribute_value.value);
                 }
                 else {
-                    console.log("Result of executing inner tag: " + execute_tag(attribute_value.value));
-                    //result += execute_tag(attribute_value.value);
+                    result += attribute_replacement.replacement(execute_tag(attribute_value.value));
                 }
                 if (attribute_value_pos !== -1) {
                     tag.attributes.splice(attribute_value_pos, 1);
@@ -178,12 +170,12 @@ function execute_tag(tag) {
                 if (typeof state_1 === "object")
                     return state_1.value;
             }
+            for (var _c = 0, _d = tag.attributes; _c < _d.length; _c++) {
+                var leftover_attribute = _d[_c];
+                return fail("Unknown attribute \"" + leftover_attribute.name + "\" in tag \"" + tag.name + "\"");
+            }
         }
         result += replacement.outro || "";
-        for (var _c = 0, _d = tag.attributes; _c < _d.length; _c++) {
-            var leftover_attribute = _d[_c];
-            return fail("Unknown attribute \"" + leftover_attribute.name + "\" in tag \"" + tag.name + "\"");
-        }
         return result;
     }
     return fail("Unknown tag " + tag.name);

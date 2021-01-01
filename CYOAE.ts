@@ -32,6 +32,8 @@ interface Tag_replacement {
 	outro?: string;
 }
 
+let game_variables = new Map<string, string | number>();
+
 const replacements: Tag_replacement[] = [
 	{
 		tag_name: "img",
@@ -58,7 +60,7 @@ const replacements: Tag_replacement[] = [
 		replacements:
 			[
 				{name: "next", replacement: next => ` href="#${current_arc}/${next}"`},
-                {name: "onclick", replacement: onclick => ` onclick='${"return false;" /*get_executor(onclick)*/}'`, default_value: ""},
+                {name: "onclick", replacement: onclick => onclick ? ` onclick="${onclick}"` : "", default_value: ""},
                 {name: "text", replacement: text => '>' + escape_html(text)},
             ],
 		outro: "</a>\n",
@@ -74,8 +76,16 @@ const replacements: Tag_replacement[] = [
     {
         tag_name: "exec",
         replacements: function(tag: Tag) {
-            return "TODO: generate exec function";
-        }
+            let result = "";
+            for (const attribute of tag.attributes) {
+                if (typeof attribute.value === "string") {
+                    game_variables.set(attribute.name, "");
+                }
+                //result += `game_variables.set("${attribute.name}", ${attribute.value});`;
+                result += `alert(typeof game_variables);`;
+            }
+            return (result + "foo='bar';return false").replace(/"/g, "&quot;");
+        },
     },
 ];
 
@@ -129,10 +139,6 @@ interface Tag {
 	attributes: Attribute[];
 }
 
-function is_generator_function(replacements: Attribute_replacement[] | ((tag: Tag) => string)): replacements is (tag: Tag) => string {
-    return typeof(replacements) === "function";
-}
-
 function remove_escapes(text: string) {
     return text.replace(/\\(.)/g, '$1');
 }
@@ -154,7 +160,7 @@ function execute_tag(tag: Tag) {
         //Todo: check if there are no duplicate attributes
 
         let result = replacement.intro || "";
-        if (is_generator_function(replacement.replacements)) {
+        if (typeof replacement.replacements === "function") {
             result += replacement.replacements(tag);
         }
         else {
@@ -177,18 +183,17 @@ function execute_tag(tag: Tag) {
                     result += attribute_replacement.replacement(attribute_value.value);
                 }
                 else {
-                    console.log(`Result of executing inner tag: ${execute_tag(attribute_value.value)}`);
-                    //result += execute_tag(attribute_value.value);
+                    result += attribute_replacement.replacement(execute_tag(attribute_value.value));
                 }
                 if (attribute_value_pos !== -1) {
                     tag.attributes.splice(attribute_value_pos, 1);
                 }
             }
+            for (const leftover_attribute of tag.attributes) {
+                return fail(`Unknown attribute "${leftover_attribute.name}" in tag "${tag.name}"`);
+            }
         }
 		result += replacement.outro || "";
-		for (const leftover_attribute of tag.attributes) {
-			return fail(`Unknown attribute "${leftover_attribute.name}" in tag "${tag.name}"`);
-		}
 		return result;
     }
     return fail("Unknown tag " + tag.name);
@@ -268,7 +273,7 @@ function parse_source_text(data: string, filename: string) {
 
 // plays through a story arc
 async function play_arc(name: string) {
-    window.location.hash = `#${name}/start`;
+    window.location.hash = `#${name}/variables`;
 }
 
 // display a scene based on a source .txt file and the current arc
