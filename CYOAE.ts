@@ -32,7 +32,13 @@ interface Tag_replacement {
 	outro?: string;
 }
 
-let game_variables = new Map<string, string | number>();
+(window as any).g = new Map<string, string | number>();
+
+function process_expression(expr: string) {
+    //TODO: Replace this with a proper parser or maybe just a lexer at some point
+    //TODO: Ensure parenthesis and quote balance
+    return expr.replace(/(?<!["\w])[_a-zA-Z]\w*/g, 'g.get("$0")');
+}
 
 const replacements: Tag_replacement[] = [
 	{
@@ -78,13 +84,11 @@ const replacements: Tag_replacement[] = [
         replacements: function(tag: Tag) {
             let result = "";
             for (const attribute of tag.attributes) {
-                if (typeof attribute.value === "string") {
-                    game_variables.set(attribute.name, "");
-                }
-                //result += `game_variables.set("${attribute.name}", ${attribute.value});`;
-                result += `alert(typeof game_variables);`;
+                const code = typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
+                //TODO: Error handling
+                result += `g.set('${attribute.name}', ${process_expression(code)});`;
             }
-            return (result + "foo='bar';return false").replace(/"/g, "&quot;");
+            return (result + "return true").replace(/"/g, "&quot;");
         },
     },
 ];
@@ -148,7 +152,7 @@ function html_comment(content: string) {
 }
 
 function execute_tag(tag: Tag) {
-    console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes [${tag.attributes.reduce((curr, attribute) => `${curr}\t${attribute.name}="${attribute.value}"\n`, "\n")}]\n`)
+    //console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes [${tag.attributes.reduce((curr, attribute) => `${curr}\t${attribute.name}="${attribute.value}"\n`, "\n")}]\n`)
     function fail(text: string) {
 		console.log(text);
         return html_comment(text);
@@ -208,8 +212,8 @@ class Listener extends cyoaeListener {
     }
     enterTag(ctx: Parse_context) {
         if (ctx.depth() !== 2) {
-            //don't listen to non-toplevel tags
-            console.log(`Skipping tag ${ctx.getText()}`)
+            //don't listen to non-toplevel tags, those get evaluated later
+            //console.log(`Skipping tag ${ctx.getText()}`)
             return;
         }
 

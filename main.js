@@ -63,7 +63,12 @@ function get_executor(text) {
     console.log("Tag to execute: " + text);
     return escape_html(text);
 }
-var game_variables = new Map();
+window.g = new Map();
+function process_expression(expr) {
+    //TODO: Replace this with a proper parser or maybe just a lexer at some point
+    //TODO: Ensure parenthesis and quote balance
+    return expr.replace(/(?<!["\w])[_a-zA-Z]\w*/g, 'g.get("$0")');
+}
 var replacements = [
     {
         tag_name: "img",
@@ -106,13 +111,11 @@ var replacements = [
             var result = "";
             for (var _i = 0, _a = tag.attributes; _i < _a.length; _i++) {
                 var attribute = _a[_i];
-                if (typeof attribute.value === "string") {
-                    game_variables.set(attribute.name, "");
-                }
-                //result += `game_variables.set("${attribute.name}", ${attribute.value});`;
-                result += "alert(typeof game_variables);";
+                var code = typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
+                //TODO: Error handling
+                result += "g.set('" + attribute.name + "', " + process_expression(code) + ");";
             }
-            return (result + "foo='bar';return false").replace(/"/g, "&quot;");
+            return (result + "return true").replace(/"/g, "&quot;");
         },
     },
 ];
@@ -123,7 +126,7 @@ function html_comment(content) {
     return "<!-- " + content.replace(/-->/g, "~~>") + " -->\n";
 }
 function execute_tag(tag) {
-    console.log("Executing tag " + tag.name + " with value \"" + tag.value + "\" and attributes [" + tag.attributes.reduce(function (curr, attribute) { return curr + "\t" + attribute.name + "=\"" + attribute.value + "\"\n"; }, "\n") + "]\n");
+    //console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes [${tag.attributes.reduce((curr, attribute) => `${curr}\t${attribute.name}="${attribute.value}"\n`, "\n")}]\n`)
     function fail(text) {
         console.log(text);
         return html_comment(text);
@@ -190,8 +193,8 @@ var Listener = /** @class */ (function (_super) {
     };
     Listener.prototype.enterTag = function (ctx) {
         if (ctx.depth() !== 2) {
-            //don't listen to non-toplevel tags
-            console.log("Skipping tag " + ctx.getText());
+            //don't listen to non-toplevel tags, those get evaluated later
+            //console.log(`Skipping tag ${ctx.getText()}`)
             return;
         }
         assert(ctx instanceof cyoaeParser.cyoaeParser.TagContext, "Passed non-tag to tak parser");
