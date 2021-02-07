@@ -9,7 +9,7 @@ which renders like this:
 [choice next=travel text=Take the sword onclick=[exec weapon="herosword"]]
 [choice next=travel text=Leave the sword]
 
-The [code onselect] part gets executed when this option is selected and sets variable [code weapon] to value [code "herosword"]. Later on you can retrieve the value. Eventually the scene with the goblin comes up which you write like so:
+The [code onselect] part gets executed when this option is selected and sets variable [code weapon] to value [code "herosword"]. Later on you can retrieve the value. Eventually a scene with a goblin comes up which you write like so:
 
 [code
 Before you stands an ugly vicious goblin, malice in its eyes, ready to devour you.

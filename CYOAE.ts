@@ -51,7 +51,7 @@ function process_expression(expr: string) {
 }
 
 const replacements: Tag_replacement[] = [
-	{
+	{ //img
 		tag_name: "img",
 		intro: "<img",
 		replacements:
@@ -61,7 +61,7 @@ const replacements: Tag_replacement[] = [
             ],
 		outro: "/>\n",
 	},
-	{
+	{ //code
 		tag_name: "code",
 		intro: "<a class='code'>",
 		replacements:
@@ -70,18 +70,18 @@ const replacements: Tag_replacement[] = [
             ],
 		outro: "</a>\n",
 	},
-	{
+	{ //choice
 		tag_name: "choice",
         intro: "<a",
 		replacements:
 			[
-				{name: "next", replacement: next => choice_available.get(next) ? ` class='choice' href="#${current_arc}/${next}"` : ` class='dead_choice'`},
-                {name: "onclick", replacement: (onclick, tag) => onclick && choice_available.get(get_attribute_value("next", tag)) ? ` onclick="${onclick}"` : "", default_value: ""},
+				{name: "next", replacement: next => choice_available.get(`${current_arc}/${next}`) ? ` class='choice' href="#${current_arc}/${next}"` : ` class='dead_choice'`},
+                {name: "onclick", replacement: (onclick, tag) => onclick && choice_available.get(`${current_arc}/${get_attribute_value("next", tag)}`) ? ` onclick="${onclick}"` : "", default_value: ""},
                 {name: "text", replacement: text => '>' + escape_html(text)},
             ],
         outro: "</a>\n",
 	},
-	{
+	{ //source
         tag_name: "source",
         intro: '<hr>',
 		replacements: function(tag: Tag) {
@@ -89,7 +89,7 @@ const replacements: Tag_replacement[] = [
             return `<a href="${`${current_url}story arcs/${current_arc}/${current_scene}.txt`}">Source</a><br>\n<p class="source">${escape_html(current_source)}</p>`;
         },
     },
-    {
+    { //exec
         tag_name: "exec",
         replacements: function(tag: Tag) {
             let result = "";
@@ -287,15 +287,23 @@ function parse_source_text(data: string, filename: string) {
 }
 
 async function update_choice_availability(code: string) {
-    for (const match of code.match(/(?<=next=)\w+/g) || []) {
-        if (choice_available.get(match) === null) {
+    const debug = false;
+    for (const scene of code.match(/(?<=next=)\w+/g) || []) {
+        const arc_scene = `${current_arc}/${scene}`;
+        debug && console.log(`Checking availabiliy for page ${arc_scene}`);
+        if (choice_available.get(scene) === undefined) {
             try {
-                await get(match);
-                choice_available.set(match, true);
+                await get(`${scene}.txt`);
+                choice_available.set(arc_scene, true);
+                debug && console.log(`Source for page ${arc_scene} is available`);
             }
             catch (_) {
-                choice_available.set(match, false);
+                choice_available.set(arc_scene, false);
+                debug && console.log(`Source for page ${arc_scene} is not available because ${_}`);
             }
+        }
+        else {
+            debug && console.log(`But we already know that page ${arc_scene} is ${choice_available.get(arc_scene) ? "available" : "unavailable"}`);
         }
     }
 }
