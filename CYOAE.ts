@@ -20,7 +20,7 @@ function get_executor(text: string) {
 
 interface Attribute_replacement {
 	name: string;
-	replacement(value: string): string;
+	replacement(value: string, tag: Tag): string;
 	default_value?: string;
     html_escape?: boolean;
 }
@@ -29,10 +29,20 @@ interface Tag_replacement {
     tag_name: string;
     intro?: string;
     replacements: Attribute_replacement[] | ((tag: Tag) => string);
-	outro?: string;
+    outro?: string;
 }
 
-(window as any).g = new Map<string, string | number>();
+function get_attribute_value(attribute_name: string, tag: Tag) {
+    const attribute = tag.attributes.find(attribute => attribute.name === attribute_name);
+    if (!attribute) {
+        throw `Tried to obtain value "${attribute_name}" from tag "${tag.name}", but no such attribute exists. Valid attributes: [${tag.attributes.reduce((curr, attribute) => `${curr} ${attribute.name}`, "")} ]`;
+    }
+    return typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
+}
+
+(window as any).g = new Map<string, string | number>(); //storage for ingame variables
+
+let choice_available = new Map<string, boolean>(); //for [choice next=foo], choice_available.get("foo") tells whether the file foo.txt exists
 
 function process_expression(expr: string) {
     //TODO: Replace this with a proper parser or maybe just a lexer at some point
@@ -62,14 +72,14 @@ const replacements: Tag_replacement[] = [
 	},
 	{
 		tag_name: "choice",
-		intro: "<a class='choice'",
+        intro: "<a",
 		replacements:
 			[
-				{name: "next", replacement: next => ` href="#${current_arc}/${next}"`},
-                {name: "onclick", replacement: onclick => onclick ? ` onclick="${onclick}"` : "", default_value: ""},
+				{name: "next", replacement: next => choice_available.get(next) ? ` class='choice' href="#${current_arc}/${next}"` : ` class='dead_choice'`},
+                {name: "onclick", replacement: (onclick, tag) => onclick && choice_available.get(get_attribute_value("next", tag)) ? ` onclick="${onclick}"` : "", default_value: ""},
                 {name: "text", replacement: text => '>' + escape_html(text)},
             ],
-		outro: "</a>\n",
+        outro: "</a>\n",
 	},
 	{
         tag_name: "source",
@@ -84,7 +94,7 @@ const replacements: Tag_replacement[] = [
         replacements: function(tag: Tag) {
             let result = "";
             for (const attribute of tag.attributes) {
-                const code = typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
+                const code = get_attribute_value(attribute.name, tag);
                 //TODO: Error handling
                 result += `g.set('${attribute.name}', ${process_expression(code)});`;
             }
@@ -172,9 +182,10 @@ function execute_tag(tag: Tag) {
                 tag.attributes.push({name: replacement.replacements[0].name, value: tag.value});
             }
     
+            const attributes = [...tag.attributes]; //making copy so that removing attributes doesn't affect replacement functions
             for (const attribute_replacement of replacement.replacements) {
-                const attribute_value_pos = tag.attributes.findIndex((attribute) => attribute.name === attribute_replacement.name);
-                let attribute_value = tag.attributes[attribute_value_pos];
+                const attribute_value_pos = attributes.findIndex((attribute) => attribute.name === attribute_replacement.name);
+                let attribute_value = attributes[attribute_value_pos];
                 if (!attribute_value) {
                     if (attribute_replacement.default_value !== undefined) {
                         attribute_value = {name: attribute_replacement.name, value: attribute_replacement.default_value};
@@ -184,16 +195,16 @@ function execute_tag(tag: Tag) {
                     }
                 }
                 if (typeof attribute_value.value === "string") {
-                    result += attribute_replacement.replacement(attribute_value.value);
+                    result += attribute_replacement.replacement(attribute_value.value, tag);
                 }
                 else {
-                    result += attribute_replacement.replacement(execute_tag(attribute_value.value));
+                    result += attribute_replacement.replacement(execute_tag(attribute_value.value), tag);
                 }
                 if (attribute_value_pos !== -1) {
-                    tag.attributes.splice(attribute_value_pos, 1);
+                    attributes.splice(attribute_value_pos, 1);
                 }
             }
-            for (const leftover_attribute of tag.attributes) {
+            for (const leftover_attribute of attributes) {
                 return fail(`Unknown attribute "${leftover_attribute.name}" in tag "${tag.name}"`);
             }
         }
@@ -275,6 +286,20 @@ function parse_source_text(data: string, filename: string) {
     antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
 }
 
+async function update_choice_availability(code: string) {
+    for (const match of code.match(/(?<=next=)\w+/g) || []) {
+        if (choice_available.get(match) === null) {
+            try {
+                await get(match);
+                choice_available.set(match, true);
+            }
+            catch (_) {
+                choice_available.set(match, false);
+            }
+        }
+    }
+}
+
 // plays through a story arc
 async function play_arc(name: string) {
     window.location.hash = `#${name}/variables`;
@@ -285,6 +310,7 @@ async function update_current_scene() {
     console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
         current_source = await get(`${current_scene}.txt`);
+        await update_choice_availability(current_source);
         document.body.innerHTML = "";
         parse_source_text(current_source, `${current_scene}.txt`);
     }

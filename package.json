@@ -1,9 +1,12 @@
 {
     "scripts": {
-        "build": "tsc --pretty -p . && NODE_PATH=. `npm config get prefix`/bin/browserify CYOAE.js > main.js",
+        "build_debug": "tsc --pretty -p . && NODE_PATH=. `npm config get prefix`/bin/browserify CYOAE.js > main.js",
+        "build_release": "tsc --pretty -p . && NODE_PATH=. `npm config get prefix`/bin/browserify CYOAE.js | `npm config get prefix`/bin/uglifyjs -cm > main.js",
         "update_grammar": "antlr4 -Dlanguage=JavaScript cyoae.g4"
     },
-    "dependencies": {},
+    "dependencies": {
+        "browserify": "^17.0.0"
+    },
     "devDependencies": {
         "@types/node": "^14.14.14"
     }

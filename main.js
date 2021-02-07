@@ -49,6 +49,13 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __spreadArrays = (this && this.__spreadArrays) || function () {
+    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
+    for (var r = Array(s), k = 0, i = 0; i < il; i++)
+        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
+            r[k] = a[j];
+    return r;
+};
 var antlr4 = require("antlr4/index");
 var cyoaeLexer = require("./cyoaeLexer");
 var cyoaeParser = require("./cyoaeParser");
@@ -63,7 +70,15 @@ function get_executor(text) {
     console.log("Tag to execute: " + text);
     return escape_html(text);
 }
-window.g = new Map();
+function get_attribute_value(attribute_name, tag) {
+    var attribute = tag.attributes.find(function (attribute) { return attribute.name === attribute_name; });
+    if (!attribute) {
+        throw "Tried to obtain value \"" + attribute_name + "\" from tag \"" + tag.name + "\", but no such attribute exists. Valid attributes: [" + tag.attributes.reduce(function (curr, attribute) { return curr + " " + attribute.name; }, "") + " ]";
+    }
+    return typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
+}
+window.g = new Map(); //storage for ingame variables
+var choice_available = new Map(); //for [choice next=foo], choice_available.get("foo") tells whether the file foo.txt exists
 function process_expression(expr) {
     //TODO: Replace this with a proper parser or maybe just a lexer at some point
     //TODO: Ensure parenthesis and quote balance
@@ -89,10 +104,10 @@ var replacements = [
     },
     {
         tag_name: "choice",
-        intro: "<a class='choice'",
+        intro: "<a",
         replacements: [
-            { name: "next", replacement: function (next) { return " href=\"#" + current_arc + "/" + next + "\""; } },
-            { name: "onclick", replacement: function (onclick) { return onclick ? " onclick=\"" + onclick + "\"" : ""; }, default_value: "" },
+            { name: "next", replacement: function (next) { return choice_available.get(next) ? " class='choice' href=\"#" + current_arc + "/" + next + "\"" : " class='dead_choice'"; } },
+            { name: "onclick", replacement: function (onclick, tag) { return onclick && choice_available.get(get_attribute_value("next", tag)) ? " onclick=\"" + onclick + "\"" : ""; }, default_value: "" },
             { name: "text", replacement: function (text) { return '>' + escape_html(text); } },
         ],
         outro: "</a>\n",
@@ -111,7 +126,7 @@ var replacements = [
             var result = "";
             for (var _i = 0, _a = tag.attributes; _i < _a.length; _i++) {
                 var attribute = _a[_i];
-                var code = typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
+                var code = get_attribute_value(attribute.name, tag);
                 //TODO: Error handling
                 result += "g.set('" + attribute.name + "', " + process_expression(code) + ");";
             }
@@ -146,9 +161,10 @@ function execute_tag(tag) {
             if (tag.value !== "") {
                 tag.attributes.push({ name: replacement.replacements[0].name, value: tag.value });
             }
+            var attributes = __spreadArrays(tag.attributes); //making copy so that removing attributes doesn't affect replacement functions
             var _loop_1 = function (attribute_replacement) {
-                var attribute_value_pos = tag.attributes.findIndex(function (attribute) { return attribute.name === attribute_replacement.name; });
-                var attribute_value = tag.attributes[attribute_value_pos];
+                var attribute_value_pos = attributes.findIndex(function (attribute) { return attribute.name === attribute_replacement.name; });
+                var attribute_value = attributes[attribute_value_pos];
                 if (!attribute_value) {
                     if (attribute_replacement.default_value !== undefined) {
                         attribute_value = { name: attribute_replacement.name, value: attribute_replacement.default_value };
@@ -158,13 +174,13 @@ function execute_tag(tag) {
                     }
                 }
                 if (typeof attribute_value.value === "string") {
-                    result += attribute_replacement.replacement(attribute_value.value);
+                    result += attribute_replacement.replacement(attribute_value.value, tag);
                 }
                 else {
-                    result += attribute_replacement.replacement(execute_tag(attribute_value.value));
+                    result += attribute_replacement.replacement(execute_tag(attribute_value.value), tag);
                 }
                 if (attribute_value_pos !== -1) {
-                    tag.attributes.splice(attribute_value_pos, 1);
+                    attributes.splice(attribute_value_pos, 1);
                 }
             };
             for (var _a = 0, _b = replacement.replacements; _a < _b.length; _a++) {
@@ -173,8 +189,8 @@ function execute_tag(tag) {
                 if (typeof state_1 === "object")
                     return state_1.value;
             }
-            for (var _c = 0, _d = tag.attributes; _c < _d.length; _c++) {
-                var leftover_attribute = _d[_c];
+            for (var _c = 0, attributes_1 = attributes; _c < attributes_1.length; _c++) {
+                var leftover_attribute = attributes_1[_c];
                 return fail("Unknown attribute \"" + leftover_attribute.name + "\" in tag \"" + tag.name + "\"");
             }
         }
@@ -254,6 +270,38 @@ function parse_source_text(data, filename) {
     var listener = new Listener();
     antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
 }
+function update_choice_availability(code) {
+    return __awaiter(this, void 0, void 0, function () {
+        var _i, _a, match, _1;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    _i = 0, _a = code.match(/(?<=next=)\w+/g) || [];
+                    _b.label = 1;
+                case 1:
+                    if (!(_i < _a.length)) return [3 /*break*/, 6];
+                    match = _a[_i];
+                    if (!(choice_available.get(match) === null)) return [3 /*break*/, 5];
+                    _b.label = 2;
+                case 2:
+                    _b.trys.push([2, 4, , 5]);
+                    return [4 /*yield*/, get(match)];
+                case 3:
+                    _b.sent();
+                    choice_available.set(match, true);
+                    return [3 /*break*/, 5];
+                case 4:
+                    _1 = _b.sent();
+                    choice_available.set(match, false);
+                    return [3 /*break*/, 5];
+                case 5:
+                    _i++;
+                    return [3 /*break*/, 1];
+                case 6: return [2 /*return*/];
+            }
+        });
+    });
+}
 // plays through a story arc
 function play_arc(name) {
     return __awaiter(this, void 0, void 0, function () {
@@ -273,18 +321,21 @@ function update_current_scene() {
                     console.log("updating scene to " + current_arc + "/" + current_scene);
                     _a.label = 1;
                 case 1:
-                    _a.trys.push([1, 3, , 4]);
+                    _a.trys.push([1, 4, , 5]);
                     return [4 /*yield*/, get(current_scene + ".txt")];
                 case 2:
                     current_source = _a.sent();
+                    return [4 /*yield*/, update_choice_availability(current_source)];
+                case 3:
+                    _a.sent();
                     document.body.innerHTML = "";
                     parse_source_text(current_source, current_scene + ".txt");
-                    return [3 /*break*/, 4];
-                case 3:
+                    return [3 /*break*/, 5];
+                case 4:
                     err_1 = _a.sent();
                     display_error_document("" + err_1);
-                    return [3 /*break*/, 4];
-                case 4: return [2 /*return*/];
+                    return [3 /*break*/, 5];
+                case 5: return [2 /*return*/];
             }
         });
     });
