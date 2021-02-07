@@ -40,7 +40,19 @@ function get_attribute_value(attribute_name: string, tag: Tag) {
     return typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
 }
 
-(window as any).g = new Map<string, string | number>(); //storage for ingame variables
+let g = new Map<string, string | number>(); //storage for ingame variables
+(window as any).g = g; //make accessible to html
+
+function evaluate_variable(variable: string) : string {
+    const value = g.get(variable);
+    if (typeof value === "undefined") {
+        return "";
+    }
+    if (typeof value === "string") {
+        return value;
+    }
+    return `${value}`;
+}
 
 let choice_available = new Map<string, boolean>(); //for [choice next=foo], choice_available.get("foo") tells whether the file foo.txt exists
 
@@ -100,6 +112,13 @@ const replacements: Tag_replacement[] = [
             }
             return (result + "return true").replace(/"/g, "&quot;");
         },
+    },
+    { //print
+        tag_name: "print",
+        replacements: 
+        [
+            {name: "text", replacement: text => evaluate_variable(text)},
+        ],
     },
 ];
 
