@@ -4,6 +4,7 @@ import * as antlr4ts from 'antlr4ts';
 import { cyoaeLexer } from './cyoaeLexer';
 import * as cyoaeParser from './cyoaeParser';
 import { cyoaeListener } from './cyoaeListener';
+import { ParseTreeWalker } from 'antlr4ts/tree/ParseTreeWalker'
 
 let current_arc = "";
 let current_scene = "";
@@ -301,7 +302,7 @@ function parse_source_text(data: string, filename: string) {
     
     const tree = parser.token_start();
     const listener = new(Listener as any)();
-    //antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
+    ParseTreeWalker.DEFAULT.walk(listener, tree);
 }
 
 async function update_choice_availability(code: string) {

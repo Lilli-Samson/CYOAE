@@ -1,69 +1,58 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
+
+var antlr4ts = _interopRequireWildcard(require("antlr4ts"));
+
+var _cyoaeLexer = require("./cyoaeLexer");
+
+var cyoaeParser = _interopRequireWildcard(require("./cyoaeParser"));
+
+var _ParseTreeWalker = require("antlr4ts/tree/ParseTreeWalker");
+
+function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+var __awaiter = void 0 && (void 0).__awaiter || function (thisArg, _arguments, P, generator) {
+  function adopt(value) {
+    return value instanceof P ? value : new P(function (resolve) {
+      resolve(value);
     });
-};
-var __generator = (this && this.__generator) || function (thisArg, body) {
-    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
-    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
-    function verb(n) { return function (v) { return step([n, v]); }; }
-    function step(op) {
-        if (f) throw new TypeError("Generator is already executing.");
-        while (_) try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [op[0] & 2, t.value];
-            switch (op[0]) {
-                case 0: case 1: t = op; break;
-                case 4: _.label++; return { value: op[1], done: false };
-                case 5: _.label++; y = op[1]; op = [0]; continue;
-                case 7: op = _.ops.pop(); _.trys.pop(); continue;
-                default:
-                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
-                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
-                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
-                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
-                    if (t[2]) _.ops.pop();
-                    _.trys.pop(); continue;
-            }
-            op = body.call(thisArg, _);
-        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
-        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+  }
+
+  return new (P || (P = Promise))(function (resolve, reject) {
+    function fulfilled(value) {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
     }
-};
-var __spreadArrays = (this && this.__spreadArrays) || function () {
-    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
-    for (var r = Array(s), k = 0, i = 0; i < il; i++)
-        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
-            r[k] = a[j];
-    return r;
-};
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-var antlr4ts = __importStar(require("antlr4ts"));
-var cyoaeLexer_1 = require("./cyoaeLexer");
-var cyoaeParser = __importStar(require("./cyoaeParser"));
-var current_arc = "";
-var current_scene = "";
-var current_source = "";
-var ParserErrorListener = /** @class */ (function () {
-    function ParserErrorListener() {
+
+    function rejected(value) {
+      try {
+        step(generator["throw"](value));
+      } catch (e) {
+        reject(e);
+      }
     }
-    ParserErrorListener.prototype.syntaxError = function (recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
-    };
-    return ParserErrorListener;
-}());
+
+    function step(result) {
+      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+    }
+
+    step((generator = generator.apply(thisArg, _arguments || [])).next());
+  });
+};
+
+let current_arc = "";
+let current_scene = "";
+let current_source = "";
+
+class ParserErrorListener {
+  syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {}
+
+}
 /*
 ParserErrorListener.prototype.syntaxError = function(recognizer: any, offendingSymbol: any, line: number, column: number, msg: string, e: any) {
     console.log(`Syntax error in line ${line}:${column}: ${msg}`);
@@ -82,1415 +71,1418 @@ ParserErrorListener.prototype.reportContextSensitivity = function(recognizer: an
     console.log(`Context sensitivity detected`);
 };
 */
+
+
 function output(text) {
-    document.body.innerHTML += text;
+  document.body.innerHTML += text;
 }
+
 function get_executor(text) {
-    console.log("Tag to execute: " + text);
-    return escape_html(text);
+  console.log(`Tag to execute: ${text}`);
+  return escape_html(text);
 }
+
 function get_attribute_value(attribute_name, tag) {
-    var attribute = tag.attributes.find(function (attribute) { return attribute.name === attribute_name; });
-    if (!attribute) {
-        throw "Tried to obtain value \"" + attribute_name + "\" from tag \"" + tag.name + "\", but no such attribute exists. Valid attributes: [" + tag.attributes.reduce(function (curr, attribute) { return curr + " " + attribute.name; }, "") + " ]";
-    }
-    return typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
+  const attribute = tag.attributes.find(attribute => attribute.name === attribute_name);
+
+  if (!attribute) {
+    throw `Tried to obtain value "${attribute_name}" from tag "${tag.name}", but no such attribute exists. Valid attributes: [${tag.attributes.reduce((curr, attribute) => `${curr} ${attribute.name}`, "")} ]`;
+  }
+
+  return typeof attribute.value === "string" ? attribute.value : execute_tag(attribute.value);
 }
-var g = new Map(); //storage for ingame variables
+
+let g = new Map(); //storage for ingame variables
+
 window.g = g; //make accessible to html
+
 function evaluate_variable(variable) {
-    var value = g.get(variable);
-    if (typeof value === "undefined") {
-        return "";
-    }
-    if (typeof value === "string") {
-        return value;
-    }
-    return "" + value;
+  const value = g.get(variable);
+
+  if (typeof value === "undefined") {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return `${value}`;
 }
-var choice_available = new Map(); //for [choice next=foo], choice_available.get("foo") tells whether the file foo.txt exists
+
+let choice_available = new Map(); //for [choice next=foo], choice_available.get("foo") tells whether the file foo.txt exists
+
 function process_expression(expr) {
-    //TODO: Replace this with a proper parser or maybe just a lexer at some point
-    //TODO: Ensure parenthesis and quote balance
-    return expr.replace(/((?<!["\w])[_a-zA-Z]\w*)/g, 'g.get("$1")');
+  //TODO: Replace this with a proper parser or maybe just a lexer at some point
+  //TODO: Ensure parenthesis and quote balance
+  return expr.replace(/((?<!["\w])[_a-zA-Z]\w*)/g, 'g.get("$1")');
 }
+
 function strip_script_tag(expr) {
-    return expr.replace(/<script>([^<]*)<\/script>/, "$0");
+  return expr.replace(/<script>([^<]*)<\/script>/, "$0");
 }
+
 function evaluate(code) {
-    //TODO
-    return code;
+  //TODO
+  return code;
 }
-var replacements = [
-    {
-        tag_name: "img",
-        intro: "<img",
-        replacements: [
-            { name: "url", replacement: function (url) { return " src=\"" + url + "\""; } },
-            { name: "alt", replacement: function (alt) { return " alt=\"" + escape_html(alt) + "\""; }, default_value: " alt='image'" },
-        ],
-        outro: "/>\n",
-    },
-    {
-        tag_name: "code",
-        intro: "<a class='code'>",
-        replacements: [
-            { name: "text", replacement: function (text) { return escape_html(text); } },
-        ],
-        outro: "</a>\n",
-    },
-    {
-        tag_name: "choice",
-        intro: "<a",
-        replacements: [
-            { name: "next", replacement: function (next) { return choice_available.get(current_arc + "/" + next) ? " class='choice' href=\"#" + current_arc + "/" + next + "\"" : " class='dead_choice'"; } },
-            { name: "onclick", replacement: function (onclick, tag) { return onclick && choice_available.get(current_arc + "/" + get_attribute_value("next", tag)) ?
-                    " onclick=\"" + onclick.replace(/"/g, "&quot;") + ";return true\"" : ""; }, default_value: "" },
-            { name: "text", replacement: function (text) { return '>' + escape_html(text); } },
-        ],
-        outro: "</a>\n",
-    },
-    {
-        tag_name: "source",
-        intro: '<hr>',
-        replacements: function (tag) {
-            var current_url = window.location.toString().replace(/\/[^\/]*$/, "/").replace(/#.*/, "");
-            return "<a href=\"" + (current_url + "story arcs/" + current_arc + "/" + current_scene + ".txt") + "\">Source</a><br>\n<p class=\"source\">" + escape_html(current_source) + "</p>";
-        },
-    },
-    {
-        tag_name: "exec",
-        replacements: function (tag) {
-            for (var _i = 0, _a = tag.attributes; _i < _a.length; _i++) {
-                var attribute = _a[_i];
-                var code = get_attribute_value(attribute.name, tag);
-                //TODO: Error handling
-                g.set(attribute.name, evaluate(code));
-            }
-            return "";
-        },
-    },
-    {
-        tag_name: "print",
-        replacements: [
-            { name: "variable", replacement: function (text) { return evaluate_variable(text); } },
-        ],
-    },
-];
+
+const replacements = [{
+  tag_name: "img",
+  intro: "<img",
+  replacements: [{
+    name: "url",
+    replacement: url => ` src="${url}"`
+  }, {
+    name: "alt",
+    replacement: alt => ` alt="${escape_html(alt)}"`,
+    default_value: " alt='image'"
+  }],
+  outro: "/>\n"
+}, {
+  tag_name: "code",
+  intro: "<a class='code'>",
+  replacements: [{
+    name: "text",
+    replacement: text => escape_html(text)
+  }],
+  outro: "</a>\n"
+}, {
+  tag_name: "choice",
+  intro: "<a",
+  replacements: [{
+    name: "next",
+    replacement: next => choice_available.get(`${current_arc}/${next}`) ? ` class='choice' href="#${current_arc}/${next}"` : ` class='dead_choice'`
+  }, {
+    name: "onclick",
+    replacement: (onclick, tag) => onclick && choice_available.get(`${current_arc}/${get_attribute_value("next", tag)}`) ? ` onclick="${onclick.replace(/"/g, "&quot;")};return true"` : "",
+    default_value: ""
+  }, {
+    name: "text",
+    replacement: text => '>' + escape_html(text)
+  }],
+  outro: "</a>\n"
+}, {
+  tag_name: "source",
+  intro: '<hr>',
+  replacements: function (tag) {
+    const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
+    return `<a href="${`${current_url}story arcs/${current_arc}/${current_scene}.txt`}">Source</a><br>\n<p class="source">${escape_html(current_source)}</p>`;
+  }
+}, {
+  tag_name: "exec",
+  replacements: function (tag) {
+    for (const attribute of tag.attributes) {
+      const code = get_attribute_value(attribute.name, tag); //TODO: Error handling
+
+      g.set(attribute.name, evaluate(code));
+    }
+
+    return "";
+  }
+}, {
+  tag_name: "print",
+  replacements: [{
+    name: "variable",
+    replacement: text => evaluate_variable(text)
+  }]
+}];
+
 function remove_escapes(text) {
-    return text.replace(/\\(.)/g, '$1');
+  return text.replace(/\\(.)/g, '$1');
 }
+
 function html_comment(content) {
-    return "<!-- " + content.replace(/-->/g, "~~>") + " -->\n";
+  return `<!-- ${content.replace(/-->/g, "~~>")} -->\n`;
 }
+
 function execute_tag(tag) {
-    //console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes [${tag.attributes.reduce((curr, attribute) => `${curr}\t${attribute.name}="${attribute.value}"\n`, "\n")}]\n`)
-    function fail(text) {
-        console.log(text);
-        return html_comment(text);
-    }
-    ;
-    for (var _i = 0, replacements_1 = replacements; _i < replacements_1.length; _i++) {
-        var replacement = replacements_1[_i];
-        if (replacement.tag_name !== tag.name) {
-            continue;
-        }
-        //Todo: check if there are no duplicate attributes
-        var result = replacement.intro || "";
-        if (typeof replacement.replacements === "function") {
-            result += replacement.replacements(tag);
-        }
-        else {
-            if (tag.value !== "") {
-                tag.attributes.push({ name: replacement.replacements[0].name, value: tag.value });
-            }
-            var attributes = __spreadArrays(tag.attributes); //making copy so that removing attributes doesn't affect replacement functions
-            var _loop_1 = function (attribute_replacement) {
-                var attribute_value_pos = attributes.findIndex(function (attribute) { return attribute.name === attribute_replacement.name; });
-                var attribute_value = attributes[attribute_value_pos];
-                if (!attribute_value) {
-                    if (attribute_replacement.default_value !== undefined) {
-                        attribute_value = { name: attribute_replacement.name, value: attribute_replacement.default_value };
-                    }
-                    else {
-                        return { value: fail("Missing attribute \"" + attribute_replacement.name + "\" in tag \"" + tag.name + "\"") };
-                    }
-                }
-                if (typeof attribute_value.value === "string") {
-                    result += attribute_replacement.replacement(attribute_value.value, tag);
-                }
-                else {
-                    result += attribute_replacement.replacement(execute_tag(attribute_value.value), tag);
-                }
-                if (attribute_value_pos !== -1) {
-                    attributes.splice(attribute_value_pos, 1);
-                }
+  //console.log(`Executing tag ${tag.name} with value "${tag.value}" and attributes [${tag.attributes.reduce((curr, attribute) => `${curr}\t${attribute.name}="${attribute.value}"\n`, "\n")}]\n`)
+  function fail(text) {
+    console.log(text);
+    return html_comment(text);
+  }
+
+  ;
+
+  for (const replacement of replacements) {
+    if (replacement.tag_name !== tag.name) {
+      continue;
+    } //Todo: check if there are no duplicate attributes
+
+
+    let result = replacement.intro || "";
+
+    if (typeof replacement.replacements === "function") {
+      result += replacement.replacements(tag);
+    } else {
+      if (tag.value !== "") {
+        tag.attributes.push({
+          name: replacement.replacements[0].name,
+          value: tag.value
+        });
+      }
+
+      const attributes = [...tag.attributes]; //making copy so that removing attributes doesn't affect replacement functions
+
+      for (const attribute_replacement of replacement.replacements) {
+        const attribute_value_pos = attributes.findIndex(attribute => attribute.name === attribute_replacement.name);
+        let attribute_value = attributes[attribute_value_pos];
+
+        if (!attribute_value) {
+          if (attribute_replacement.default_value !== undefined) {
+            attribute_value = {
+              name: attribute_replacement.name,
+              value: attribute_replacement.default_value
             };
-            for (var _a = 0, _b = replacement.replacements; _a < _b.length; _a++) {
-                var attribute_replacement = _b[_a];
-                var state_1 = _loop_1(attribute_replacement);
-                if (typeof state_1 === "object")
-                    return state_1.value;
-            }
-            for (var _c = 0, attributes_1 = attributes; _c < attributes_1.length; _c++) {
-                var leftover_attribute = attributes_1[_c];
-                return fail("Unknown attribute \"" + leftover_attribute.name + "\" in tag \"" + tag.name + "\"");
-            }
+          } else {
+            return fail(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`);
+          }
         }
-        result += replacement.outro || "";
-        return result;
+
+        if (typeof attribute_value.value === "string") {
+          result += attribute_replacement.replacement(attribute_value.value, tag);
+        } else {
+          result += attribute_replacement.replacement(execute_tag(attribute_value.value), tag);
+        }
+
+        if (attribute_value_pos !== -1) {
+          attributes.splice(attribute_value_pos, 1);
+        }
+      }
+
+      for (const leftover_attribute of attributes) {
+        return fail(`Unknown attribute "${leftover_attribute.name}" in tag "${tag.name}"`);
+      }
     }
-    return fail("Unknown tag " + tag.name);
+
+    result += replacement.outro || "";
+    return result;
+  }
+
+  return fail("Unknown tag " + tag.name);
 }
-var Listener = /** @class */ (function () {
-    function Listener() {
-        this.debug = false;
+
+class Listener {
+  constructor() {
+    this.debug = false;
+  }
+
+  exitToken_text(ctx) {
+    output(`<a class="text">${escape_html(remove_escapes(ctx.text))}</a>`);
+  }
+
+  enterToken_tag(ctx) {
+    if (ctx.depth() !== 2) {
+      //don't listen to non-toplevel tags, those get evaluated later
+      this.debug && console.log(`Skipping tag ${ctx.text}`);
+      return;
     }
-    Listener.prototype.exitToken_text = function (ctx) {
-        output("<a class=\"text\">" + escape_html(remove_escapes(ctx.text)) + "</a>");
-    };
-    Listener.prototype.enterToken_tag = function (ctx) {
-        if (ctx.depth() !== 2) {
-            //don't listen to non-toplevel tags, those get evaluated later
-            this.debug && console.log("Skipping tag " + ctx.text);
-            return;
+
+    const debug = this.debug;
+
+    function extract_tag(ctx) {
+      let tag = {
+        ctx: ctx,
+        name: "",
+        value: "",
+        attributes: []
+      };
+
+      for (let i = 0; i < ctx.childCount; i++) {
+        const child = ctx.getChild(i);
+        debug && console.log(`Tag child ${i}`);
+
+        if (child === null) {
+          debug && console.log(`Got premature null child`);
+          continue;
+        } else if (child instanceof cyoaeParser.Token_tag_nameContext) {
+          debug && console.log(`Got a tag name "${child.text}"`);
+          tag.name = child.text;
+        } else if (child instanceof cyoaeParser.Token_attributeContext) {
+          debug && console.log(`Got a tag attribute name "${child.text}"`);
+          tag.attributes.push({
+            name: child.text,
+            value: ""
+          });
+        } else if (child instanceof cyoaeParser.Token_valueContext) {
+          if (tag.attributes.length === 0) {
+            debug && console.log(`Got a tag value "${child.text}"`);
+            tag.value = remove_escapes(child.text);
+          } else {
+            debug && console.log(`Got a tag attribute value "${child.text}"`);
+            tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.text);
+          }
+        } else if (child instanceof cyoaeParser.Token_tagContext) {
+          debug && console.log(`Got a tag attribute of type tag`);
+          tag.attributes[tag.attributes.length - 1].value = extract_tag(child);
+        } else {
+          debug && console.log(`Skipping child of type "${typeof child}" with value "${child.text}"`);
         }
-        var debug = this.debug;
-        function extract_tag(ctx) {
-            var tag = {
-                ctx: ctx,
-                name: "",
-                value: "",
-                attributes: []
-            };
-            for (var i = 0; i < ctx.childCount; i++) {
-                var child = ctx.getChild(i);
-                debug && console.log("Tag child " + i);
-                if (child === null) {
-                    debug && console.log("Got premature null child");
-                    continue;
-                }
-                else if (child instanceof cyoaeParser.Token_tag_nameContext) {
-                    debug && console.log("Got a tag name \"" + child.text + "\"");
-                    tag.name = child.text;
-                }
-                else if (child instanceof cyoaeParser.Token_attributeContext) {
-                    debug && console.log("Got a tag attribute name \"" + child.text + "\"");
-                    tag.attributes.push({ name: child.text, value: "" });
-                }
-                else if (child instanceof cyoaeParser.Token_valueContext) {
-                    if (tag.attributes.length === 0) {
-                        debug && console.log("Got a tag value \"" + child.text + "\"");
-                        tag.value = remove_escapes(child.text);
-                    }
-                    else {
-                        debug && console.log("Got a tag attribute value \"" + child.text + "\"");
-                        tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.text);
-                    }
-                }
-                else if (child instanceof cyoaeParser.Token_tagContext) {
-                    debug && console.log("Got a tag attribute of type tag");
-                    tag.attributes[tag.attributes.length - 1].value = extract_tag(child);
-                }
-                else {
-                    debug && console.log("Skipping child of type \"" + typeof child + "\" with value \"" + child.text + "\"");
-                }
-            }
-            return tag;
-        }
-        output(execute_tag(extract_tag(ctx)));
-    };
-    return Listener;
-}());
+      }
+
+      return tag;
+    }
+
+    output(execute_tag(extract_tag(ctx)));
+  }
+
+}
+
 function parse_source_text(data, filename) {
-    console.log("Starting parsing source text " + filename);
-    var input = antlr4ts.CharStreams.fromString(data, filename);
-    var lexer = new cyoaeLexer_1.cyoaeLexer(input);
-    var tokens = new antlr4ts.CommonTokenStream(lexer);
-    var parser = new cyoaeParser.cyoaeParser(tokens);
-    //TODO: Add error listeners
-    lexer.removeErrorListeners();
-    parser.removeErrorListeners();
-    //lexer.addErrorListener(error_listener);
-    parser.addErrorListener(new ParserErrorListener);
-    var tree = parser.token_start();
-    var listener = new Listener();
-    //antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
+  console.log(`Starting parsing source text ${filename}`);
+  const input = antlr4ts.CharStreams.fromString(data, filename);
+  const lexer = new _cyoaeLexer.cyoaeLexer(input);
+  const tokens = new antlr4ts.CommonTokenStream(lexer);
+  const parser = new cyoaeParser.cyoaeParser(tokens); //TODO: Add error listeners
+
+  lexer.removeErrorListeners();
+  parser.removeErrorListeners(); //lexer.addErrorListener(error_listener);
+
+  parser.addErrorListener(new ParserErrorListener());
+  const tree = parser.token_start();
+  const listener = new Listener();
+
+  _ParseTreeWalker.ParseTreeWalker.DEFAULT.walk(listener, tree);
 }
+
 function update_choice_availability(code) {
-    return __awaiter(this, void 0, void 0, function () {
-        var debug, _i, _a, scene, arc_scene, _1;
-        return __generator(this, function (_b) {
-            switch (_b.label) {
-                case 0:
-                    debug = false;
-                    _i = 0, _a = code.match(/(?<=next=)\w+/g) || [];
-                    _b.label = 1;
-                case 1:
-                    if (!(_i < _a.length)) return [3 /*break*/, 8];
-                    scene = _a[_i];
-                    arc_scene = current_arc + "/" + scene;
-                    debug && console.log("Checking availabiliy for page " + arc_scene);
-                    if (!(choice_available.get(scene) === undefined)) return [3 /*break*/, 6];
-                    _b.label = 2;
-                case 2:
-                    _b.trys.push([2, 4, , 5]);
-                    return [4 /*yield*/, get(scene + ".txt")];
-                case 3:
-                    _b.sent();
-                    choice_available.set(arc_scene, true);
-                    debug && console.log("Source for page " + arc_scene + " is available");
-                    return [3 /*break*/, 5];
-                case 4:
-                    _1 = _b.sent();
-                    choice_available.set(arc_scene, false);
-                    debug && console.log("Source for page " + arc_scene + " is not available because " + _1);
-                    return [3 /*break*/, 5];
-                case 5: return [3 /*break*/, 7];
-                case 6:
-                    debug && console.log("But we already know that page " + arc_scene + " is " + (choice_available.get(arc_scene) ? "available" : "unavailable"));
-                    _b.label = 7;
-                case 7:
-                    _i++;
-                    return [3 /*break*/, 1];
-                case 8: return [2 /*return*/];
-            }
-        });
-    });
-}
-// plays through a story arc
-function play_arc(name) {
-    return __awaiter(this, void 0, void 0, function () {
-        return __generator(this, function (_a) {
-            window.location.hash = "#" + name + "/variables";
-            return [2 /*return*/];
-        });
-    });
-}
-// display a scene based on a source .txt file and the current arc
-function update_current_scene() {
-    return __awaiter(this, void 0, void 0, function () {
-        var err_1;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    console.log("updating scene to " + current_arc + "/" + current_scene);
-                    _a.label = 1;
-                case 1:
-                    _a.trys.push([1, 4, , 5]);
-                    return [4 /*yield*/, get(current_scene + ".txt")];
-                case 2:
-                    current_source = _a.sent();
-                    return [4 /*yield*/, update_choice_availability(current_source)];
-                case 3:
-                    _a.sent();
-                    document.body.innerHTML = "";
-                    parse_source_text(current_source, current_scene + ".txt");
-                    return [3 /*break*/, 5];
-                case 4:
-                    err_1 = _a.sent();
-                    display_error_document("" + err_1);
-                    return [3 /*break*/, 5];
-                case 5: return [2 /*return*/];
-            }
-        });
-    });
-}
-function url_hash_change() {
-    return __awaiter(this, void 0, void 0, function () {
-        var _a, arc, scene;
-        return __generator(this, function (_b) {
-            switch (_b.label) {
-                case 0:
-                    _a = window.location.hash.match(/#([^\/]*)\/(.*)/) || [], arc = _a[1], scene = _a[2];
-                    if (!(arc && scene)) return [3 /*break*/, 2];
-                    current_arc = arc;
-                    current_scene = scene;
-                    return [4 /*yield*/, update_current_scene()];
-                case 1:
-                    _b.sent();
-                    _b.label = 2;
-                case 2: return [2 /*return*/];
-            }
-        });
-    });
-}
-window.onhashchange = url_hash_change;
-// escapes HTML tags
-function escape_html(str) {
-    var element = document.createElement('p');
-    element.innerText = str;
-    return element.innerHTML;
-}
-// downloads a local resource given its path/filename
-function get(url) {
-    return __awaiter(this, void 0, void 0, function () {
-        var current_url, filepath, request, err_2;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    current_url = window.location.toString().replace(/\/[^\/]*$/, "/").replace(/#.*/, "");
-                    filepath = current_url + "story arcs/" + current_arc + "/" + url;
-                    _a.label = 1;
-                case 1:
-                    _a.trys.push([1, 5, , 6]);
-                    return [4 /*yield*/, fetch(filepath)];
-                case 2:
-                    request = _a.sent();
-                    if (!request.ok) return [3 /*break*/, 4];
-                    return [4 /*yield*/, request.text()];
-                case 3: return [2 /*return*/, _a.sent()];
-                case 4: throw request.statusText;
-                case 5:
-                    err_2 = _a.sent();
-                    throw "Failed loading resource " + filepath + ": " + err_2;
-                case 6: return [2 /*return*/];
-            }
-        });
-    });
-}
-function display_error_document(error) {
-    document.body.innerHTML = escape_html("Error: " + error);
-}
-function assert(predicate, explanation) {
-    if (explanation === void 0) { explanation = ""; }
-    if (!predicate) {
-        if (explanation) {
-            throw "Assertion fail: " + explanation;
+  return __awaiter(this, void 0, void 0, function* () {
+    const debug = false;
+
+    for (const scene of code.match(/(?<=next=)\w+/g) || []) {
+      const arc_scene = `${current_arc}/${scene}`;
+      debug && console.log(`Checking availabiliy for page ${arc_scene}`);
+
+      if (choice_available.get(scene) === undefined) {
+        try {
+          yield get(`${scene}.txt`);
+          choice_available.set(arc_scene, true);
+          debug && console.log(`Source for page ${arc_scene} is available`);
+        } catch (_) {
+          choice_available.set(arc_scene, false);
+          debug && console.log(`Source for page ${arc_scene} is not available because ${_}`);
         }
-        throw "Assertion fail";
+      } else {
+        debug && console.log(`But we already know that page ${arc_scene} is ${choice_available.get(arc_scene) ? "available" : "unavailable"}`);
+      }
     }
+  });
+} // plays through a story arc
+
+
+function play_arc(name) {
+  return __awaiter(this, void 0, void 0, function* () {
+    window.location.hash = `#${name}/variables`;
+  });
+} // display a scene based on a source .txt file and the current arc
+
+
+function update_current_scene() {
+  return __awaiter(this, void 0, void 0, function* () {
+    console.log(`updating scene to ${current_arc}/${current_scene}`);
+
+    try {
+      current_source = yield get(`${current_scene}.txt`);
+      yield update_choice_availability(current_source);
+      document.body.innerHTML = "";
+      parse_source_text(current_source, `${current_scene}.txt`);
+    } catch (err) {
+      display_error_document(`${err}`);
+    }
+  });
 }
-// script entry point, loading the correct state and displays errors
+
+function url_hash_change() {
+  return __awaiter(this, void 0, void 0, function* () {
+    const [, arc, scene] = window.location.hash.match(/#([^\/]*)\/(.*)/) || [];
+
+    if (arc && scene) {
+      current_arc = arc;
+      current_scene = scene;
+      yield update_current_scene();
+    }
+  });
+}
+
+window.onhashchange = url_hash_change; // escapes HTML tags
+
+function escape_html(str) {
+  let element = document.createElement('p');
+  element.innerText = str;
+  return element.innerHTML;
+} // downloads a local resource given its path/filename
+
+
+function get(url) {
+  return __awaiter(this, void 0, void 0, function* () {
+    const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
+    const filepath = `${current_url}story arcs/${current_arc}/${url}`;
+
+    try {
+      const request = yield fetch(filepath);
+
+      if (request.ok) {
+        return yield request.text();
+      }
+
+      throw request.statusText;
+    } catch (err) {
+      throw `Failed loading resource ${filepath}: ${err}`;
+    }
+  });
+}
+
+function display_error_document(error) {
+  document.body.innerHTML = escape_html(`Error: ${error}`);
+}
+
+function assert(predicate, explanation = "") {
+  if (!predicate) {
+    if (explanation) {
+      throw `Assertion fail: ${explanation}`;
+    }
+
+    throw `Assertion fail`;
+  }
+} // script entry point, loading the correct state and displays errors
+
+
 function main() {
-    return __awaiter(this, void 0, void 0, function () {
-        var err_3;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    _a.trys.push([0, 3, , 4]);
-                    return [4 /*yield*/, play_arc("intro")];
-                case 1:
-                    _a.sent();
-                    return [4 /*yield*/, url_hash_change()];
-                case 2:
-                    _a.sent();
-                    return [3 /*break*/, 4];
-                case 3:
-                    err_3 = _a.sent();
-                    display_error_document("" + err_3);
-                    return [3 /*break*/, 4];
-                case 4: return [2 /*return*/];
-            }
-        });
-    });
+  return __awaiter(this, void 0, void 0, function* () {
+    try {
+      yield play_arc("intro");
+      yield url_hash_change();
+    } catch (err) {
+      display_error_document(`${err}`);
+    }
+  });
 }
+
 main();
 
-},{"./cyoaeLexer":2,"./cyoaeParser":3,"antlr4ts":119}],2:[function(require,module,exports){
+},{"./cyoaeLexer":2,"./cyoaeParser":3,"antlr4ts":119,"antlr4ts/tree/ParseTreeWalker":138}],2:[function(require,module,exports){
 "use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.cyoaeLexer = void 0;
+
+var _ATNDeserializer = require("antlr4ts/atn/ATNDeserializer");
+
+var _Lexer = require("antlr4ts/Lexer");
+
+var _LexerATNSimulator = require("antlr4ts/atn/LexerATNSimulator");
+
+var _VocabularyImpl = require("antlr4ts/VocabularyImpl");
+
+var Utils = _interopRequireWildcard(require("antlr4ts/misc/Utils"));
+
+function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
 // Generated from cyoae.g4 by ANTLR 4.9.0-SNAPSHOT
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = function (d, b) {
-        extendStatics = Object.setPrototypeOf ||
-            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-        return extendStatics(d, b);
-    };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-var ATNDeserializer_1 = require("antlr4ts/atn/ATNDeserializer");
-var Lexer_1 = require("antlr4ts/Lexer");
-var LexerATNSimulator_1 = require("antlr4ts/atn/LexerATNSimulator");
-var VocabularyImpl_1 = require("antlr4ts/VocabularyImpl");
-var Utils = __importStar(require("antlr4ts/misc/Utils"));
-var cyoaeLexer = /** @class */ (function (_super) {
-    __extends(cyoaeLexer, _super);
-    // tslint:enable:no-trailing-whitespace
-    function cyoaeLexer(input) {
-        var _this = _super.call(this, input) || this;
-        _this._interp = new LexerATNSimulator_1.LexerATNSimulator(cyoaeLexer._ATN, _this);
-        return _this;
+class cyoaeLexer extends _Lexer.Lexer {
+  // tslint:enable:no-trailing-whitespace
+  constructor(input) {
+    super(input);
+    this._interp = new _LexerATNSimulator.LexerATNSimulator(cyoaeLexer._ATN, this);
+  } // @Override
+  // @NotNull
+
+
+  get vocabulary() {
+    return cyoaeLexer.VOCABULARY;
+  } // @Override
+
+
+  get grammarFileName() {
+    return "cyoae.g4";
+  } // @Override
+
+
+  get ruleNames() {
+    return cyoaeLexer.ruleNames;
+  } // @Override
+
+
+  get serializedATN() {
+    return cyoaeLexer._serializedATN;
+  } // @Override
+
+
+  get channelNames() {
+    return cyoaeLexer.channelNames;
+  } // @Override
+
+
+  get modeNames() {
+    return cyoaeLexer.modeNames;
+  }
+
+  static get _ATN() {
+    if (!cyoaeLexer.__ATN) {
+      cyoaeLexer.__ATN = new _ATNDeserializer.ATNDeserializer().deserialize(Utils.toCharArray(cyoaeLexer._serializedATN));
     }
-    Object.defineProperty(cyoaeLexer.prototype, "vocabulary", {
-        // @Override
-        // @NotNull
-        get: function () {
-            return cyoaeLexer.VOCABULARY;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeLexer.prototype, "grammarFileName", {
-        // @Override
-        get: function () { return "cyoae.g4"; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeLexer.prototype, "ruleNames", {
-        // @Override
-        get: function () { return cyoaeLexer.ruleNames; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeLexer.prototype, "serializedATN", {
-        // @Override
-        get: function () { return cyoaeLexer._serializedATN; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeLexer.prototype, "channelNames", {
-        // @Override
-        get: function () { return cyoaeLexer.channelNames; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeLexer.prototype, "modeNames", {
-        // @Override
-        get: function () { return cyoaeLexer.modeNames; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeLexer, "_ATN", {
-        get: function () {
-            if (!cyoaeLexer.__ATN) {
-                cyoaeLexer.__ATN = new ATNDeserializer_1.ATNDeserializer().deserialize(Utils.toCharArray(cyoaeLexer._serializedATN));
-            }
-            return cyoaeLexer.__ATN;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    cyoaeLexer.T__0 = 1;
-    cyoaeLexer.T__1 = 2;
-    cyoaeLexer.T__2 = 3;
-    cyoaeLexer.T__3 = 4;
-    cyoaeLexer.T__4 = 5;
-    cyoaeLexer.T__5 = 6;
-    cyoaeLexer.T__6 = 7;
-    cyoaeLexer.WORD = 8;
-    cyoaeLexer.WS = 9;
-    // tslint:disable:no-trailing-whitespace
-    cyoaeLexer.channelNames = [
-        "DEFAULT_TOKEN_CHANNEL", "HIDDEN",
-    ];
-    // tslint:disable:no-trailing-whitespace
-    cyoaeLexer.modeNames = [
-        "DEFAULT_MODE",
-    ];
-    cyoaeLexer.ruleNames = [
-        "T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "WORD", "WS",
-    ];
-    cyoaeLexer._LITERAL_NAMES = [
-        undefined, "'='", "'['", "']'", "'\\''", "'\\'", "'\\'", "'\\'",
-    ];
-    cyoaeLexer._SYMBOLIC_NAMES = [
-        undefined, undefined, undefined, undefined, undefined, undefined, undefined,
-        undefined, "WORD", "WS",
-    ];
-    cyoaeLexer.VOCABULARY = new VocabularyImpl_1.VocabularyImpl(cyoaeLexer._LITERAL_NAMES, cyoaeLexer._SYMBOLIC_NAMES, []);
-    cyoaeLexer._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x02\v1\b\x01\x04" +
-        "\x02\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04" +
-        "\x07\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x03\x02\x03\x02\x03\x03\x03\x03" +
-        "\x03\x04\x03\x04\x03\x05\x03\x05\x03\x05\x03\x06\x03\x06\x03\x06\x03\x07" +
-        "\x03\x07\x03\x07\x03\b\x03\b\x03\b\x03\t\x06\t)\n\t\r\t\x0E\t*\x03\n\x06" +
-        "\n.\n\n\r\n\x0E\n/\x02\x02\x02\v\x03\x02\x03\x05\x02\x04\x07\x02\x05\t" +
-        "\x02\x06\v\x02\x07\r\x02\b\x0F\x02\t\x11\x02\n\x13\x02\v\x03\x02\x04\x0E" +
-        "\x02\v\x0F\"\"??]_\x87\x87\xA2\xA2\u1682\u1682\u2002\u200C\u202A\u202B" +
-        "\u2031\u2031\u2061\u2061\u3002\u3002\f\x02\v\x0F\"\"\x87\x87\xA2\xA2\u1682" +
-        "\u1682\u2002\u200C\u202A\u202B\u2031\u2031\u2061\u2061\u3002\u3002\x02" +
-        "2\x02\x03\x03\x02\x02\x02\x02\x05\x03\x02\x02\x02\x02\x07\x03\x02\x02" +
-        "\x02\x02\t\x03\x02\x02\x02\x02\v\x03\x02\x02\x02\x02\r\x03\x02\x02\x02" +
-        "\x02\x0F\x03\x02\x02\x02\x02\x11\x03\x02\x02\x02\x02\x13\x03\x02\x02\x02" +
-        "\x03\x15\x03\x02\x02\x02\x05\x17\x03\x02\x02\x02\x07\x19\x03\x02\x02\x02" +
-        "\t\x1B\x03\x02\x02\x02\v\x1E\x03\x02\x02\x02\r!\x03\x02\x02\x02\x0F$\x03" +
-        "\x02\x02\x02\x11(\x03\x02\x02\x02\x13-\x03\x02\x02\x02\x15\x16\x07?\x02" +
-        "\x02\x16\x04\x03\x02\x02\x02\x17\x18\x07]\x02\x02\x18\x06\x03\x02\x02" +
-        "\x02\x19\x1A\x07_\x02\x02\x1A\b\x03\x02\x02\x02\x1B\x1C\x07^\x02\x02\x1C" +
-        "\x1D\x07^\x02\x02\x1D\n\x03\x02\x02\x02\x1E\x1F\x07^\x02\x02\x1F \x07" +
-        "]\x02\x02 \f\x03\x02\x02\x02!\"\x07^\x02\x02\"#\x07_\x02\x02#\x0E\x03" +
-        "\x02\x02\x02$%\x07^\x02\x02%&\x07?\x02\x02&\x10\x03\x02\x02\x02\')\n\x02" +
-        "\x02\x02(\'\x03\x02\x02\x02)*\x03\x02\x02\x02*(\x03\x02\x02\x02*+\x03" +
-        "\x02\x02\x02+\x12\x03\x02\x02\x02,.\t\x03\x02\x02-,\x03\x02\x02\x02./" +
-        "\x03\x02\x02\x02/-\x03\x02\x02\x02/0\x03\x02\x02\x020\x14\x03\x02\x02" +
-        "\x02\x05\x02*/\x02";
-    return cyoaeLexer;
-}(Lexer_1.Lexer));
+
+    return cyoaeLexer.__ATN;
+  }
+
+}
+
 exports.cyoaeLexer = cyoaeLexer;
+cyoaeLexer.T__0 = 1;
+cyoaeLexer.T__1 = 2;
+cyoaeLexer.T__2 = 3;
+cyoaeLexer.T__3 = 4;
+cyoaeLexer.T__4 = 5;
+cyoaeLexer.T__5 = 6;
+cyoaeLexer.T__6 = 7;
+cyoaeLexer.WORD = 8;
+cyoaeLexer.WS = 9; // tslint:disable:no-trailing-whitespace
+
+cyoaeLexer.channelNames = ["DEFAULT_TOKEN_CHANNEL", "HIDDEN"]; // tslint:disable:no-trailing-whitespace
+
+cyoaeLexer.modeNames = ["DEFAULT_MODE"];
+cyoaeLexer.ruleNames = ["T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "WORD", "WS"];
+cyoaeLexer._LITERAL_NAMES = [undefined, "'='", "'['", "']'", "'\\''", "'\\'", "'\\'", "'\\'"];
+cyoaeLexer._SYMBOLIC_NAMES = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, "WORD", "WS"];
+cyoaeLexer.VOCABULARY = new _VocabularyImpl.VocabularyImpl(cyoaeLexer._LITERAL_NAMES, cyoaeLexer._SYMBOLIC_NAMES, []);
+cyoaeLexer._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x02\v1\b\x01\x04" + "\x02\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04" + "\x07\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x03\x02\x03\x02\x03\x03\x03\x03" + "\x03\x04\x03\x04\x03\x05\x03\x05\x03\x05\x03\x06\x03\x06\x03\x06\x03\x07" + "\x03\x07\x03\x07\x03\b\x03\b\x03\b\x03\t\x06\t)\n\t\r\t\x0E\t*\x03\n\x06" + "\n.\n\n\r\n\x0E\n/\x02\x02\x02\v\x03\x02\x03\x05\x02\x04\x07\x02\x05\t" + "\x02\x06\v\x02\x07\r\x02\b\x0F\x02\t\x11\x02\n\x13\x02\v\x03\x02\x04\x0E" + "\x02\v\x0F\"\"??]_\x87\x87\xA2\xA2\u1682\u1682\u2002\u200C\u202A\u202B" + "\u2031\u2031\u2061\u2061\u3002\u3002\f\x02\v\x0F\"\"\x87\x87\xA2\xA2\u1682" + "\u1682\u2002\u200C\u202A\u202B\u2031\u2031\u2061\u2061\u3002\u3002\x02" + "2\x02\x03\x03\x02\x02\x02\x02\x05\x03\x02\x02\x02\x02\x07\x03\x02\x02" + "\x02\x02\t\x03\x02\x02\x02\x02\v\x03\x02\x02\x02\x02\r\x03\x02\x02\x02" + "\x02\x0F\x03\x02\x02\x02\x02\x11\x03\x02\x02\x02\x02\x13\x03\x02\x02\x02" + "\x03\x15\x03\x02\x02\x02\x05\x17\x03\x02\x02\x02\x07\x19\x03\x02\x02\x02" + "\t\x1B\x03\x02\x02\x02\v\x1E\x03\x02\x02\x02\r!\x03\x02\x02\x02\x0F$\x03" + "\x02\x02\x02\x11(\x03\x02\x02\x02\x13-\x03\x02\x02\x02\x15\x16\x07?\x02" + "\x02\x16\x04\x03\x02\x02\x02\x17\x18\x07]\x02\x02\x18\x06\x03\x02\x02" + "\x02\x19\x1A\x07_\x02\x02\x1A\b\x03\x02\x02\x02\x1B\x1C\x07^\x02\x02\x1C" + "\x1D\x07^\x02\x02\x1D\n\x03\x02\x02\x02\x1E\x1F\x07^\x02\x02\x1F \x07" + "]\x02\x02 \f\x03\x02\x02\x02!\"\x07^\x02\x02\"#\x07_\x02\x02#\x0E\x03" + "\x02\x02\x02$%\x07^\x02\x02%&\x07?\x02\x02&\x10\x03\x02\x02\x02\')\n\x02" + "\x02\x02(\'\x03\x02\x02\x02)*\x03\x02\x02\x02*(\x03\x02\x02\x02*+\x03" + "\x02\x02\x02+\x12\x03\x02\x02\x02,.\t\x03\x02\x02-,\x03\x02\x02\x02./" + "\x03\x02\x02\x02/-\x03\x02\x02\x02/0\x03\x02\x02\x020\x14\x03\x02\x02" + "\x02\x05\x02*/\x02";
 
 },{"antlr4ts/Lexer":25,"antlr4ts/VocabularyImpl":48,"antlr4ts/atn/ATNDeserializer":54,"antlr4ts/atn/LexerATNSimulator":75,"antlr4ts/misc/Utils":136}],3:[function(require,module,exports){
 "use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.Token_escaped_textContext = exports.Token_valueContext = exports.Token_attributeContext = exports.Token_tag_nameContext = exports.Token_tagContext = exports.Token_textContext = exports.Token_startContext = exports.cyoaeParser = void 0;
+
+var _ATN = require("antlr4ts/atn/ATN");
+
+var _ATNDeserializer = require("antlr4ts/atn/ATNDeserializer");
+
+var _FailedPredicateException = require("antlr4ts/FailedPredicateException");
+
+var _NoViableAltException = require("antlr4ts/NoViableAltException");
+
+var _Parser = require("antlr4ts/Parser");
+
+var _ParserRuleContext = require("antlr4ts/ParserRuleContext");
+
+var _ParserATNSimulator = require("antlr4ts/atn/ParserATNSimulator");
+
+var _RecognitionException = require("antlr4ts/RecognitionException");
+
+var _Token = require("antlr4ts/Token");
+
+var _VocabularyImpl = require("antlr4ts/VocabularyImpl");
+
+var Utils = _interopRequireWildcard(require("antlr4ts/misc/Utils"));
+
+function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
 // Generated from cyoae.g4 by ANTLR 4.9.0-SNAPSHOT
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = function (d, b) {
-        extendStatics = Object.setPrototypeOf ||
-            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-        return extendStatics(d, b);
-    };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-var ATN_1 = require("antlr4ts/atn/ATN");
-var ATNDeserializer_1 = require("antlr4ts/atn/ATNDeserializer");
-var FailedPredicateException_1 = require("antlr4ts/FailedPredicateException");
-var NoViableAltException_1 = require("antlr4ts/NoViableAltException");
-var Parser_1 = require("antlr4ts/Parser");
-var ParserRuleContext_1 = require("antlr4ts/ParserRuleContext");
-var ParserATNSimulator_1 = require("antlr4ts/atn/ParserATNSimulator");
-var RecognitionException_1 = require("antlr4ts/RecognitionException");
-var Token_1 = require("antlr4ts/Token");
-var VocabularyImpl_1 = require("antlr4ts/VocabularyImpl");
-var Utils = __importStar(require("antlr4ts/misc/Utils"));
-var cyoaeParser = /** @class */ (function (_super) {
-    __extends(cyoaeParser, _super);
-    function cyoaeParser(input) {
-        var _this = _super.call(this, input) || this;
-        _this._interp = new ParserATNSimulator_1.ParserATNSimulator(cyoaeParser._ATN, _this);
-        return _this;
-    }
-    Object.defineProperty(cyoaeParser.prototype, "vocabulary", {
-        // @Override
-        // @NotNull
-        get: function () {
-            return cyoaeParser.VOCABULARY;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeParser.prototype, "grammarFileName", {
-        // tslint:enable:no-trailing-whitespace
-        // @Override
-        get: function () { return "cyoae.g4"; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeParser.prototype, "ruleNames", {
-        // @Override
-        get: function () { return cyoaeParser.ruleNames; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(cyoaeParser.prototype, "serializedATN", {
-        // @Override
-        get: function () { return cyoaeParser._serializedATN; },
-        enumerable: true,
-        configurable: true
-    });
-    cyoaeParser.prototype.createFailedPredicateException = function (predicate, message) {
-        return new FailedPredicateException_1.FailedPredicateException(this, predicate, message);
-    };
-    // @RuleVersion(0)
-    cyoaeParser.prototype.token_start = function () {
-        var _localctx = new Token_startContext(this._ctx, this.state);
-        this.enterRule(_localctx, 0, cyoaeParser.RULE_token_start);
-        var _la;
-        try {
-            this.enterOuterAlt(_localctx, 1);
-            {
-                this.state = 18;
-                this._errHandler.sync(this);
-                _la = this._input.LA(1);
-                while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << cyoaeParser.T__0) | (1 << cyoaeParser.T__1) | (1 << cyoaeParser.T__3) | (1 << cyoaeParser.T__4) | (1 << cyoaeParser.T__5) | (1 << cyoaeParser.T__6) | (1 << cyoaeParser.WORD) | (1 << cyoaeParser.WS))) !== 0)) {
-                    {
-                        this.state = 16;
-                        this._errHandler.sync(this);
-                        switch (this._input.LA(1)) {
-                            case cyoaeParser.T__0:
-                            case cyoaeParser.T__3:
-                            case cyoaeParser.T__4:
-                            case cyoaeParser.T__5:
-                            case cyoaeParser.T__6:
-                            case cyoaeParser.WORD:
-                            case cyoaeParser.WS:
-                                {
-                                    this.state = 14;
-                                    this.token_text();
-                                }
-                                break;
-                            case cyoaeParser.T__1:
-                                {
-                                    this.state = 15;
-                                    this.token_tag();
-                                }
-                                break;
-                            default:
-                                throw new NoViableAltException_1.NoViableAltException(this);
-                        }
-                    }
-                    this.state = 20;
-                    this._errHandler.sync(this);
-                    _la = this._input.LA(1);
+class cyoaeParser extends _Parser.Parser {
+  constructor(input) {
+    super(input);
+    this._interp = new _ParserATNSimulator.ParserATNSimulator(cyoaeParser._ATN, this);
+  } // @Override
+  // @NotNull
+
+
+  get vocabulary() {
+    return cyoaeParser.VOCABULARY;
+  } // tslint:enable:no-trailing-whitespace
+  // @Override
+
+
+  get grammarFileName() {
+    return "cyoae.g4";
+  } // @Override
+
+
+  get ruleNames() {
+    return cyoaeParser.ruleNames;
+  } // @Override
+
+
+  get serializedATN() {
+    return cyoaeParser._serializedATN;
+  }
+
+  createFailedPredicateException(predicate, message) {
+    return new _FailedPredicateException.FailedPredicateException(this, predicate, message);
+  } // @RuleVersion(0)
+
+
+  token_start() {
+    let _localctx = new Token_startContext(this._ctx, this.state);
+
+    this.enterRule(_localctx, 0, cyoaeParser.RULE_token_start);
+
+    let _la;
+
+    try {
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 18;
+
+        this._errHandler.sync(this);
+
+        _la = this._input.LA(1);
+
+        while ((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__0 | 1 << cyoaeParser.T__1 | 1 << cyoaeParser.T__3 | 1 << cyoaeParser.T__4 | 1 << cyoaeParser.T__5 | 1 << cyoaeParser.T__6 | 1 << cyoaeParser.WORD | 1 << cyoaeParser.WS)) !== 0) {
+          {
+            this.state = 16;
+
+            this._errHandler.sync(this);
+
+            switch (this._input.LA(1)) {
+              case cyoaeParser.T__0:
+              case cyoaeParser.T__3:
+              case cyoaeParser.T__4:
+              case cyoaeParser.T__5:
+              case cyoaeParser.T__6:
+              case cyoaeParser.WORD:
+              case cyoaeParser.WS:
+                {
+                  this.state = 14;
+                  this.token_text();
                 }
-                this.state = 21;
-                this.match(cyoaeParser.EOF);
+                break;
+
+              case cyoaeParser.T__1:
+                {
+                  this.state = 15;
+                  this.token_tag();
+                }
+                break;
+
+              default:
+                throw new _NoViableAltException.NoViableAltException(this);
             }
+          }
+          this.state = 20;
+
+          this._errHandler.sync(this);
+
+          _la = this._input.LA(1);
         }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    };
-    // @RuleVersion(0)
-    cyoaeParser.prototype.token_text = function () {
-        var _localctx = new Token_textContext(this._ctx, this.state);
-        this.enterRule(_localctx, 2, cyoaeParser.RULE_token_text);
-        try {
-            var _alt = void 0;
-            this.enterOuterAlt(_localctx, 1);
-            {
+
+        this.state = 21;
+        this.match(cyoaeParser.EOF);
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
+  } // @RuleVersion(0)
+
+
+  token_text() {
+    let _localctx = new Token_textContext(this._ctx, this.state);
+
+    this.enterRule(_localctx, 2, cyoaeParser.RULE_token_text);
+
+    try {
+      let _alt;
+
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 27;
+
+        this._errHandler.sync(this);
+
+        _alt = 1;
+
+        do {
+          switch (_alt) {
+            case 1:
+              {
                 this.state = 27;
+
                 this._errHandler.sync(this);
-                _alt = 1;
-                do {
-                    switch (_alt) {
-                        case 1:
-                            {
-                                this.state = 27;
-                                this._errHandler.sync(this);
-                                switch (this._input.LA(1)) {
-                                    case cyoaeParser.T__3:
-                                    case cyoaeParser.T__4:
-                                    case cyoaeParser.T__5:
-                                    case cyoaeParser.T__6:
-                                        {
-                                            this.state = 23;
-                                            this.token_escaped_text();
-                                        }
-                                        break;
-                                    case cyoaeParser.WORD:
-                                        {
-                                            this.state = 24;
-                                            this.match(cyoaeParser.WORD);
-                                        }
-                                        break;
-                                    case cyoaeParser.WS:
-                                        {
-                                            this.state = 25;
-                                            this.match(cyoaeParser.WS);
-                                        }
-                                        break;
-                                    case cyoaeParser.T__0:
-                                        {
-                                            this.state = 26;
-                                            this.match(cyoaeParser.T__0);
-                                        }
-                                        break;
-                                    default:
-                                        throw new NoViableAltException_1.NoViableAltException(this);
-                                }
-                            }
-                            break;
-                        default:
-                            throw new NoViableAltException_1.NoViableAltException(this);
+
+                switch (this._input.LA(1)) {
+                  case cyoaeParser.T__3:
+                  case cyoaeParser.T__4:
+                  case cyoaeParser.T__5:
+                  case cyoaeParser.T__6:
+                    {
+                      this.state = 23;
+                      this.token_escaped_text();
                     }
-                    this.state = 29;
-                    this._errHandler.sync(this);
-                    _alt = this.interpreter.adaptivePredict(this._input, 3, this._ctx);
-                } while (_alt !== 2 && _alt !== ATN_1.ATN.INVALID_ALT_NUMBER);
-            }
+                    break;
+
+                  case cyoaeParser.WORD:
+                    {
+                      this.state = 24;
+                      this.match(cyoaeParser.WORD);
+                    }
+                    break;
+
+                  case cyoaeParser.WS:
+                    {
+                      this.state = 25;
+                      this.match(cyoaeParser.WS);
+                    }
+                    break;
+
+                  case cyoaeParser.T__0:
+                    {
+                      this.state = 26;
+                      this.match(cyoaeParser.T__0);
+                    }
+                    break;
+
+                  default:
+                    throw new _NoViableAltException.NoViableAltException(this);
+                }
+              }
+              break;
+
+            default:
+              throw new _NoViableAltException.NoViableAltException(this);
+          }
+
+          this.state = 29;
+
+          this._errHandler.sync(this);
+
+          _alt = this.interpreter.adaptivePredict(this._input, 3, this._ctx);
+        } while (_alt !== 2 && _alt !== _ATN.ATN.INVALID_ALT_NUMBER);
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
+  } // @RuleVersion(0)
+
+
+  token_tag() {
+    let _localctx = new Token_tagContext(this._ctx, this.state);
+
+    this.enterRule(_localctx, 4, cyoaeParser.RULE_token_tag);
+
+    let _la;
+
+    try {
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 31;
+        this.match(cyoaeParser.T__1);
+        this.state = 33;
+
+        this._errHandler.sync(this);
+
+        _la = this._input.LA(1);
+
+        if (_la === cyoaeParser.WS) {
+          {
+            this.state = 32;
+            this.match(cyoaeParser.WS);
+          }
         }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    };
-    // @RuleVersion(0)
-    cyoaeParser.prototype.token_tag = function () {
-        var _localctx = new Token_tagContext(this._ctx, this.state);
-        this.enterRule(_localctx, 4, cyoaeParser.RULE_token_tag);
-        var _la;
-        try {
-            this.enterOuterAlt(_localctx, 1);
+
+        this.state = 35;
+        this.token_tag_name();
+        this.state = 37;
+
+        this._errHandler.sync(this);
+
+        switch (this.interpreter.adaptivePredict(this._input, 5, this._ctx)) {
+          case 1:
             {
-                this.state = 31;
-                this.match(cyoaeParser.T__1);
-                this.state = 33;
-                this._errHandler.sync(this);
-                _la = this._input.LA(1);
-                if (_la === cyoaeParser.WS) {
+              this.state = 36;
+              this.match(cyoaeParser.WS);
+            }
+            break;
+        }
+
+        this.state = 41;
+
+        this._errHandler.sync(this);
+
+        switch (this.interpreter.adaptivePredict(this._input, 6, this._ctx)) {
+          case 1:
+            {
+              this.state = 39;
+              this.token_value();
+            }
+            break;
+
+          case 2:
+            {
+              this.state = 40;
+              this.token_tag();
+            }
+            break;
+        }
+
+        this.state = 44;
+
+        this._errHandler.sync(this);
+
+        _la = this._input.LA(1);
+
+        if (_la === cyoaeParser.WS) {
+          {
+            this.state = 43;
+            this.match(cyoaeParser.WS);
+          }
+        }
+
+        this.state = 57;
+
+        this._errHandler.sync(this);
+
+        _la = this._input.LA(1);
+
+        while (_la === cyoaeParser.WORD) {
+          {
+            {
+              this.state = 46;
+              this.token_attribute();
+              this.state = 47;
+              this.match(cyoaeParser.T__0);
+              this.state = 50;
+
+              this._errHandler.sync(this);
+
+              switch (this._input.LA(1)) {
+                case cyoaeParser.T__3:
+                case cyoaeParser.T__4:
+                case cyoaeParser.T__5:
+                case cyoaeParser.T__6:
+                case cyoaeParser.WORD:
+                case cyoaeParser.WS:
+                  {
+                    this.state = 48;
+                    this.token_value();
+                  }
+                  break;
+
+                case cyoaeParser.T__1:
+                  {
+                    this.state = 49;
+                    this.token_tag();
+                  }
+                  break;
+
+                default:
+                  throw new _NoViableAltException.NoViableAltException(this);
+              }
+
+              this.state = 53;
+
+              this._errHandler.sync(this);
+
+              _la = this._input.LA(1);
+
+              if (_la === cyoaeParser.WS) {
+                {
+                  this.state = 52;
+                  this.match(cyoaeParser.WS);
+                }
+              }
+            }
+          }
+          this.state = 59;
+
+          this._errHandler.sync(this);
+
+          _la = this._input.LA(1);
+        }
+
+        this.state = 60;
+        this.match(cyoaeParser.T__2);
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
+  } // @RuleVersion(0)
+
+
+  token_tag_name() {
+    let _localctx = new Token_tag_nameContext(this._ctx, this.state);
+
+    this.enterRule(_localctx, 6, cyoaeParser.RULE_token_tag_name);
+
+    try {
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 62;
+        this.match(cyoaeParser.WORD);
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
+  } // @RuleVersion(0)
+
+
+  token_attribute() {
+    let _localctx = new Token_attributeContext(this._ctx, this.state);
+
+    this.enterRule(_localctx, 8, cyoaeParser.RULE_token_attribute);
+
+    try {
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 64;
+        this.match(cyoaeParser.WORD);
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
+  } // @RuleVersion(0)
+
+
+  token_value() {
+    let _localctx = new Token_valueContext(this._ctx, this.state);
+
+    this.enterRule(_localctx, 10, cyoaeParser.RULE_token_value);
+
+    let _la;
+
+    try {
+      let _alt;
+
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 76;
+
+        this._errHandler.sync(this);
+
+        _alt = 1;
+
+        do {
+          switch (_alt) {
+            case 1:
+              {
+                {
+                  this.state = 69;
+
+                  this._errHandler.sync(this);
+
+                  _la = this._input.LA(1);
+
+                  while (_la === cyoaeParser.WS) {
                     {
-                        this.state = 32;
+                      {
+                        this.state = 66;
                         this.match(cyoaeParser.WS);
+                      }
                     }
-                }
-                this.state = 35;
-                this.token_tag_name();
-                this.state = 37;
-                this._errHandler.sync(this);
-                switch (this.interpreter.adaptivePredict(this._input, 5, this._ctx)) {
-                    case 1:
-                        {
-                            this.state = 36;
-                            this.match(cyoaeParser.WS);
-                        }
-                        break;
-                }
-                this.state = 41;
-                this._errHandler.sync(this);
-                switch (this.interpreter.adaptivePredict(this._input, 6, this._ctx)) {
-                    case 1:
-                        {
-                            this.state = 39;
-                            this.token_value();
-                        }
-                        break;
-                    case 2:
-                        {
-                            this.state = 40;
-                            this.token_tag();
-                        }
-                        break;
-                }
-                this.state = 44;
-                this._errHandler.sync(this);
-                _la = this._input.LA(1);
-                if (_la === cyoaeParser.WS) {
-                    {
-                        this.state = 43;
-                        this.match(cyoaeParser.WS);
-                    }
-                }
-                this.state = 57;
-                this._errHandler.sync(this);
-                _la = this._input.LA(1);
-                while (_la === cyoaeParser.WORD) {
-                    {
-                        {
-                            this.state = 46;
-                            this.token_attribute();
-                            this.state = 47;
-                            this.match(cyoaeParser.T__0);
-                            this.state = 50;
-                            this._errHandler.sync(this);
-                            switch (this._input.LA(1)) {
-                                case cyoaeParser.T__3:
-                                case cyoaeParser.T__4:
-                                case cyoaeParser.T__5:
-                                case cyoaeParser.T__6:
-                                case cyoaeParser.WORD:
-                                case cyoaeParser.WS:
-                                    {
-                                        this.state = 48;
-                                        this.token_value();
-                                    }
-                                    break;
-                                case cyoaeParser.T__1:
-                                    {
-                                        this.state = 49;
-                                        this.token_tag();
-                                    }
-                                    break;
-                                default:
-                                    throw new NoViableAltException_1.NoViableAltException(this);
-                            }
-                            this.state = 53;
-                            this._errHandler.sync(this);
-                            _la = this._input.LA(1);
-                            if (_la === cyoaeParser.WS) {
-                                {
-                                    this.state = 52;
-                                    this.match(cyoaeParser.WS);
-                                }
-                            }
-                        }
-                    }
-                    this.state = 59;
+                    this.state = 71;
+
                     this._errHandler.sync(this);
+
                     _la = this._input.LA(1);
+                  }
+
+                  this.state = 74;
+
+                  this._errHandler.sync(this);
+
+                  switch (this._input.LA(1)) {
+                    case cyoaeParser.T__3:
+                    case cyoaeParser.T__4:
+                    case cyoaeParser.T__5:
+                    case cyoaeParser.T__6:
+                      {
+                        this.state = 72;
+                        this.token_escaped_text();
+                      }
+                      break;
+
+                    case cyoaeParser.WORD:
+                      {
+                        this.state = 73;
+                        this.match(cyoaeParser.WORD);
+                      }
+                      break;
+
+                    default:
+                      throw new _NoViableAltException.NoViableAltException(this);
+                  }
                 }
-                this.state = 60;
-                this.match(cyoaeParser.T__2);
-            }
+              }
+              break;
+
+            default:
+              throw new _NoViableAltException.NoViableAltException(this);
+          }
+
+          this.state = 78;
+
+          this._errHandler.sync(this);
+
+          _alt = this.interpreter.adaptivePredict(this._input, 13, this._ctx);
+        } while (_alt !== 2 && _alt !== _ATN.ATN.INVALID_ALT_NUMBER);
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
+  } // @RuleVersion(0)
+
+
+  token_escaped_text() {
+    let _localctx = new Token_escaped_textContext(this._ctx, this.state);
+
+    this.enterRule(_localctx, 12, cyoaeParser.RULE_token_escaped_text);
+
+    let _la;
+
+    try {
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 80;
+        _la = this._input.LA(1);
+
+        if (!((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__3 | 1 << cyoaeParser.T__4 | 1 << cyoaeParser.T__5 | 1 << cyoaeParser.T__6)) !== 0)) {
+          this._errHandler.recoverInline(this);
+        } else {
+          if (this._input.LA(1) === _Token.Token.EOF) {
+            this.matchedEOF = true;
+          }
+
+          this._errHandler.reportMatch(this);
+
+          this.consume();
         }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    };
-    // @RuleVersion(0)
-    cyoaeParser.prototype.token_tag_name = function () {
-        var _localctx = new Token_tag_nameContext(this._ctx, this.state);
-        this.enterRule(_localctx, 6, cyoaeParser.RULE_token_tag_name);
-        try {
-            this.enterOuterAlt(_localctx, 1);
-            {
-                this.state = 62;
-                this.match(cyoaeParser.WORD);
-            }
-        }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    };
-    // @RuleVersion(0)
-    cyoaeParser.prototype.token_attribute = function () {
-        var _localctx = new Token_attributeContext(this._ctx, this.state);
-        this.enterRule(_localctx, 8, cyoaeParser.RULE_token_attribute);
-        try {
-            this.enterOuterAlt(_localctx, 1);
-            {
-                this.state = 64;
-                this.match(cyoaeParser.WORD);
-            }
-        }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    };
-    // @RuleVersion(0)
-    cyoaeParser.prototype.token_value = function () {
-        var _localctx = new Token_valueContext(this._ctx, this.state);
-        this.enterRule(_localctx, 10, cyoaeParser.RULE_token_value);
-        var _la;
-        try {
-            var _alt = void 0;
-            this.enterOuterAlt(_localctx, 1);
-            {
-                this.state = 76;
-                this._errHandler.sync(this);
-                _alt = 1;
-                do {
-                    switch (_alt) {
-                        case 1:
-                            {
-                                {
-                                    this.state = 69;
-                                    this._errHandler.sync(this);
-                                    _la = this._input.LA(1);
-                                    while (_la === cyoaeParser.WS) {
-                                        {
-                                            {
-                                                this.state = 66;
-                                                this.match(cyoaeParser.WS);
-                                            }
-                                        }
-                                        this.state = 71;
-                                        this._errHandler.sync(this);
-                                        _la = this._input.LA(1);
-                                    }
-                                    this.state = 74;
-                                    this._errHandler.sync(this);
-                                    switch (this._input.LA(1)) {
-                                        case cyoaeParser.T__3:
-                                        case cyoaeParser.T__4:
-                                        case cyoaeParser.T__5:
-                                        case cyoaeParser.T__6:
-                                            {
-                                                this.state = 72;
-                                                this.token_escaped_text();
-                                            }
-                                            break;
-                                        case cyoaeParser.WORD:
-                                            {
-                                                this.state = 73;
-                                                this.match(cyoaeParser.WORD);
-                                            }
-                                            break;
-                                        default:
-                                            throw new NoViableAltException_1.NoViableAltException(this);
-                                    }
-                                }
-                            }
-                            break;
-                        default:
-                            throw new NoViableAltException_1.NoViableAltException(this);
-                    }
-                    this.state = 78;
-                    this._errHandler.sync(this);
-                    _alt = this.interpreter.adaptivePredict(this._input, 13, this._ctx);
-                } while (_alt !== 2 && _alt !== ATN_1.ATN.INVALID_ALT_NUMBER);
-            }
-        }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    };
-    // @RuleVersion(0)
-    cyoaeParser.prototype.token_escaped_text = function () {
-        var _localctx = new Token_escaped_textContext(this._ctx, this.state);
-        this.enterRule(_localctx, 12, cyoaeParser.RULE_token_escaped_text);
-        var _la;
-        try {
-            this.enterOuterAlt(_localctx, 1);
-            {
-                this.state = 80;
-                _la = this._input.LA(1);
-                if (!((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << cyoaeParser.T__3) | (1 << cyoaeParser.T__4) | (1 << cyoaeParser.T__5) | (1 << cyoaeParser.T__6))) !== 0))) {
-                    this._errHandler.recoverInline(this);
-                }
-                else {
-                    if (this._input.LA(1) === Token_1.Token.EOF) {
-                        this.matchedEOF = true;
-                    }
-                    this._errHandler.reportMatch(this);
-                    this.consume();
-                }
-            }
-        }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    };
-    Object.defineProperty(cyoaeParser, "_ATN", {
-        get: function () {
-            if (!cyoaeParser.__ATN) {
-                cyoaeParser.__ATN = new ATNDeserializer_1.ATNDeserializer().deserialize(Utils.toCharArray(cyoaeParser._serializedATN));
-            }
-            return cyoaeParser.__ATN;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    cyoaeParser.T__0 = 1;
-    cyoaeParser.T__1 = 2;
-    cyoaeParser.T__2 = 3;
-    cyoaeParser.T__3 = 4;
-    cyoaeParser.T__4 = 5;
-    cyoaeParser.T__5 = 6;
-    cyoaeParser.T__6 = 7;
-    cyoaeParser.WORD = 8;
-    cyoaeParser.WS = 9;
-    cyoaeParser.RULE_token_start = 0;
-    cyoaeParser.RULE_token_text = 1;
-    cyoaeParser.RULE_token_tag = 2;
-    cyoaeParser.RULE_token_tag_name = 3;
-    cyoaeParser.RULE_token_attribute = 4;
-    cyoaeParser.RULE_token_value = 5;
-    cyoaeParser.RULE_token_escaped_text = 6;
-    // tslint:disable:no-trailing-whitespace
-    cyoaeParser.ruleNames = [
-        "token_start", "token_text", "token_tag", "token_tag_name", "token_attribute",
-        "token_value", "token_escaped_text",
-    ];
-    cyoaeParser._LITERAL_NAMES = [
-        undefined, "'='", "'['", "']'", "'\\''", "'\\'", "'\\'", "'\\'",
-    ];
-    cyoaeParser._SYMBOLIC_NAMES = [
-        undefined, undefined, undefined, undefined, undefined, undefined, undefined,
-        undefined, "WORD", "WS",
-    ];
-    cyoaeParser.VOCABULARY = new VocabularyImpl_1.VocabularyImpl(cyoaeParser._LITERAL_NAMES, cyoaeParser._SYMBOLIC_NAMES, []);
-    cyoaeParser._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\vU\x04\x02\t" +
-        "\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07\t" +
-        "\x07\x04\b\t\b\x03\x02\x03\x02\x07\x02\x13\n\x02\f\x02\x0E\x02\x16\v\x02" +
-        "\x03\x02\x03\x02\x03\x03\x03\x03\x03\x03\x03\x03\x06\x03\x1E\n\x03\r\x03" +
-        "\x0E\x03\x1F\x03\x04\x03\x04\x05\x04$\n\x04\x03\x04\x03\x04\x05\x04(\n" +
-        "\x04\x03\x04\x03\x04\x05\x04,\n\x04\x03\x04\x05\x04/\n\x04\x03\x04\x03" +
-        "\x04\x03\x04\x03\x04\x05\x045\n\x04\x03\x04\x05\x048\n\x04\x07\x04:\n" +
-        "\x04\f\x04\x0E\x04=\v\x04\x03\x04\x03\x04\x03\x05\x03\x05\x03\x06\x03" +
-        "\x06\x03\x07\x07\x07F\n\x07\f\x07\x0E\x07I\v\x07\x03\x07\x03\x07\x05\x07" +
-        "M\n\x07\x06\x07O\n\x07\r\x07\x0E\x07P\x03\b\x03\b\x03\b\x02\x02\x02\t" +
-        "\x02\x02\x04\x02\x06\x02\b\x02\n\x02\f\x02\x0E\x02\x02\x03\x03\x02\x06" +
-        "\t\x02^\x02\x14\x03\x02\x02\x02\x04\x1D\x03\x02\x02\x02\x06!\x03\x02\x02" +
-        "\x02\b@\x03\x02\x02\x02\nB\x03\x02\x02\x02\fN\x03\x02\x02\x02\x0ER\x03" +
-        "\x02\x02\x02\x10\x13\x05\x04\x03\x02\x11\x13\x05\x06\x04\x02\x12\x10\x03" +
-        "\x02\x02\x02\x12\x11\x03\x02\x02\x02\x13\x16\x03\x02\x02\x02\x14\x12\x03" +
-        "\x02\x02\x02\x14\x15\x03\x02\x02\x02\x15\x17\x03\x02\x02\x02\x16\x14\x03" +
-        "\x02\x02\x02\x17\x18\x07\x02\x02\x03\x18\x03\x03\x02\x02\x02\x19\x1E\x05" +
-        "\x0E\b\x02\x1A\x1E\x07\n\x02\x02\x1B\x1E\x07\v\x02\x02\x1C\x1E\x07\x03" +
-        "\x02\x02\x1D\x19\x03\x02\x02\x02\x1D\x1A\x03\x02\x02\x02\x1D\x1B\x03\x02" +
-        "\x02\x02\x1D\x1C\x03\x02\x02\x02\x1E\x1F\x03\x02\x02\x02\x1F\x1D\x03\x02" +
-        "\x02\x02\x1F \x03\x02\x02\x02 \x05\x03\x02\x02\x02!#\x07\x04\x02\x02\"" +
-        "$\x07\v\x02\x02#\"\x03\x02\x02\x02#$\x03\x02\x02\x02$%\x03\x02\x02\x02" +
-        "%\'\x05\b\x05\x02&(\x07\v\x02\x02\'&\x03\x02\x02\x02\'(\x03\x02\x02\x02" +
-        "(+\x03\x02\x02\x02),\x05\f\x07\x02*,\x05\x06\x04\x02+)\x03\x02\x02\x02" +
-        "+*\x03\x02\x02\x02+,\x03\x02\x02\x02,.\x03\x02\x02\x02-/\x07\v\x02\x02" +
-        ".-\x03\x02\x02\x02./\x03\x02\x02\x02/;\x03\x02\x02\x0201\x05\n\x06\x02" +
-        "14\x07\x03\x02\x0225\x05\f\x07\x0235\x05\x06\x04\x0242\x03\x02\x02\x02" +
-        "43\x03\x02\x02\x0257\x03\x02\x02\x0268\x07\v\x02\x0276\x03\x02\x02\x02" +
-        "78\x03\x02\x02\x028:\x03\x02\x02\x0290\x03\x02\x02\x02:=\x03\x02\x02\x02" +
-        ";9\x03\x02\x02\x02;<\x03\x02\x02\x02<>\x03\x02\x02\x02=;\x03\x02\x02\x02" +
-        ">?\x07\x05\x02\x02?\x07\x03\x02\x02\x02@A\x07\n\x02\x02A\t\x03\x02\x02" +
-        "\x02BC\x07\n\x02\x02C\v\x03\x02\x02\x02DF\x07\v\x02\x02ED\x03\x02\x02" +
-        "\x02FI\x03\x02\x02\x02GE\x03\x02\x02\x02GH\x03\x02\x02\x02HL\x03\x02\x02" +
-        "\x02IG\x03\x02\x02\x02JM\x05\x0E\b\x02KM\x07\n\x02\x02LJ\x03\x02\x02\x02" +
-        "LK\x03\x02\x02\x02MO\x03\x02\x02\x02NG\x03\x02\x02\x02OP\x03\x02\x02\x02" +
-        "PN\x03\x02\x02\x02PQ\x03\x02\x02\x02Q\r\x03\x02\x02\x02RS\t\x02\x02\x02" +
-        "S\x0F\x03\x02\x02\x02\x10\x12\x14\x1D\x1F#\'+.47;GLP";
-    return cyoaeParser;
-}(Parser_1.Parser));
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
+  }
+
+  static get _ATN() {
+    if (!cyoaeParser.__ATN) {
+      cyoaeParser.__ATN = new _ATNDeserializer.ATNDeserializer().deserialize(Utils.toCharArray(cyoaeParser._serializedATN));
+    }
+
+    return cyoaeParser.__ATN;
+  }
+
+}
+
 exports.cyoaeParser = cyoaeParser;
-var Token_startContext = /** @class */ (function (_super) {
-    __extends(Token_startContext, _super);
-    function Token_startContext(parent, invokingState) {
-        return _super.call(this, parent, invokingState) || this;
+cyoaeParser.T__0 = 1;
+cyoaeParser.T__1 = 2;
+cyoaeParser.T__2 = 3;
+cyoaeParser.T__3 = 4;
+cyoaeParser.T__4 = 5;
+cyoaeParser.T__5 = 6;
+cyoaeParser.T__6 = 7;
+cyoaeParser.WORD = 8;
+cyoaeParser.WS = 9;
+cyoaeParser.RULE_token_start = 0;
+cyoaeParser.RULE_token_text = 1;
+cyoaeParser.RULE_token_tag = 2;
+cyoaeParser.RULE_token_tag_name = 3;
+cyoaeParser.RULE_token_attribute = 4;
+cyoaeParser.RULE_token_value = 5;
+cyoaeParser.RULE_token_escaped_text = 6; // tslint:disable:no-trailing-whitespace
+
+cyoaeParser.ruleNames = ["token_start", "token_text", "token_tag", "token_tag_name", "token_attribute", "token_value", "token_escaped_text"];
+cyoaeParser._LITERAL_NAMES = [undefined, "'='", "'['", "']'", "'\\''", "'\\'", "'\\'", "'\\'"];
+cyoaeParser._SYMBOLIC_NAMES = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, "WORD", "WS"];
+cyoaeParser.VOCABULARY = new _VocabularyImpl.VocabularyImpl(cyoaeParser._LITERAL_NAMES, cyoaeParser._SYMBOLIC_NAMES, []);
+cyoaeParser._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\vU\x04\x02\t" + "\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07\t" + "\x07\x04\b\t\b\x03\x02\x03\x02\x07\x02\x13\n\x02\f\x02\x0E\x02\x16\v\x02" + "\x03\x02\x03\x02\x03\x03\x03\x03\x03\x03\x03\x03\x06\x03\x1E\n\x03\r\x03" + "\x0E\x03\x1F\x03\x04\x03\x04\x05\x04$\n\x04\x03\x04\x03\x04\x05\x04(\n" + "\x04\x03\x04\x03\x04\x05\x04,\n\x04\x03\x04\x05\x04/\n\x04\x03\x04\x03" + "\x04\x03\x04\x03\x04\x05\x045\n\x04\x03\x04\x05\x048\n\x04\x07\x04:\n" + "\x04\f\x04\x0E\x04=\v\x04\x03\x04\x03\x04\x03\x05\x03\x05\x03\x06\x03" + "\x06\x03\x07\x07\x07F\n\x07\f\x07\x0E\x07I\v\x07\x03\x07\x03\x07\x05\x07" + "M\n\x07\x06\x07O\n\x07\r\x07\x0E\x07P\x03\b\x03\b\x03\b\x02\x02\x02\t" + "\x02\x02\x04\x02\x06\x02\b\x02\n\x02\f\x02\x0E\x02\x02\x03\x03\x02\x06" + "\t\x02^\x02\x14\x03\x02\x02\x02\x04\x1D\x03\x02\x02\x02\x06!\x03\x02\x02" + "\x02\b@\x03\x02\x02\x02\nB\x03\x02\x02\x02\fN\x03\x02\x02\x02\x0ER\x03" + "\x02\x02\x02\x10\x13\x05\x04\x03\x02\x11\x13\x05\x06\x04\x02\x12\x10\x03" + "\x02\x02\x02\x12\x11\x03\x02\x02\x02\x13\x16\x03\x02\x02\x02\x14\x12\x03" + "\x02\x02\x02\x14\x15\x03\x02\x02\x02\x15\x17\x03\x02\x02\x02\x16\x14\x03" + "\x02\x02\x02\x17\x18\x07\x02\x02\x03\x18\x03\x03\x02\x02\x02\x19\x1E\x05" + "\x0E\b\x02\x1A\x1E\x07\n\x02\x02\x1B\x1E\x07\v\x02\x02\x1C\x1E\x07\x03" + "\x02\x02\x1D\x19\x03\x02\x02\x02\x1D\x1A\x03\x02\x02\x02\x1D\x1B\x03\x02" + "\x02\x02\x1D\x1C\x03\x02\x02\x02\x1E\x1F\x03\x02\x02\x02\x1F\x1D\x03\x02" + "\x02\x02\x1F \x03\x02\x02\x02 \x05\x03\x02\x02\x02!#\x07\x04\x02\x02\"" + "$\x07\v\x02\x02#\"\x03\x02\x02\x02#$\x03\x02\x02\x02$%\x03\x02\x02\x02" + "%\'\x05\b\x05\x02&(\x07\v\x02\x02\'&\x03\x02\x02\x02\'(\x03\x02\x02\x02" + "(+\x03\x02\x02\x02),\x05\f\x07\x02*,\x05\x06\x04\x02+)\x03\x02\x02\x02" + "+*\x03\x02\x02\x02+,\x03\x02\x02\x02,.\x03\x02\x02\x02-/\x07\v\x02\x02" + ".-\x03\x02\x02\x02./\x03\x02\x02\x02/;\x03\x02\x02\x0201\x05\n\x06\x02" + "14\x07\x03\x02\x0225\x05\f\x07\x0235\x05\x06\x04\x0242\x03\x02\x02\x02" + "43\x03\x02\x02\x0257\x03\x02\x02\x0268\x07\v\x02\x0276\x03\x02\x02\x02" + "78\x03\x02\x02\x028:\x03\x02\x02\x0290\x03\x02\x02\x02:=\x03\x02\x02\x02" + ";9\x03\x02\x02\x02;<\x03\x02\x02\x02<>\x03\x02\x02\x02=;\x03\x02\x02\x02" + ">?\x07\x05\x02\x02?\x07\x03\x02\x02\x02@A\x07\n\x02\x02A\t\x03\x02\x02" + "\x02BC\x07\n\x02\x02C\v\x03\x02\x02\x02DF\x07\v\x02\x02ED\x03\x02\x02" + "\x02FI\x03\x02\x02\x02GE\x03\x02\x02\x02GH\x03\x02\x02\x02HL\x03\x02\x02" + "\x02IG\x03\x02\x02\x02JM\x05\x0E\b\x02KM\x07\n\x02\x02LJ\x03\x02\x02\x02" + "LK\x03\x02\x02\x02MO\x03\x02\x02\x02NG\x03\x02\x02\x02OP\x03\x02\x02\x02" + "PN\x03\x02\x02\x02PQ\x03\x02\x02\x02Q\r\x03\x02\x02\x02RS\t\x02\x02\x02" + "S\x0F\x03\x02\x02\x02\x10\x12\x14\x1D\x1F#\'+.47;GLP";
+
+class Token_startContext extends _ParserRuleContext.ParserRuleContext {
+  EOF() {
+    return this.getToken(cyoaeParser.EOF, 0);
+  }
+
+  token_text(i) {
+    if (i === undefined) {
+      return this.getRuleContexts(Token_textContext);
+    } else {
+      return this.getRuleContext(i, Token_textContext);
     }
-    Token_startContext.prototype.EOF = function () { return this.getToken(cyoaeParser.EOF, 0); };
-    Token_startContext.prototype.token_text = function (i) {
-        if (i === undefined) {
-            return this.getRuleContexts(Token_textContext);
-        }
-        else {
-            return this.getRuleContext(i, Token_textContext);
-        }
-    };
-    Token_startContext.prototype.token_tag = function (i) {
-        if (i === undefined) {
-            return this.getRuleContexts(Token_tagContext);
-        }
-        else {
-            return this.getRuleContext(i, Token_tagContext);
-        }
-    };
-    Object.defineProperty(Token_startContext.prototype, "ruleIndex", {
-        // @Override
-        get: function () { return cyoaeParser.RULE_token_start; },
-        enumerable: true,
-        configurable: true
-    });
-    // @Override
-    Token_startContext.prototype.enterRule = function (listener) {
-        if (listener.enterToken_start) {
-            listener.enterToken_start(this);
-        }
-    };
-    // @Override
-    Token_startContext.prototype.exitRule = function (listener) {
-        if (listener.exitToken_start) {
-            listener.exitToken_start(this);
-        }
-    };
-    return Token_startContext;
-}(ParserRuleContext_1.ParserRuleContext));
+  }
+
+  token_tag(i) {
+    if (i === undefined) {
+      return this.getRuleContexts(Token_tagContext);
+    } else {
+      return this.getRuleContext(i, Token_tagContext);
+    }
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_token_start;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterToken_start) {
+      listener.enterToken_start(this);
+    }
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitToken_start) {
+      listener.exitToken_start(this);
+    }
+  }
+
+}
+
 exports.Token_startContext = Token_startContext;
-var Token_textContext = /** @class */ (function (_super) {
-    __extends(Token_textContext, _super);
-    function Token_textContext(parent, invokingState) {
-        return _super.call(this, parent, invokingState) || this;
+
+class Token_textContext extends _ParserRuleContext.ParserRuleContext {
+  token_escaped_text(i) {
+    if (i === undefined) {
+      return this.getRuleContexts(Token_escaped_textContext);
+    } else {
+      return this.getRuleContext(i, Token_escaped_textContext);
     }
-    Token_textContext.prototype.token_escaped_text = function (i) {
-        if (i === undefined) {
-            return this.getRuleContexts(Token_escaped_textContext);
-        }
-        else {
-            return this.getRuleContext(i, Token_escaped_textContext);
-        }
-    };
-    Token_textContext.prototype.WORD = function (i) {
-        if (i === undefined) {
-            return this.getTokens(cyoaeParser.WORD);
-        }
-        else {
-            return this.getToken(cyoaeParser.WORD, i);
-        }
-    };
-    Token_textContext.prototype.WS = function (i) {
-        if (i === undefined) {
-            return this.getTokens(cyoaeParser.WS);
-        }
-        else {
-            return this.getToken(cyoaeParser.WS, i);
-        }
-    };
-    Object.defineProperty(Token_textContext.prototype, "ruleIndex", {
-        // @Override
-        get: function () { return cyoaeParser.RULE_token_text; },
-        enumerable: true,
-        configurable: true
-    });
-    // @Override
-    Token_textContext.prototype.enterRule = function (listener) {
-        if (listener.enterToken_text) {
-            listener.enterToken_text(this);
-        }
-    };
-    // @Override
-    Token_textContext.prototype.exitRule = function (listener) {
-        if (listener.exitToken_text) {
-            listener.exitToken_text(this);
-        }
-    };
-    return Token_textContext;
-}(ParserRuleContext_1.ParserRuleContext));
+  }
+
+  WORD(i) {
+    if (i === undefined) {
+      return this.getTokens(cyoaeParser.WORD);
+    } else {
+      return this.getToken(cyoaeParser.WORD, i);
+    }
+  }
+
+  WS(i) {
+    if (i === undefined) {
+      return this.getTokens(cyoaeParser.WS);
+    } else {
+      return this.getToken(cyoaeParser.WS, i);
+    }
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_token_text;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterToken_text) {
+      listener.enterToken_text(this);
+    }
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitToken_text) {
+      listener.exitToken_text(this);
+    }
+  }
+
+}
+
 exports.Token_textContext = Token_textContext;
-var Token_tagContext = /** @class */ (function (_super) {
-    __extends(Token_tagContext, _super);
-    function Token_tagContext(parent, invokingState) {
-        return _super.call(this, parent, invokingState) || this;
+
+class Token_tagContext extends _ParserRuleContext.ParserRuleContext {
+  token_tag_name() {
+    return this.getRuleContext(0, Token_tag_nameContext);
+  }
+
+  WS(i) {
+    if (i === undefined) {
+      return this.getTokens(cyoaeParser.WS);
+    } else {
+      return this.getToken(cyoaeParser.WS, i);
     }
-    Token_tagContext.prototype.token_tag_name = function () {
-        return this.getRuleContext(0, Token_tag_nameContext);
-    };
-    Token_tagContext.prototype.WS = function (i) {
-        if (i === undefined) {
-            return this.getTokens(cyoaeParser.WS);
-        }
-        else {
-            return this.getToken(cyoaeParser.WS, i);
-        }
-    };
-    Token_tagContext.prototype.token_value = function (i) {
-        if (i === undefined) {
-            return this.getRuleContexts(Token_valueContext);
-        }
-        else {
-            return this.getRuleContext(i, Token_valueContext);
-        }
-    };
-    Token_tagContext.prototype.token_tag = function (i) {
-        if (i === undefined) {
-            return this.getRuleContexts(Token_tagContext);
-        }
-        else {
-            return this.getRuleContext(i, Token_tagContext);
-        }
-    };
-    Token_tagContext.prototype.token_attribute = function (i) {
-        if (i === undefined) {
-            return this.getRuleContexts(Token_attributeContext);
-        }
-        else {
-            return this.getRuleContext(i, Token_attributeContext);
-        }
-    };
-    Object.defineProperty(Token_tagContext.prototype, "ruleIndex", {
-        // @Override
-        get: function () { return cyoaeParser.RULE_token_tag; },
-        enumerable: true,
-        configurable: true
-    });
-    // @Override
-    Token_tagContext.prototype.enterRule = function (listener) {
-        if (listener.enterToken_tag) {
-            listener.enterToken_tag(this);
-        }
-    };
-    // @Override
-    Token_tagContext.prototype.exitRule = function (listener) {
-        if (listener.exitToken_tag) {
-            listener.exitToken_tag(this);
-        }
-    };
-    return Token_tagContext;
-}(ParserRuleContext_1.ParserRuleContext));
+  }
+
+  token_value(i) {
+    if (i === undefined) {
+      return this.getRuleContexts(Token_valueContext);
+    } else {
+      return this.getRuleContext(i, Token_valueContext);
+    }
+  }
+
+  token_tag(i) {
+    if (i === undefined) {
+      return this.getRuleContexts(Token_tagContext);
+    } else {
+      return this.getRuleContext(i, Token_tagContext);
+    }
+  }
+
+  token_attribute(i) {
+    if (i === undefined) {
+      return this.getRuleContexts(Token_attributeContext);
+    } else {
+      return this.getRuleContext(i, Token_attributeContext);
+    }
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_token_tag;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterToken_tag) {
+      listener.enterToken_tag(this);
+    }
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitToken_tag) {
+      listener.exitToken_tag(this);
+    }
+  }
+
+}
+
 exports.Token_tagContext = Token_tagContext;
-var Token_tag_nameContext = /** @class */ (function (_super) {
-    __extends(Token_tag_nameContext, _super);
-    function Token_tag_nameContext(parent, invokingState) {
-        return _super.call(this, parent, invokingState) || this;
+
+class Token_tag_nameContext extends _ParserRuleContext.ParserRuleContext {
+  WORD() {
+    return this.getToken(cyoaeParser.WORD, 0);
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_token_tag_name;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterToken_tag_name) {
+      listener.enterToken_tag_name(this);
     }
-    Token_tag_nameContext.prototype.WORD = function () { return this.getToken(cyoaeParser.WORD, 0); };
-    Object.defineProperty(Token_tag_nameContext.prototype, "ruleIndex", {
-        // @Override
-        get: function () { return cyoaeParser.RULE_token_tag_name; },
-        enumerable: true,
-        configurable: true
-    });
-    // @Override
-    Token_tag_nameContext.prototype.enterRule = function (listener) {
-        if (listener.enterToken_tag_name) {
-            listener.enterToken_tag_name(this);
-        }
-    };
-    // @Override
-    Token_tag_nameContext.prototype.exitRule = function (listener) {
-        if (listener.exitToken_tag_name) {
-            listener.exitToken_tag_name(this);
-        }
-    };
-    return Token_tag_nameContext;
-}(ParserRuleContext_1.ParserRuleContext));
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitToken_tag_name) {
+      listener.exitToken_tag_name(this);
+    }
+  }
+
+}
+
 exports.Token_tag_nameContext = Token_tag_nameContext;
-var Token_attributeContext = /** @class */ (function (_super) {
-    __extends(Token_attributeContext, _super);
-    function Token_attributeContext(parent, invokingState) {
-        return _super.call(this, parent, invokingState) || this;
+
+class Token_attributeContext extends _ParserRuleContext.ParserRuleContext {
+  WORD() {
+    return this.getToken(cyoaeParser.WORD, 0);
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_token_attribute;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterToken_attribute) {
+      listener.enterToken_attribute(this);
     }
-    Token_attributeContext.prototype.WORD = function () { return this.getToken(cyoaeParser.WORD, 0); };
-    Object.defineProperty(Token_attributeContext.prototype, "ruleIndex", {
-        // @Override
-        get: function () { return cyoaeParser.RULE_token_attribute; },
-        enumerable: true,
-        configurable: true
-    });
-    // @Override
-    Token_attributeContext.prototype.enterRule = function (listener) {
-        if (listener.enterToken_attribute) {
-            listener.enterToken_attribute(this);
-        }
-    };
-    // @Override
-    Token_attributeContext.prototype.exitRule = function (listener) {
-        if (listener.exitToken_attribute) {
-            listener.exitToken_attribute(this);
-        }
-    };
-    return Token_attributeContext;
-}(ParserRuleContext_1.ParserRuleContext));
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitToken_attribute) {
+      listener.exitToken_attribute(this);
+    }
+  }
+
+}
+
 exports.Token_attributeContext = Token_attributeContext;
-var Token_valueContext = /** @class */ (function (_super) {
-    __extends(Token_valueContext, _super);
-    function Token_valueContext(parent, invokingState) {
-        return _super.call(this, parent, invokingState) || this;
+
+class Token_valueContext extends _ParserRuleContext.ParserRuleContext {
+  token_escaped_text(i) {
+    if (i === undefined) {
+      return this.getRuleContexts(Token_escaped_textContext);
+    } else {
+      return this.getRuleContext(i, Token_escaped_textContext);
     }
-    Token_valueContext.prototype.token_escaped_text = function (i) {
-        if (i === undefined) {
-            return this.getRuleContexts(Token_escaped_textContext);
-        }
-        else {
-            return this.getRuleContext(i, Token_escaped_textContext);
-        }
-    };
-    Token_valueContext.prototype.WORD = function (i) {
-        if (i === undefined) {
-            return this.getTokens(cyoaeParser.WORD);
-        }
-        else {
-            return this.getToken(cyoaeParser.WORD, i);
-        }
-    };
-    Token_valueContext.prototype.WS = function (i) {
-        if (i === undefined) {
-            return this.getTokens(cyoaeParser.WS);
-        }
-        else {
-            return this.getToken(cyoaeParser.WS, i);
-        }
-    };
-    Object.defineProperty(Token_valueContext.prototype, "ruleIndex", {
-        // @Override
-        get: function () { return cyoaeParser.RULE_token_value; },
-        enumerable: true,
-        configurable: true
-    });
-    // @Override
-    Token_valueContext.prototype.enterRule = function (listener) {
-        if (listener.enterToken_value) {
-            listener.enterToken_value(this);
-        }
-    };
-    // @Override
-    Token_valueContext.prototype.exitRule = function (listener) {
-        if (listener.exitToken_value) {
-            listener.exitToken_value(this);
-        }
-    };
-    return Token_valueContext;
-}(ParserRuleContext_1.ParserRuleContext));
+  }
+
+  WORD(i) {
+    if (i === undefined) {
+      return this.getTokens(cyoaeParser.WORD);
+    } else {
+      return this.getToken(cyoaeParser.WORD, i);
+    }
+  }
+
+  WS(i) {
+    if (i === undefined) {
+      return this.getTokens(cyoaeParser.WS);
+    } else {
+      return this.getToken(cyoaeParser.WS, i);
+    }
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_token_value;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterToken_value) {
+      listener.enterToken_value(this);
+    }
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitToken_value) {
+      listener.exitToken_value(this);
+    }
+  }
+
+}
+
 exports.Token_valueContext = Token_valueContext;
-var Token_escaped_textContext = /** @class */ (function (_super) {
-    __extends(Token_escaped_textContext, _super);
-    function Token_escaped_textContext(parent, invokingState) {
-        return _super.call(this, parent, invokingState) || this;
+
+class Token_escaped_textContext extends _ParserRuleContext.ParserRuleContext {
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_token_escaped_text;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterToken_escaped_text) {
+      listener.enterToken_escaped_text(this);
     }
-    Object.defineProperty(Token_escaped_textContext.prototype, "ruleIndex", {
-        // @Override
-        get: function () { return cyoaeParser.RULE_token_escaped_text; },
-        enumerable: true,
-        configurable: true
-    });
-    // @Override
-    Token_escaped_textContext.prototype.enterRule = function (listener) {
-        if (listener.enterToken_escaped_text) {
-            listener.enterToken_escaped_text(this);
-        }
-    };
-    // @Override
-    Token_escaped_textContext.prototype.exitRule = function (listener) {
-        if (listener.exitToken_escaped_text) {
-            listener.exitToken_escaped_text(this);
-        }
-    };
-    return Token_escaped_textContext;
-}(ParserRuleContext_1.ParserRuleContext));
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitToken_escaped_text) {
+      listener.exitToken_escaped_text(this);
+    }
+  }
+
+}
+
 exports.Token_escaped_textContext = Token_escaped_textContext;
 
 },{"antlr4ts/FailedPredicateException":21,"antlr4ts/NoViableAltException":29,"antlr4ts/Parser":30,"antlr4ts/ParserRuleContext":33,"antlr4ts/RecognitionException":36,"antlr4ts/Token":42,"antlr4ts/VocabularyImpl":48,"antlr4ts/atn/ATN":50,"antlr4ts/atn/ATNDeserializer":54,"antlr4ts/atn/ParserATNSimulator":91,"antlr4ts/misc/Utils":136}],4:[function(require,module,exports){
@@ -1671,7 +1663,7 @@ __decorate([
 ], ANTLRInputStream.prototype, "toString", null);
 exports.ANTLRInputStream = ANTLRInputStream;
 
-},{"./Decorators":17,"./IntStream":23,"assert":160}],7:[function(require,module,exports){
+},{"./Decorators":17,"./IntStream":23,"assert":161}],7:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -2244,7 +2236,7 @@ BufferedTokenStream = __decorate([
 ], BufferedTokenStream);
 exports.BufferedTokenStream = BufferedTokenStream;
 
-},{"./CommonToken":13,"./Decorators":17,"./Lexer":25,"./Token":42,"./misc/Interval":129,"assert":160}],9:[function(require,module,exports){
+},{"./CommonToken":13,"./Decorators":17,"./Lexer":25,"./Token":42,"./misc/Interval":129,"assert":161}],9:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -2258,12 +2250,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * Copyright 2016 The ANTLR Project. All rights reserved.
  * Licensed under the BSD-3-Clause license. See LICENSE file in the project root for license information.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
 exports.CharStreams = void 0;
+
 const CodePointBuffer_1 = require("./CodePointBuffer");
+
 const CodePointCharStream_1 = require("./CodePointCharStream");
-const IntStream_1 = require("./IntStream");
-// const DEFAULT_BUFFER_SIZE: number = 4096;
+
+const IntStream_1 = require("./IntStream"); // const DEFAULT_BUFFER_SIZE: number = 4096;
+
 /** This class represents the primary interface for creating {@link CharStream}s
  *  from a variety of sources as of 4.7.  The motivation was to support
  *  Unicode code points > U+FFFF.  {@link ANTLRInputStream} and
@@ -2302,88 +2300,94 @@ const IntStream_1 = require("./IntStream");
  *
  *  @since 4.7
  */
+
+
 var CharStreams;
+
 (function (CharStreams) {
-    // /**
-    //  * Creates a {@link CharStream} given a path to a UTF-8
-    //  * encoded file on disk.
-    //  *
-    //  * Reads the entire contents of the file into the result before returning.
-    //  */
-    // export function fromFile(file: File): CharStream;
-    // export function fromFile(file: File, charset: Charset): CharStream;
-    // export function fromFile(file: File, charset?: Charset): CharStream {
-    // 	if (charset === undefined) {
-    // 		charset = Charset.forName("UTF-8");
-    // 	}
-    function fromString(s, sourceName) {
-        if (sourceName === undefined || sourceName.length === 0) {
-            sourceName = IntStream_1.IntStream.UNKNOWN_SOURCE_NAME;
-        }
-        // Initial guess assumes no code points > U+FFFF: one code
-        // point for each code unit in the string
-        let codePointBufferBuilder = CodePointBuffer_1.CodePointBuffer.builder(s.length);
-        // TODO: CharBuffer.wrap(String) rightfully returns a read-only buffer
-        // which doesn't expose its array, so we make a copy.
-        let cb = new Uint16Array(s.length);
-        for (let i = 0; i < s.length; i++) {
-            cb[i] = s.charCodeAt(i);
-        }
-        codePointBufferBuilder.append(cb);
-        return CodePointCharStream_1.CodePointCharStream.fromBuffer(codePointBufferBuilder.build(), sourceName);
+  // /**
+  //  * Creates a {@link CharStream} given a path to a UTF-8
+  //  * encoded file on disk.
+  //  *
+  //  * Reads the entire contents of the file into the result before returning.
+  //  */
+  // export function fromFile(file: File): CharStream;
+  // export function fromFile(file: File, charset: Charset): CharStream;
+  // export function fromFile(file: File, charset?: Charset): CharStream {
+  // 	if (charset === undefined) {
+  // 		charset = Charset.forName("UTF-8");
+  // 	}
+  function fromString(s, sourceName) {
+    if (sourceName === undefined || sourceName.length === 0) {
+      sourceName = IntStream_1.IntStream.UNKNOWN_SOURCE_NAME;
+    } // Initial guess assumes no code points > U+FFFF: one code
+    // point for each code unit in the string
+
+
+    let codePointBufferBuilder = CodePointBuffer_1.CodePointBuffer.builder(s.length); // TODO: CharBuffer.wrap(String) rightfully returns a read-only buffer
+    // which doesn't expose its array, so we make a copy.
+
+    let cb = new Uint16Array(s.length);
+
+    for (let i = 0; i < s.length; i++) {
+      cb[i] = s.charCodeAt(i);
     }
-    CharStreams.fromString = fromString;
-    // export function bufferFromChannel(
-    // 	channel: ReadableByteChannel,
-    // 	charset: Charset,
-    // 	bufferSize: number,
-    // 	decodingErrorAction: CodingErrorAction,
-    // 	inputSize: number): CodePointBuffer {
-    // 	try {
-    // 		let utf8BytesIn: Uint8Array = new Uint8Array(bufferSize);
-    // 		let utf16CodeUnitsOut: Uint16Array = new Uint16Array(bufferSize);
-    // 		if (inputSize === -1) {
-    // 			inputSize = bufferSize;
-    // 		} else if (inputSize > Integer.MAX_VALUE) {
-    // 			// ByteBuffer et al don't support long sizes
-    // 			throw new RangeError(`inputSize ${inputSize} larger than max ${Integer.MAX_VALUE}`);
-    // 		}
-    // 		let codePointBufferBuilder: CodePointBuffer.Builder = CodePointBuffer.builder(inputSize);
-    // 		let decoder: CharsetDecoder = charset
-    // 				.newDecoder()
-    // 				.onMalformedInput(decodingErrorAction)
-    // 				.onUnmappableCharacter(decodingErrorAction);
-    // 		let endOfInput: boolean = false;
-    // 		while (!endOfInput) {
-    // 			let bytesRead: number = channel.read(utf8BytesIn);
-    // 			endOfInput = (bytesRead === -1);
-    // 			utf8BytesIn.flip();
-    // 			let result: CoderResult = decoder.decode(
-    // 				utf8BytesIn,
-    // 				utf16CodeUnitsOut,
-    // 				endOfInput);
-    // 			if (result.isError() && decodingErrorAction === CodingErrorAction.REPORT) {
-    // 				result.throwException();
-    // 			}
-    // 			utf16CodeUnitsOut.flip();
-    // 			codePointBufferBuilder.append(utf16CodeUnitsOut);
-    // 			utf8BytesIn.compact();
-    // 			utf16CodeUnitsOut.compact();
-    // 		}
-    // 		// Handle any bytes at the end of the file which need to
-    // 		// be represented as errors or substitution characters.
-    // 		let flushResult: CoderResult = decoder.flush(utf16CodeUnitsOut);
-    // 		if (flushResult.isError() && decodingErrorAction === CodingErrorAction.REPORT) {
-    // 			flushResult.throwException();
-    // 		}
-    // 		utf16CodeUnitsOut.flip();
-    // 		codePointBufferBuilder.append(utf16CodeUnitsOut);
-    // 		return codePointBufferBuilder.build();
-    // 	}
-    // 	finally {
-    // 		channel.close();
-    // 	}
-    // }
+
+    codePointBufferBuilder.append(cb);
+    return CodePointCharStream_1.CodePointCharStream.fromBuffer(codePointBufferBuilder.build(), sourceName);
+  }
+
+  CharStreams.fromString = fromString; // export function bufferFromChannel(
+  // 	channel: ReadableByteChannel,
+  // 	charset: Charset,
+  // 	bufferSize: number,
+  // 	decodingErrorAction: CodingErrorAction,
+  // 	inputSize: number): CodePointBuffer {
+  // 	try {
+  // 		let utf8BytesIn: Uint8Array = new Uint8Array(bufferSize);
+  // 		let utf16CodeUnitsOut: Uint16Array = new Uint16Array(bufferSize);
+  // 		if (inputSize === -1) {
+  // 			inputSize = bufferSize;
+  // 		} else if (inputSize > Integer.MAX_VALUE) {
+  // 			// ByteBuffer et al don't support long sizes
+  // 			throw new RangeError(`inputSize ${inputSize} larger than max ${Integer.MAX_VALUE}`);
+  // 		}
+  // 		let codePointBufferBuilder: CodePointBuffer.Builder = CodePointBuffer.builder(inputSize);
+  // 		let decoder: CharsetDecoder = charset
+  // 				.newDecoder()
+  // 				.onMalformedInput(decodingErrorAction)
+  // 				.onUnmappableCharacter(decodingErrorAction);
+  // 		let endOfInput: boolean = false;
+  // 		while (!endOfInput) {
+  // 			let bytesRead: number = channel.read(utf8BytesIn);
+  // 			endOfInput = (bytesRead === -1);
+  // 			utf8BytesIn.flip();
+  // 			let result: CoderResult = decoder.decode(
+  // 				utf8BytesIn,
+  // 				utf16CodeUnitsOut,
+  // 				endOfInput);
+  // 			if (result.isError() && decodingErrorAction === CodingErrorAction.REPORT) {
+  // 				result.throwException();
+  // 			}
+  // 			utf16CodeUnitsOut.flip();
+  // 			codePointBufferBuilder.append(utf16CodeUnitsOut);
+  // 			utf8BytesIn.compact();
+  // 			utf16CodeUnitsOut.compact();
+  // 		}
+  // 		// Handle any bytes at the end of the file which need to
+  // 		// be represented as errors or substitution characters.
+  // 		let flushResult: CoderResult = decoder.flush(utf16CodeUnitsOut);
+  // 		if (flushResult.isError() && decodingErrorAction === CodingErrorAction.REPORT) {
+  // 			flushResult.throwException();
+  // 		}
+  // 		utf16CodeUnitsOut.flip();
+  // 		codePointBufferBuilder.append(utf16CodeUnitsOut);
+  // 		return codePointBufferBuilder.build();
+  // 	}
+  // 	finally {
+  // 		channel.close();
+  // 	}
+  // }
 })(CharStreams = exports.CharStreams || (exports.CharStreams = {}));
 
 },{"./CodePointBuffer":11,"./CodePointCharStream":12,"./IntStream":23}],11:[function(require,module,exports){
@@ -2621,7 +2625,7 @@ exports.CodePointBuffer = CodePointBuffer;
     CodePointBuffer.Builder = Builder;
 })(CodePointBuffer = exports.CodePointBuffer || (exports.CodePointBuffer = {}));
 
-},{"./misc/Character":125,"assert":160}],12:[function(require,module,exports){
+},{"./misc/Character":125,"assert":161}],12:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -2771,7 +2775,7 @@ __decorate([
 ], CodePointCharStream.prototype, "getText", null);
 exports.CodePointCharStream = CodePointCharStream;
 
-},{"./Decorators":17,"./IntStream":23,"./misc/Interval":129,"assert":160}],13:[function(require,module,exports){
+},{"./Decorators":17,"./IntStream":23,"./misc/Interval":129,"assert":161}],13:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -6050,7 +6054,7 @@ __decorate([
 exports.Parser = Parser;
 
 }).call(this)}).call(this,require('_process'))
-},{"./Decorators":17,"./DefaultErrorStrategy":18,"./Lexer":25,"./ProxyParserErrorListener":35,"./Recognizer":37,"./Token":42,"./atn/ATNDeserializationOptions":53,"./atn/ATNDeserializer":54,"./atn/ParseInfo":90,"./atn/ParserATNSimulator":91,"./atn/ProfilingATNSimulator":100,"./misc/IntegerStack":128,"./misc/Utils":136,"./tree/ErrorNode":137,"./tree/TerminalNode":139,"./tree/pattern/ParseTreePatternMatcher":144,"_process":180}],31:[function(require,module,exports){
+},{"./Decorators":17,"./DefaultErrorStrategy":18,"./Lexer":25,"./ProxyParserErrorListener":35,"./Recognizer":37,"./Token":42,"./atn/ATNDeserializationOptions":53,"./atn/ATNDeserializer":54,"./atn/ParseInfo":90,"./atn/ParserATNSimulator":91,"./atn/ProfilingATNSimulator":100,"./misc/IntegerStack":128,"./misc/Utils":136,"./tree/ErrorNode":137,"./tree/TerminalNode":140,"./tree/pattern/ParseTreePatternMatcher":145,"_process":181}],31:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -6767,7 +6771,7 @@ __decorate([
 ], ParserRuleContext.prototype, "sourceInterval", null);
 exports.ParserRuleContext = ParserRuleContext;
 
-},{"./Decorators":17,"./RuleContext":38,"./misc/Interval":129,"./tree/ErrorNode":137,"./tree/TerminalNode":139}],34:[function(require,module,exports){
+},{"./Decorators":17,"./RuleContext":38,"./misc/Interval":129,"./tree/ErrorNode":137,"./tree/TerminalNode":140}],34:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -7417,7 +7421,7 @@ __decorate([
 ], RuleContext.prototype, "toStringTree", null);
 exports.RuleContext = RuleContext;
 
-},{"./Decorators":17,"./ParserRuleContext":33,"./Recognizer":37,"./atn/ATN":50,"./misc/Interval":129,"./tree/RuleNode":138,"./tree/Trees":140}],39:[function(require,module,exports){
+},{"./Decorators":17,"./ParserRuleContext":33,"./Recognizer":37,"./atn/ATN":50,"./misc/Interval":129,"./tree/RuleNode":139,"./tree/Trees":141}],39:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -8440,7 +8444,7 @@ exports.ATN = ATN;
 })(ATN = exports.ATN || (exports.ATN = {}));
 exports.ATN = ATN;
 
-},{"../Decorators":17,"../Token":42,"../dfa/DFA":115,"../misc/Array2DHashMap":120,"../misc/IntervalSet":130,"../misc/ObjectEqualityComparator":133,"./InvalidState":73,"./LL1Analyzer":74,"./PredictionContext":97,"assert":160}],51:[function(require,module,exports){
+},{"../Decorators":17,"../Token":42,"../dfa/DFA":115,"../misc/Array2DHashMap":120,"../misc/IntervalSet":130,"../misc/ObjectEqualityComparator":133,"./InvalidState":73,"./LL1Analyzer":74,"./PredictionContext":97,"assert":161}],51:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -8965,7 +8969,7 @@ ActionSemanticContextATNConfig = __decorate([
     __param(1, Decorators_1.NotNull), __param(2, Decorators_1.NotNull)
 ], ActionSemanticContextATNConfig);
 
-},{"../Decorators":17,"../misc/Array2DHashMap":120,"../misc/MurmurHash":132,"../misc/ObjectEqualityComparator":133,"./DecisionState":70,"./PredictionContext":97,"./SemanticContext":105,"assert":160}],52:[function(require,module,exports){
+},{"../Decorators":17,"../misc/Array2DHashMap":120,"../misc/MurmurHash":132,"../misc/ObjectEqualityComparator":133,"./DecisionState":70,"./PredictionContext":97,"./SemanticContext":105,"assert":161}],52:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -9412,7 +9416,7 @@ __decorate([
 ], ATNConfigSet.prototype, "hashCode", null);
 exports.ATNConfigSet = ATNConfigSet;
 
-},{"../Decorators":17,"../misc/Array2DHashMap":120,"../misc/Array2DHashSet":121,"../misc/ArrayEqualityComparator":122,"../misc/BitSet":124,"../misc/ObjectEqualityComparator":133,"../misc/Utils":136,"./ATN":50,"./ATNConfig":51,"./PredictionContext":97,"./PredictionContextCache":98,"./SemanticContext":105,"assert":160}],53:[function(require,module,exports){
+},{"../Decorators":17,"../misc/Array2DHashMap":120,"../misc/Array2DHashSet":121,"../misc/ArrayEqualityComparator":122,"../misc/BitSet":124,"../misc/ObjectEqualityComparator":133,"../misc/Utils":136,"./ATN":50,"./ATNConfig":51,"./PredictionContext":97,"./PredictionContextCache":98,"./SemanticContext":105,"assert":161}],53:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -12687,7 +12691,7 @@ exports.LexerATNSimulator = LexerATNSimulator;
 })(LexerATNSimulator = exports.LexerATNSimulator || (exports.LexerATNSimulator = {}));
 exports.LexerATNSimulator = LexerATNSimulator;
 
-},{"../Decorators":17,"../IntStream":23,"../Lexer":25,"../LexerNoViableAltException":27,"../Token":42,"../dfa/AcceptStateInfo":114,"../dfa/DFAState":117,"../misc/Interval":129,"./ATN":50,"./ATNConfig":51,"./ATNConfigSet":52,"./ATNSimulator":55,"./LexerActionExecutor":76,"./OrderedATNConfigSet":89,"./PredictionContext":97,"./RuleStopState":103,"assert":160}],76:[function(require,module,exports){
+},{"../Decorators":17,"../IntStream":23,"../Lexer":25,"../LexerNoViableAltException":27,"../Token":42,"../dfa/AcceptStateInfo":114,"../dfa/DFAState":117,"../misc/Interval":129,"./ATN":50,"./ATNConfig":51,"./ATNConfigSet":52,"./ATNSimulator":55,"./LexerActionExecutor":76,"./OrderedATNConfigSet":89,"./PredictionContext":97,"./RuleStopState":103,"assert":161}],76:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -16479,7 +16483,7 @@ ParserATNSimulator = __decorate([
 ], ParserATNSimulator);
 exports.ParserATNSimulator = ParserATNSimulator;
 
-},{"../Decorators":17,"../IntStream":23,"../NoViableAltException":29,"../ParserRuleContext":33,"../Token":42,"../VocabularyImpl":48,"../dfa/AcceptStateInfo":114,"../dfa/DFAState":117,"../misc/Array2DHashSet":121,"../misc/Arrays":123,"../misc/BitSet":124,"../misc/IntegerList":127,"../misc/Interval":129,"../misc/ObjectEqualityComparator":133,"./ATN":50,"./ATNConfig":51,"./ATNConfigSet":52,"./ATNSimulator":55,"./ATNStateType":57,"./ActionTransition":59,"./AtomTransition":61,"./ConflictInfo":66,"./DecisionState":70,"./NotSetTransition":88,"./PredictionContext":97,"./PredictionContextCache":98,"./PredictionMode":99,"./RuleStopState":103,"./RuleTransition":104,"./SemanticContext":105,"./SetTransition":106,"./SimulatorState":107,"assert":160}],92:[function(require,module,exports){
+},{"../Decorators":17,"../IntStream":23,"../NoViableAltException":29,"../ParserRuleContext":33,"../Token":42,"../VocabularyImpl":48,"../dfa/AcceptStateInfo":114,"../dfa/DFAState":117,"../misc/Array2DHashSet":121,"../misc/Arrays":123,"../misc/BitSet":124,"../misc/IntegerList":127,"../misc/Interval":129,"../misc/ObjectEqualityComparator":133,"./ATN":50,"./ATNConfig":51,"./ATNConfigSet":52,"./ATNSimulator":55,"./ATNStateType":57,"./ActionTransition":59,"./AtomTransition":61,"./ConflictInfo":66,"./DecisionState":70,"./NotSetTransition":88,"./PredictionContext":97,"./PredictionContextCache":98,"./PredictionMode":99,"./RuleStopState":103,"./RuleTransition":104,"./SemanticContext":105,"./SetTransition":106,"./SimulatorState":107,"assert":161}],92:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -17426,7 +17430,7 @@ exports.SingletonPredictionContext = SingletonPredictionContext;
     PredictionContext.IdentityEqualityComparator = IdentityEqualityComparator;
 })(PredictionContext = exports.PredictionContext || (exports.PredictionContext = {}));
 
-},{"../Decorators":17,"../misc/Array2DHashMap":120,"../misc/Array2DHashSet":121,"../misc/Arrays":123,"../misc/MurmurHash":132,"./PredictionContextCache":98,"assert":160}],98:[function(require,module,exports){
+},{"../Decorators":17,"../misc/Array2DHashMap":120,"../misc/Array2DHashSet":121,"../misc/Arrays":123,"../misc/MurmurHash":132,"./PredictionContextCache":98,"assert":161}],98:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -17567,7 +17571,7 @@ PredictionContextCache.UNCACHED = new PredictionContextCache(false);
     PredictionContextCache.IdentityCommutativePredictionContextOperands = IdentityCommutativePredictionContextOperands;
 })(PredictionContextCache = exports.PredictionContextCache || (exports.PredictionContextCache = {}));
 
-},{"../Decorators":17,"../misc/Array2DHashMap":120,"../misc/ObjectEqualityComparator":133,"./PredictionContext":97,"assert":160}],99:[function(require,module,exports){
+},{"../Decorators":17,"../misc/Array2DHashMap":120,"../misc/ObjectEqualityComparator":133,"./PredictionContext":97,"assert":161}],99:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -17997,7 +18001,7 @@ __decorate([
 exports.ProfilingATNSimulator = ProfilingATNSimulator;
 
 }).call(this)}).call(this,require('_process'))
-},{"../Decorators":17,"./ATN":50,"./ATNSimulator":55,"./AmbiguityInfo":60,"./ContextSensitivityInfo":67,"./DecisionInfo":69,"./ErrorInfo":72,"./LookaheadEventInfo":86,"./ParserATNSimulator":91,"./PredicateEvalInfo":95,"./SemanticContext":105,"./SimulatorState":107,"_process":180}],101:[function(require,module,exports){
+},{"../Decorators":17,"./ATN":50,"./ATNSimulator":55,"./AmbiguityInfo":60,"./ContextSensitivityInfo":67,"./DecisionInfo":69,"./ErrorInfo":72,"./LookaheadEventInfo":86,"./ParserATNSimulator":91,"./PredicateEvalInfo":95,"./SemanticContext":105,"./SimulatorState":107,"_process":181}],101:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -19622,7 +19626,7 @@ exports.DFAState = DFAState;
     DFAState.PredPrediction = PredPrediction;
 })(DFAState = exports.DFAState || (exports.DFAState = {}));
 
-},{"../Decorators":17,"../atn/ATN":50,"../atn/PredictionContext":97,"../misc/BitSet":124,"../misc/MurmurHash":132,"assert":160}],118:[function(require,module,exports){
+},{"../Decorators":17,"../atn/ATN":50,"../atn/PredictionContext":97,"../misc/BitSet":124,"../misc/MurmurHash":132,"assert":161}],118:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -19665,64 +19669,119 @@ exports.LexerDFASerializer = LexerDFASerializer;
  * Copyright 2016 The ANTLR Project. All rights reserved.
  * Licensed under the BSD-3-Clause license. See LICENSE file in the project root for license information.
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __exportStar = (this && this.__exportStar) || function(m, exports) {
-    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+
+var __createBinding = void 0 && (void 0).__createBinding || (Object.create ? function (o, m, k, k2) {
+  if (k2 === undefined) k2 = k;
+  Object.defineProperty(o, k2, {
+    enumerable: true,
+    get: function () {
+      return m[k];
+    }
+  });
+} : function (o, m, k, k2) {
+  if (k2 === undefined) k2 = k;
+  o[k2] = m[k];
+});
+
+var __exportStar = void 0 && (void 0).__exportStar || function (m, exports) {
+  for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
-Object.defineProperty(exports, "__esModule", { value: true });
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
 __exportStar(require("./ANTLRErrorListener"), exports);
-__exportStar(require("./ANTLRErrorStrategy"), exports);
-// export * from "./ANTLRFileStream";
+
+__exportStar(require("./ANTLRErrorStrategy"), exports); // export * from "./ANTLRFileStream";
+
+
 __exportStar(require("./ANTLRInputStream"), exports);
+
 __exportStar(require("./BailErrorStrategy"), exports);
+
 __exportStar(require("./BufferedTokenStream"), exports);
+
 __exportStar(require("./CharStream"), exports);
+
 __exportStar(require("./CharStreams"), exports);
+
 __exportStar(require("./CodePointBuffer"), exports);
+
 __exportStar(require("./CodePointCharStream"), exports);
+
 __exportStar(require("./CommonToken"), exports);
+
 __exportStar(require("./CommonTokenFactory"), exports);
+
 __exportStar(require("./CommonTokenStream"), exports);
+
 __exportStar(require("./ConsoleErrorListener"), exports);
+
 __exportStar(require("./DefaultErrorStrategy"), exports);
+
 __exportStar(require("./Dependents"), exports);
+
 __exportStar(require("./DiagnosticErrorListener"), exports);
+
 __exportStar(require("./FailedPredicateException"), exports);
+
 __exportStar(require("./InputMismatchException"), exports);
+
 __exportStar(require("./InterpreterRuleContext"), exports);
+
 __exportStar(require("./IntStream"), exports);
+
 __exportStar(require("./Lexer"), exports);
+
 __exportStar(require("./LexerInterpreter"), exports);
+
 __exportStar(require("./LexerNoViableAltException"), exports);
+
 __exportStar(require("./ListTokenSource"), exports);
+
 __exportStar(require("./NoViableAltException"), exports);
+
 __exportStar(require("./Parser"), exports);
+
 __exportStar(require("./ParserErrorListener"), exports);
+
 __exportStar(require("./ParserInterpreter"), exports);
+
 __exportStar(require("./ParserRuleContext"), exports);
+
 __exportStar(require("./ProxyErrorListener"), exports);
+
 __exportStar(require("./ProxyParserErrorListener"), exports);
+
 __exportStar(require("./RecognitionException"), exports);
+
 __exportStar(require("./Recognizer"), exports);
+
 __exportStar(require("./RuleContext"), exports);
+
 __exportStar(require("./RuleContextWithAltNum"), exports);
+
 __exportStar(require("./RuleDependency"), exports);
+
 __exportStar(require("./RuleVersion"), exports);
+
 __exportStar(require("./Token"), exports);
+
 __exportStar(require("./TokenFactory"), exports);
+
 __exportStar(require("./TokenSource"), exports);
+
 __exportStar(require("./TokenStream"), exports);
-__exportStar(require("./TokenStreamRewriter"), exports);
-// export * from "./UnbufferedCharStream";
+
+__exportStar(require("./TokenStreamRewriter"), exports); // export * from "./UnbufferedCharStream";
 // export * from "./UnbufferedTokenStream";
+
+
 __exportStar(require("./Vocabulary"), exports);
+
 __exportStar(require("./VocabularyImpl"), exports);
+
 __exportStar(require("./WritableToken"), exports);
 
 },{"./ANTLRErrorListener":4,"./ANTLRErrorStrategy":5,"./ANTLRInputStream":6,"./BailErrorStrategy":7,"./BufferedTokenStream":8,"./CharStream":9,"./CharStreams":10,"./CodePointBuffer":11,"./CodePointCharStream":12,"./CommonToken":13,"./CommonTokenFactory":14,"./CommonTokenStream":15,"./ConsoleErrorListener":16,"./DefaultErrorStrategy":18,"./Dependents":19,"./DiagnosticErrorListener":20,"./FailedPredicateException":21,"./InputMismatchException":22,"./IntStream":23,"./InterpreterRuleContext":24,"./Lexer":25,"./LexerInterpreter":26,"./LexerNoViableAltException":27,"./ListTokenSource":28,"./NoViableAltException":29,"./Parser":30,"./ParserErrorListener":31,"./ParserInterpreter":32,"./ParserRuleContext":33,"./ProxyErrorListener":34,"./ProxyParserErrorListener":35,"./RecognitionException":36,"./Recognizer":37,"./RuleContext":38,"./RuleContextWithAltNum":39,"./RuleDependency":40,"./RuleVersion":41,"./Token":42,"./TokenFactory":43,"./TokenSource":44,"./TokenStream":45,"./TokenStreamRewriter":46,"./Vocabulary":47,"./VocabularyImpl":48,"./WritableToken":49}],120:[function(require,module,exports){
@@ -20175,7 +20234,7 @@ __decorate([
 ], Array2DHashSet.prototype, "createBuckets", null);
 exports.Array2DHashSet = Array2DHashSet;
 
-},{"../Decorators":17,"./DefaultEqualityComparator":126,"./MurmurHash":132,"assert":160}],122:[function(require,module,exports){
+},{"../Decorators":17,"./DefaultEqualityComparator":126,"./MurmurHash":132,"assert":161}],122:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -20989,7 +21048,7 @@ class BitSetIterator {
     [Symbol.iterator]() { return this; }
 }
 
-},{"./MurmurHash":132,"util":183}],125:[function(require,module,exports){
+},{"./MurmurHash":132,"util":184}],125:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -22490,42 +22549,50 @@ exports.UUID = UUID;
  * Copyright 2016 The ANTLR Project. All rights reserved.
  * Licensed under the BSD-3-Clause license. See LICENSE file in the project root for license information.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
 exports.toCharArray = exports.toMap = exports.equals = exports.join = exports.escapeWhitespace = void 0;
+
 function escapeWhitespace(s, escapeSpaces) {
-    return escapeSpaces ? s.replace(/ /, "\u00B7") : s
-        .replace(/\t/, "\\t")
-        .replace(/\n/, "\\n")
-        .replace(/\r/, "\\r");
+  return escapeSpaces ? s.replace(/ /, "\u00B7") : s.replace(/\t/, "\\t").replace(/\n/, "\\n").replace(/\r/, "\\r");
 }
-exports.escapeWhitespace = escapeWhitespace;
-// Seriously: why isn't this built in to java? ugh!
+
+exports.escapeWhitespace = escapeWhitespace; // Seriously: why isn't this built in to java? ugh!
+
 function join(collection, separator) {
-    let buf = "";
-    let first = true;
-    for (let current of collection) {
-        if (first) {
-            first = false;
-        }
-        else {
-            buf += separator;
-        }
-        buf += current;
+  let buf = "";
+  let first = true;
+
+  for (let current of collection) {
+    if (first) {
+      first = false;
+    } else {
+      buf += separator;
     }
-    return buf;
+
+    buf += current;
+  }
+
+  return buf;
 }
+
 exports.join = join;
+
 function equals(x, y) {
-    if (x === y) {
-        return true;
-    }
-    if (x === undefined || y === undefined) {
-        return false;
-    }
-    return x.equals(y);
+  if (x === y) {
+    return true;
+  }
+
+  if (x === undefined || y === undefined) {
+    return false;
+  }
+
+  return x.equals(y);
 }
-exports.equals = equals;
-// export function numNonnull(data: any[]): number {
+
+exports.equals = equals; // export function numNonnull(data: any[]): number {
 // 	let n: number =  0;
 // 	if ( data == null ) return n;
 // 	for (let o of data) {
@@ -22621,31 +22688,38 @@ exports.equals = equals;
 // 		}
 // 	}
 // }
+
 /** Convert array of strings to string&rarr;index map. Useful for
  *  converting rulenames to name&rarr;ruleindex map.
  */
+
 function toMap(keys) {
-    let m = new Map();
-    for (let i = 0; i < keys.length; i++) {
-        m.set(keys[i], i);
-    }
-    return m;
+  let m = new Map();
+
+  for (let i = 0; i < keys.length; i++) {
+    m.set(keys[i], i);
+  }
+
+  return m;
 }
+
 exports.toMap = toMap;
+
 function toCharArray(str) {
-    if (typeof str === "string") {
-        let result = new Uint16Array(str.length);
-        for (let i = 0; i < str.length; i++) {
-            result[i] = str.charCodeAt(i);
-        }
-        return result;
+  if (typeof str === "string") {
+    let result = new Uint16Array(str.length);
+
+    for (let i = 0; i < str.length; i++) {
+      result[i] = str.charCodeAt(i);
     }
-    else {
-        return str.toCharArray();
-    }
+
+    return result;
+  } else {
+    return str.toCharArray();
+  }
 }
-exports.toCharArray = toCharArray;
-// /**
+
+exports.toCharArray = toCharArray; // /**
 // 	* @since 4.5
 // 	*/
 // @NotNull
@@ -22695,7 +22769,112 @@ __decorate([
 ], ErrorNode.prototype, "accept", null);
 exports.ErrorNode = ErrorNode;
 
-},{"../Decorators":17,"./TerminalNode":139}],138:[function(require,module,exports){
+},{"../Decorators":17,"./TerminalNode":140}],138:[function(require,module,exports){
+"use strict";
+/*!
+ * Copyright 2016 The ANTLR Project. All rights reserved.
+ * Licensed under the BSD-3-Clause license. See LICENSE file in the project root for license information.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ParseTreeWalker = void 0;
+const ErrorNode_1 = require("./ErrorNode");
+const TerminalNode_1 = require("./TerminalNode");
+const RuleNode_1 = require("./RuleNode");
+class ParseTreeWalker {
+    /**
+     * Performs a walk on the given parse tree starting at the root and going down recursively
+     * with depth-first search. On each node, {@link ParseTreeWalker#enterRule} is called before
+     * recursively walking down into child nodes, then
+     * {@link ParseTreeWalker#exitRule} is called after the recursive call to wind up.
+     * @param listener The listener used by the walker to process grammar rules
+     * @param t The parse tree to be walked on
+     */
+    walk(listener, t) {
+        let nodeStack = [];
+        let indexStack = [];
+        let currentNode = t;
+        let currentIndex = 0;
+        while (currentNode) {
+            // pre-order visit
+            if (currentNode instanceof ErrorNode_1.ErrorNode) {
+                if (listener.visitErrorNode) {
+                    listener.visitErrorNode(currentNode);
+                }
+            }
+            else if (currentNode instanceof TerminalNode_1.TerminalNode) {
+                if (listener.visitTerminal) {
+                    listener.visitTerminal(currentNode);
+                }
+            }
+            else {
+                this.enterRule(listener, currentNode);
+            }
+            // Move down to first child, if exists
+            if (currentNode.childCount > 0) {
+                nodeStack.push(currentNode);
+                indexStack.push(currentIndex);
+                currentIndex = 0;
+                currentNode = currentNode.getChild(0);
+                continue;
+            }
+            // No child nodes, so walk tree
+            do {
+                // post-order visit
+                if (currentNode instanceof RuleNode_1.RuleNode) {
+                    this.exitRule(listener, currentNode);
+                }
+                // No parent, so no siblings
+                if (nodeStack.length === 0) {
+                    currentNode = undefined;
+                    currentIndex = 0;
+                    break;
+                }
+                // Move to next sibling if possible
+                let last = nodeStack[nodeStack.length - 1];
+                currentIndex++;
+                currentNode = currentIndex < last.childCount ? last.getChild(currentIndex) : undefined;
+                if (currentNode) {
+                    break;
+                }
+                // No next sibling, so move up
+                currentNode = nodeStack.pop();
+                currentIndex = indexStack.pop();
+            } while (currentNode);
+        }
+    }
+    /**
+     * Enters a grammar rule by first triggering the generic event {@link ParseTreeListener#enterEveryRule}
+     * then by triggering the event specific to the given parse tree node
+     * @param listener The listener responding to the trigger events
+     * @param r The grammar rule containing the rule context
+     */
+    enterRule(listener, r) {
+        let ctx = r.ruleContext;
+        if (listener.enterEveryRule) {
+            listener.enterEveryRule(ctx);
+        }
+        ctx.enterRule(listener);
+    }
+    /**
+     * Exits a grammar rule by first triggering the event specific to the given parse tree node
+     * then by triggering the generic event {@link ParseTreeListener#exitEveryRule}
+     * @param listener The listener responding to the trigger events
+     * @param r The grammar rule containing the rule context
+     */
+    exitRule(listener, r) {
+        let ctx = r.ruleContext;
+        ctx.exitRule(listener);
+        if (listener.exitEveryRule) {
+            listener.exitEveryRule(ctx);
+        }
+    }
+}
+exports.ParseTreeWalker = ParseTreeWalker;
+(function (ParseTreeWalker) {
+    ParseTreeWalker.DEFAULT = new ParseTreeWalker();
+})(ParseTreeWalker = exports.ParseTreeWalker || (exports.ParseTreeWalker = {}));
+
+},{"./ErrorNode":137,"./RuleNode":139,"./TerminalNode":140}],139:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -22707,7 +22886,7 @@ class RuleNode {
 }
 exports.RuleNode = RuleNode;
 
-},{}],139:[function(require,module,exports){
+},{}],140:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -22799,7 +22978,7 @@ __decorate([
 ], TerminalNode.prototype, "toString", null);
 exports.TerminalNode = TerminalNode;
 
-},{"../Decorators":17,"../Token":42,"../misc/Interval":129}],140:[function(require,module,exports){
+},{"../Decorators":17,"../Token":42,"../misc/Interval":129}],141:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -23043,7 +23222,7 @@ __decorate([
 ], Trees, "getRootOfSubtreeEnclosingRegion", null);
 exports.Trees = Trees;
 
-},{"../CommonToken":13,"../Decorators":17,"../Parser":30,"../ParserRuleContext":33,"../Token":42,"../atn/ATN":50,"../misc/Utils":136,"./ErrorNode":137,"./RuleNode":138,"./TerminalNode":139}],141:[function(require,module,exports){
+},{"../CommonToken":13,"../Decorators":17,"../Parser":30,"../ParserRuleContext":33,"../Token":42,"../atn/ATN":50,"../misc/Utils":136,"./ErrorNode":137,"./RuleNode":139,"./TerminalNode":140}],142:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -23067,7 +23246,7 @@ class Chunk {
 }
 exports.Chunk = Chunk;
 
-},{}],142:[function(require,module,exports){
+},{}],143:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -23247,7 +23426,7 @@ ParseTreeMatch = __decorate([
 ], ParseTreeMatch);
 exports.ParseTreeMatch = ParseTreeMatch;
 
-},{"../../Decorators":17}],143:[function(require,module,exports){
+},{"../../Decorators":17}],144:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -23405,7 +23584,7 @@ ParseTreePattern = __decorate([
 ], ParseTreePattern);
 exports.ParseTreePattern = ParseTreePattern;
 
-},{"../../Decorators":17,"../xpath/XPath":149}],144:[function(require,module,exports){
+},{"../../Decorators":17,"../xpath/XPath":150}],145:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -23883,7 +24062,7 @@ exports.ParseTreePatternMatcher = ParseTreePatternMatcher;
     ParseTreePatternMatcher.StartRuleDoesNotConsumeFullPattern = StartRuleDoesNotConsumeFullPattern;
 })(ParseTreePatternMatcher = exports.ParseTreePatternMatcher || (exports.ParseTreePatternMatcher = {}));
 
-},{"../../BailErrorStrategy":7,"../../CharStreams":10,"../../CommonTokenStream":15,"../../Decorators":17,"../../ListTokenSource":28,"../../ParserInterpreter":32,"../../ParserRuleContext":33,"../../RecognitionException":36,"../../Token":42,"../../misc/MultiMap":131,"../../misc/ParseCancellationException":134,"../RuleNode":138,"../TerminalNode":139,"./ParseTreeMatch":142,"./ParseTreePattern":143,"./RuleTagToken":145,"./TagChunk":146,"./TextChunk":147,"./TokenTagToken":148}],145:[function(require,module,exports){
+},{"../../BailErrorStrategy":7,"../../CharStreams":10,"../../CommonTokenStream":15,"../../Decorators":17,"../../ListTokenSource":28,"../../ParserInterpreter":32,"../../ParserRuleContext":33,"../../RecognitionException":36,"../../Token":42,"../../misc/MultiMap":131,"../../misc/ParseCancellationException":134,"../RuleNode":139,"../TerminalNode":140,"./ParseTreeMatch":143,"./ParseTreePattern":144,"./RuleTagToken":146,"./TagChunk":147,"./TextChunk":148,"./TokenTagToken":149}],146:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -24081,7 +24260,7 @@ RuleTagToken = __decorate([
 ], RuleTagToken);
 exports.RuleTagToken = RuleTagToken;
 
-},{"../../Decorators":17,"../../Token":42}],146:[function(require,module,exports){
+},{"../../Decorators":17,"../../Token":42}],147:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -24168,7 +24347,7 @@ __decorate([
 ], TagChunk.prototype, "toString", null);
 exports.TagChunk = TagChunk;
 
-},{"../../Decorators":17,"./Chunk":141}],147:[function(require,module,exports){
+},{"../../Decorators":17,"./Chunk":142}],148:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -24238,7 +24417,7 @@ TextChunk = __decorate([
 ], TextChunk);
 exports.TextChunk = TextChunk;
 
-},{"../../Decorators":17,"./Chunk":141}],148:[function(require,module,exports){
+},{"../../Decorators":17,"./Chunk":142}],149:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -24333,7 +24512,7 @@ TokenTagToken = __decorate([
 ], TokenTagToken);
 exports.TokenTagToken = TokenTagToken;
 
-},{"../../CommonToken":13,"../../Decorators":17}],149:[function(require,module,exports){
+},{"../../CommonToken":13,"../../Decorators":17}],150:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -24530,7 +24709,7 @@ exports.XPath = XPath;
 XPath.WILDCARD = "*"; // word not operator/separator
 XPath.NOT = "!"; // word for invert operator
 
-},{"../../CharStreams":10,"../../CommonTokenStream":15,"../../LexerNoViableAltException":27,"../../ParserRuleContext":33,"../../Token":42,"./XPathLexer":151,"./XPathLexerErrorListener":152,"./XPathRuleAnywhereElement":153,"./XPathRuleElement":154,"./XPathTokenAnywhereElement":155,"./XPathTokenElement":156,"./XPathWildcardAnywhereElement":157,"./XPathWildcardElement":158}],150:[function(require,module,exports){
+},{"../../CharStreams":10,"../../CommonTokenStream":15,"../../LexerNoViableAltException":27,"../../ParserRuleContext":33,"../../Token":42,"./XPathLexer":152,"./XPathLexerErrorListener":153,"./XPathRuleAnywhereElement":154,"./XPathRuleElement":155,"./XPathTokenAnywhereElement":156,"./XPathTokenElement":157,"./XPathWildcardAnywhereElement":158,"./XPathWildcardElement":159}],151:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -24565,7 +24744,7 @@ __decorate([
 ], XPathElement.prototype, "toString", null);
 exports.XPathElement = XPathElement;
 
-},{"../../Decorators":17}],151:[function(require,module,exports){
+},{"../../Decorators":17}],152:[function(require,module,exports){
 "use strict";
 // Generated from XPathLexer.g4 by ANTLR 4.9.0-SNAPSHOT
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -25040,7 +25219,7 @@ XPathLexer._serializedATN = Utils.join([
     XPathLexer._serializedATNSegment1,
 ], "");
 
-},{"../../Lexer":25,"../../VocabularyImpl":48,"../../atn/ATNDeserializer":54,"../../atn/LexerATNSimulator":75,"../../misc/Utils":136}],152:[function(require,module,exports){
+},{"../../Lexer":25,"../../VocabularyImpl":48,"../../atn/ATNDeserializer":54,"../../atn/LexerATNSimulator":75,"../../misc/Utils":136}],153:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -25065,7 +25244,7 @@ __decorate([
 ], XPathLexerErrorListener.prototype, "syntaxError", null);
 exports.XPathLexerErrorListener = XPathLexerErrorListener;
 
-},{"../../Decorators":17}],153:[function(require,module,exports){
+},{"../../Decorators":17}],154:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -25099,7 +25278,7 @@ __decorate([
 ], XPathRuleAnywhereElement.prototype, "evaluate", null);
 exports.XPathRuleAnywhereElement = XPathRuleAnywhereElement;
 
-},{"../../Decorators":17,"../Trees":140,"./XPathElement":150}],154:[function(require,module,exports){
+},{"../../Decorators":17,"../Trees":141,"./XPathElement":151}],155:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -25142,7 +25321,7 @@ __decorate([
 ], XPathRuleElement.prototype, "evaluate", null);
 exports.XPathRuleElement = XPathRuleElement;
 
-},{"../../Decorators":17,"../../ParserRuleContext":33,"../Trees":140,"./XPathElement":150}],155:[function(require,module,exports){
+},{"../../Decorators":17,"../../ParserRuleContext":33,"../Trees":141,"./XPathElement":151}],156:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -25174,7 +25353,7 @@ __decorate([
 ], XPathTokenAnywhereElement.prototype, "evaluate", null);
 exports.XPathTokenAnywhereElement = XPathTokenAnywhereElement;
 
-},{"../../Decorators":17,"../Trees":140,"./XPathElement":150}],156:[function(require,module,exports){
+},{"../../Decorators":17,"../Trees":141,"./XPathElement":151}],157:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -25217,7 +25396,7 @@ __decorate([
 ], XPathTokenElement.prototype, "evaluate", null);
 exports.XPathTokenElement = XPathTokenElement;
 
-},{"../../Decorators":17,"../TerminalNode":139,"../Trees":140,"./XPathElement":150}],157:[function(require,module,exports){
+},{"../../Decorators":17,"../TerminalNode":140,"../Trees":141,"./XPathElement":151}],158:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -25253,7 +25432,7 @@ __decorate([
 ], XPathWildcardAnywhereElement.prototype, "evaluate", null);
 exports.XPathWildcardAnywhereElement = XPathWildcardAnywhereElement;
 
-},{"../../Decorators":17,"../Trees":140,"./XPath":149,"./XPathElement":150}],158:[function(require,module,exports){
+},{"../../Decorators":17,"../Trees":141,"./XPath":150,"./XPathElement":151}],159:[function(require,module,exports){
 "use strict";
 /*!
  * Copyright 2016 The ANTLR Project. All rights reserved.
@@ -25293,7 +25472,7 @@ __decorate([
 ], XPathWildcardElement.prototype, "evaluate", null);
 exports.XPathWildcardElement = XPathWildcardElement;
 
-},{"../../Decorators":17,"../Trees":140,"./XPath":149,"./XPathElement":150}],159:[function(require,module,exports){
+},{"../../Decorators":17,"../Trees":141,"./XPath":150,"./XPathElement":151}],160:[function(require,module,exports){
 
 /**
  * Array#filter.
@@ -25320,7 +25499,7 @@ module.exports = function (arr, fn, self) {
 
 var hasOwn = Object.prototype.hasOwnProperty;
 
-},{}],160:[function(require,module,exports){
+},{}],161:[function(require,module,exports){
 (function (global){(function (){
 'use strict';
 
@@ -25830,7 +26009,7 @@ var objectKeys = Object.keys || function (obj) {
 };
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"object-assign":179,"util/":163}],161:[function(require,module,exports){
+},{"object-assign":180,"util/":164}],162:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -25855,14 +26034,14 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],162:[function(require,module,exports){
+},{}],163:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],163:[function(require,module,exports){
+},{}],164:[function(require,module,exports){
 (function (process,global){(function (){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -26452,7 +26631,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this)}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":162,"_process":180,"inherits":161}],164:[function(require,module,exports){
+},{"./support/isBuffer":163,"_process":181,"inherits":162}],165:[function(require,module,exports){
 (function (global){(function (){
 'use strict';
 
@@ -26477,7 +26656,7 @@ module.exports = function availableTypedArrays() {
 };
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"array-filter":159}],165:[function(require,module,exports){
+},{"array-filter":160}],166:[function(require,module,exports){
 'use strict';
 
 var GetIntrinsic = require('get-intrinsic');
@@ -26494,7 +26673,7 @@ module.exports = function callBoundIntrinsic(name, allowMissing) {
 	return intrinsic;
 };
 
-},{"./":166,"get-intrinsic":171}],166:[function(require,module,exports){
+},{"./":167,"get-intrinsic":172}],167:[function(require,module,exports){
 'use strict';
 
 var bind = require('function-bind');
@@ -26543,7 +26722,7 @@ if ($defineProperty) {
 	module.exports.apply = applyBind;
 }
 
-},{"function-bind":170,"get-intrinsic":171}],167:[function(require,module,exports){
+},{"function-bind":171,"get-intrinsic":172}],168:[function(require,module,exports){
 'use strict';
 
 var GetIntrinsic = require('get-intrinsic');
@@ -26560,7 +26739,7 @@ if ($gOPD) {
 
 module.exports = $gOPD;
 
-},{"get-intrinsic":171}],168:[function(require,module,exports){
+},{"get-intrinsic":172}],169:[function(require,module,exports){
 
 var hasOwn = Object.prototype.hasOwnProperty;
 var toString = Object.prototype.toString;
@@ -26584,7 +26763,7 @@ module.exports = function forEach (obj, fn, ctx) {
 };
 
 
-},{}],169:[function(require,module,exports){
+},{}],170:[function(require,module,exports){
 'use strict';
 
 /* eslint no-invalid-this: 1 */
@@ -26638,14 +26817,14 @@ module.exports = function bind(that) {
     return bound;
 };
 
-},{}],170:[function(require,module,exports){
+},{}],171:[function(require,module,exports){
 'use strict';
 
 var implementation = require('./implementation');
 
 module.exports = Function.prototype.bind || implementation;
 
-},{"./implementation":169}],171:[function(require,module,exports){
+},{"./implementation":170}],172:[function(require,module,exports){
 'use strict';
 
 var undefined;
@@ -26977,7 +27156,7 @@ module.exports = function GetIntrinsic(name, allowMissing) {
 	return value;
 };
 
-},{"function-bind":170,"has":174,"has-symbols":172}],172:[function(require,module,exports){
+},{"function-bind":171,"has":175,"has-symbols":173}],173:[function(require,module,exports){
 (function (global){(function (){
 'use strict';
 
@@ -26994,7 +27173,7 @@ module.exports = function hasNativeSymbols() {
 };
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./shams":173}],173:[function(require,module,exports){
+},{"./shams":174}],174:[function(require,module,exports){
 'use strict';
 
 /* eslint complexity: [2, 18], max-statements: [2, 33] */
@@ -27038,14 +27217,14 @@ module.exports = function hasSymbols() {
 	return true;
 };
 
-},{}],174:[function(require,module,exports){
+},{}],175:[function(require,module,exports){
 'use strict';
 
 var bind = require('function-bind');
 
 module.exports = bind.call(Function.call, Object.prototype.hasOwnProperty);
 
-},{"function-bind":170}],175:[function(require,module,exports){
+},{"function-bind":171}],176:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -27074,7 +27253,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],176:[function(require,module,exports){
+},{}],177:[function(require,module,exports){
 'use strict';
 
 var hasToStringTag = typeof Symbol === 'function' && typeof Symbol.toStringTag === 'symbol';
@@ -27109,7 +27288,7 @@ isStandardArguments.isLegacyArguments = isLegacyArguments; // for tests
 
 module.exports = supportsStandardArguments ? isStandardArguments : isLegacyArguments;
 
-},{"call-bind/callBound":165}],177:[function(require,module,exports){
+},{"call-bind/callBound":166}],178:[function(require,module,exports){
 'use strict';
 
 var toStr = Object.prototype.toString;
@@ -27143,7 +27322,7 @@ module.exports = function isGeneratorFunction(fn) {
 	return getProto && getProto(fn) === GeneratorFunction;
 };
 
-},{}],178:[function(require,module,exports){
+},{}],179:[function(require,module,exports){
 (function (global){(function (){
 'use strict';
 
@@ -27208,7 +27387,7 @@ module.exports = function isTypedArray(value) {
 };
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"available-typed-arrays":164,"call-bind/callBound":165,"es-abstract/helpers/getOwnPropertyDescriptor":167,"foreach":168,"has-symbols":172}],179:[function(require,module,exports){
+},{"available-typed-arrays":165,"call-bind/callBound":166,"es-abstract/helpers/getOwnPropertyDescriptor":168,"foreach":169,"has-symbols":173}],180:[function(require,module,exports){
 /*
 object-assign
 (c) Sindre Sorhus
@@ -27300,7 +27479,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 	return to;
 };
 
-},{}],180:[function(require,module,exports){
+},{}],181:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -27486,9 +27665,9 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],181:[function(require,module,exports){
-arguments[4][162][0].apply(exports,arguments)
-},{"dup":162}],182:[function(require,module,exports){
+},{}],182:[function(require,module,exports){
+arguments[4][163][0].apply(exports,arguments)
+},{"dup":163}],183:[function(require,module,exports){
 // Currently in sync with Node.js lib/internal/util/types.js
 // https://github.com/nodejs/node/commit/112cc7c27551254aa2b17098fb774867f05ed0d9
 
@@ -27822,7 +28001,7 @@ exports.isAnyArrayBuffer = isAnyArrayBuffer;
   });
 });
 
-},{"is-arguments":176,"is-generator-function":177,"is-typed-array":178,"which-typed-array":184}],183:[function(require,module,exports){
+},{"is-arguments":177,"is-generator-function":178,"is-typed-array":179,"which-typed-array":185}],184:[function(require,module,exports){
 (function (process){(function (){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -28541,7 +28720,7 @@ function callbackify(original) {
 exports.callbackify = callbackify;
 
 }).call(this)}).call(this,require('_process'))
-},{"./support/isBuffer":181,"./support/types":182,"_process":180,"inherits":175}],184:[function(require,module,exports){
+},{"./support/isBuffer":182,"./support/types":183,"_process":181,"inherits":176}],185:[function(require,module,exports){
 (function (global){(function (){
 'use strict';
 
@@ -28601,4 +28780,4 @@ module.exports = function whichTypedArray(value) {
 };
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"available-typed-arrays":164,"call-bind/callBound":165,"es-abstract/helpers/getOwnPropertyDescriptor":167,"foreach":168,"has-symbols":172,"is-typed-array":178}]},{},[1]);
+},{"available-typed-arrays":165,"call-bind/callBound":166,"es-abstract/helpers/getOwnPropertyDescriptor":168,"foreach":169,"has-symbols":173,"is-typed-array":179}]},{},[1]);

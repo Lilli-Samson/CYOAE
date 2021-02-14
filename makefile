@@ -1,6 +1,6 @@
 TSC = tsc
 TSC_FLAGS = --pretty -p
-BROWSERIFY = NODE_PATH=. node_modules/.bin/browserify
+BROWSERIFY = NODE_PATH=. node_modules/.bin/browserify -p esmify
 MINIFY = node_modules/uglify-es/bin/uglifyjs
 ANTLR4 = node_modules/.bin/antlr4ts
 ANTLR_FILES = cyoaeLexer.interp cyoaeLexer.ts cyoaeLexer.tokens cyoae.interp cyoaeParser.ts cyoaeListener.ts cyoae.tokens
