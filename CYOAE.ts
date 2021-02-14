@@ -162,7 +162,7 @@ interface Attribute {
 }
 
 interface Tag {
-	ctx: cyoaeParser.TagContext;
+	ctx: cyoaeParser.Token_tagContext;
 	name: string;
 	value: string;
 	attributes: Attribute[];
@@ -231,17 +231,17 @@ function execute_tag(tag: Tag) {
 
 class Listener implements cyoaeListener {
     debug = false;
-    exitText(ctx: cyoaeParser.TextContext) {
+    exitToken_text(ctx: cyoaeParser.Token_textContext) {
         output(`<a class="text">${escape_html(remove_escapes(ctx.text))}</a>`);
     }
-    enterTag(ctx: cyoaeParser.TagContext) {
+    enterToken_tag(ctx: cyoaeParser.Token_tagContext) {
         if (ctx.depth() !== 2) {
             //don't listen to non-toplevel tags, those get evaluated later
             this.debug && console.log(`Skipping tag ${ctx.text}`)
             return;
         }
         const debug = this.debug;
-        function extract_tag(ctx: cyoaeParser.TagContext) {
+        function extract_tag(ctx: cyoaeParser.Token_tagContext) {
             let tag: Tag = {
                 ctx: ctx,
                 name: "",
@@ -255,15 +255,15 @@ class Listener implements cyoaeListener {
                     debug && console.log(`Got premature null child`);
                     continue;
                 }
-                else if (child instanceof cyoaeParser.Tag_nameContext) {
+                else if (child instanceof cyoaeParser.Token_tag_nameContext) {
                     debug && console.log(`Got a tag name "${child.text}"`);
                     tag.name = child.text;
                 }
-                else if (child instanceof cyoaeParser.AttributeContext) {
+                else if (child instanceof cyoaeParser.Token_attributeContext) {
                     debug && console.log(`Got a tag attribute name "${child.text}"`);
                     tag.attributes.push({name: child.text, value: ""});
                 }
-                else if (child instanceof cyoaeParser.ValueContext) {
+                else if (child instanceof cyoaeParser.Token_valueContext) {
                     if (tag.attributes.length === 0) {
                         debug && console.log(`Got a tag value "${child.text}"`);
                         tag.value = remove_escapes(child.text);
@@ -272,7 +272,7 @@ class Listener implements cyoaeListener {
                         tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.text);
                     }
                 }
-                else if (child instanceof cyoaeParser.TagContext) {
+                else if (child instanceof cyoaeParser.Token_tagContext) {
                     debug && console.log(`Got a tag attribute of type tag`);
                     tag.attributes[tag.attributes.length - 1].value = extract_tag(child);
                 }
@@ -299,7 +299,7 @@ function parse_source_text(data: string, filename: string) {
     //lexer.addErrorListener(error_listener);
     parser.addErrorListener(new ParserErrorListener);
     
-    const tree = parser.start();
+    const tree = parser.token_start();
     const listener = new(Listener as any)();
     //antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
 }

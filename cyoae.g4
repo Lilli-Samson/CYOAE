@@ -1,12 +1,12 @@
 grammar cyoae;
 
-start: (text | tag)* EOF;
-text: (escaped_text | WORD | WS | '=')+;
-tag: '[' WS? tag_name  WS? (value | tag)? WS? (attribute '=' (value | tag) WS?)* ']';
-tag_name: WORD;
-attribute: WORD;
-value: (WS* (escaped_text | WORD))+;
-escaped_text: '\\\\' | '\\[' | '\\]' | '\\=';
+token_start: (token_text | token_tag)* EOF;
+token_text: (token_escaped_text | WORD | WS | '=')+;
+token_tag: '[' WS? token_tag_name  WS? (token_value | token_tag)? WS? (token_attribute '=' (token_value | token_tag) WS?)* ']';
+token_tag_name: WORD;
+token_attribute: WORD;
+token_value: (WS* (token_escaped_text | WORD))+;
+token_escaped_text: '\\\\' | '\\[' | '\\]' | '\\=';
 
 //lexer grammar cyoa;
 
