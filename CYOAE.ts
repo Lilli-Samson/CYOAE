@@ -1,13 +1,38 @@
 "use strict";
 
-const antlr4 = require("antlr4/index");
-const cyoaeLexer = require("./cyoaeLexer");
-const cyoaeParser = require("./cyoaeParser");
-let cyoaeListener = require("./cyoaeListener").cyoaeListener;
+import * as antlr4ts from 'antlr4ts';
+import { cyoaeLexer } from './cyoaeLexer';
+import * as cyoaeParser from './cyoaeParser';
+import { cyoaeListener } from './cyoaeListener';
 
 let current_arc = "";
 let current_scene = "";
 let current_source = "";
+
+class ParserErrorListener implements antlr4ts.ANTLRErrorListener<antlr4ts.Token> {
+    syntaxError(recognizer: antlr4ts.Recognizer<antlr4ts.Token, any>, offendingSymbol: antlr4ts.Token | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
+
+    }
+}
+
+/*
+ParserErrorListener.prototype.syntaxError = function(recognizer: any, offendingSymbol: any, line: number, column: number, msg: string, e: any) {
+    console.log(`Syntax error in line ${line}:${column}: ${msg}`);
+    console.log(`Details: recognizer: ${recognizer}, offendingSymbol: ${offendingSymbol}, e: ${e}`);
+};
+
+ParserErrorListener.prototype.reportAmbiguity = function(recognizer: any, dfa: any, startIndex: number, stopIndex: number, exact: any, ambigAlts: any, configs: any) {
+    console.log(`Ambiguity error`);
+};
+
+ParserErrorListener.prototype.reportAttemptingFullContext = function(recognizer: any, dfa: any, startIndex: number, stopIndex: number, conflictingAlts: any, configs: any) {
+    console.log(`Attempting full context`);
+};
+
+ParserErrorListener.prototype.reportContextSensitivity = function(recognizer: any, dfa: any, startIndex: number, stopIndex: number, prediction: any, configs: any) {
+    console.log(`Context sensitivity detected`);
+};
+*/
 
 function output(text: string) {
     document.body.innerHTML += text;
@@ -59,7 +84,16 @@ let choice_available = new Map<string, boolean>(); //for [choice next=foo], choi
 function process_expression(expr: string) {
     //TODO: Replace this with a proper parser or maybe just a lexer at some point
     //TODO: Ensure parenthesis and quote balance
-    return expr.replace(/(?<!["\w])[_a-zA-Z]\w*/g, 'g.get("$0")');
+    return expr.replace(/((?<!["\w])[_a-zA-Z]\w*)/g, 'g.get("$1")');
+}
+
+function strip_script_tag(expr: string) { //turns "<script>code</script>" into "code"
+    return expr.replace(/<script>([^<]*)<\/script>/, "$0");
+}
+
+function evaluate(code: string) { //evaluates a string that may contain variables and expressions
+    //TODO
+    return code;
 }
 
 const replacements: Tag_replacement[] = [
@@ -88,7 +122,8 @@ const replacements: Tag_replacement[] = [
 		replacements:
 			[
 				{name: "next", replacement: next => choice_available.get(`${current_arc}/${next}`) ? ` class='choice' href="#${current_arc}/${next}"` : ` class='dead_choice'`},
-                {name: "onclick", replacement: (onclick, tag) => onclick && choice_available.get(`${current_arc}/${get_attribute_value("next", tag)}`) ? ` onclick="${onclick}"` : "", default_value: ""},
+                {name: "onclick", replacement: (onclick, tag) => onclick && choice_available.get(`${current_arc}/${get_attribute_value("next", tag)}`) ?
+                    ` onclick="${onclick.replace(/"/g, "&quot;")};return true"` : "", default_value: ""},
                 {name: "text", replacement: text => '>' + escape_html(text)},
             ],
         outro: "</a>\n",
@@ -104,61 +139,22 @@ const replacements: Tag_replacement[] = [
     { //exec
         tag_name: "exec",
         replacements: function(tag: Tag) {
-            let result = "";
             for (const attribute of tag.attributes) {
                 const code = get_attribute_value(attribute.name, tag);
                 //TODO: Error handling
-                result += `g.set('${attribute.name}', ${process_expression(code)});`;
+                g.set(attribute.name, evaluate(code));
             }
-            return (result + "return true").replace(/"/g, "&quot;");
+            return "";
         },
     },
     { //print
         tag_name: "print",
         replacements: 
         [
-            {name: "text", replacement: text => evaluate_variable(text)},
+            {name: "variable", replacement: text => evaluate_variable(text)},
         ],
     },
 ];
-
-interface Parse_context {
-    getText (): string;
-    invokingState: number;
-    ruleIndex: number;
-    //children: ?;
-    //start: ?;
-    //stop: ?;
-    //exception: ?;
-    //parser: ?;
-    constructor(parser: any, parent: any, invokingState: any): Parse_context;
-    tag_name(): string;
-    enterRule(listener: any): void;
-    exitRule(listener: any): void;
-    copyFrom(ctx: Parse_context): void;
-    //addChild: ?;
-    //removeLastChild: ?;
-    //addTokenNode: ?;
-    //addErrorNode: ?;
-    getChild(i: number, type?: string): Parse_context | null;
-    //getToken: ?;
-    //getTokens: ?;
-    //getTypedRuleContext: ?;
-    //getTypedRuleContexts: ?;
-    getChildCount(): number;
-    //getSourceInterval: ?;
-    depth(): number;
-    isEmpty(): boolean;
-    getRuleContext(): Parse_context;
-    getPayload(): Parse_context;
-    getText(): string;
-    //getAltNumber: ?;
-    //setAltNumber: ?;
-    //accept: ?;
-    //toStringTree: ?;
-    //toString: ?;
-    text: string;
-}
 
 interface Attribute {
 	name: string;
@@ -166,7 +162,7 @@ interface Attribute {
 }
 
 interface Tag {
-	ctx: Parse_context;
+	ctx: cyoaeParser.TagContext;
 	name: string;
 	value: string;
 	attributes: Attribute[];
@@ -233,59 +229,55 @@ function execute_tag(tag: Tag) {
     return fail("Unknown tag " + tag.name);
 }
 
-class Listener extends cyoaeListener {
-    constructor() {
-        super();
+class Listener implements cyoaeListener {
+    debug = false;
+    exitText(ctx: cyoaeParser.TextContext) {
+        output(`<a class="text">${escape_html(remove_escapes(ctx.text))}</a>`);
     }
-    exitText(ctx: Parse_context) {
-        output(`<a class="text">${escape_html(remove_escapes(ctx.getText()))}</a>`);
-    }
-    enterTag(ctx: Parse_context) {
+    enterTag(ctx: cyoaeParser.TagContext) {
         if (ctx.depth() !== 2) {
             //don't listen to non-toplevel tags, those get evaluated later
-            //console.log(`Skipping tag ${ctx.getText()}`)
+            this.debug && console.log(`Skipping tag ${ctx.text}`)
             return;
         }
-
-        assert(ctx instanceof cyoaeParser.cyoaeParser.TagContext, "Passed non-tag to tak parser");
-
-        function extract_tag(ctx: Parse_context) {
+        const debug = this.debug;
+        function extract_tag(ctx: cyoaeParser.TagContext) {
             let tag: Tag = {
                 ctx: ctx,
                 name: "",
                 value: "",
                 attributes: []
             };
-            for (let i = 0; i < ctx.getChildCount(); i++) {
+            for (let i = 0; i < ctx.childCount; i++) {
                 const child = ctx.getChild(i);
-                //console.log(`Tag child ${i}`);
+                debug && console.log(`Tag child ${i}`);
                 if (child === null) {
-                    //console.log(`Got premature null child`);
+                    debug && console.log(`Got premature null child`);
                     continue;
                 }
-                else if (child instanceof cyoaeParser.cyoaeParser.Tag_nameContext) {
-                    //console.log(`Got a tag name "${child.getText()}"`);
-                    tag.name = child.getText();
+                else if (child instanceof cyoaeParser.Tag_nameContext) {
+                    debug && console.log(`Got a tag name "${child.text}"`);
+                    tag.name = child.text;
                 }
-                else if (child instanceof cyoaeParser.cyoaeParser.AttributeContext) {
-                    //console.log(`Got a tag attribute name "${child.getText()}"`);
-                    tag.attributes.push({name: child.getText(), value: ""});
+                else if (child instanceof cyoaeParser.AttributeContext) {
+                    debug && console.log(`Got a tag attribute name "${child.text}"`);
+                    tag.attributes.push({name: child.text, value: ""});
                 }
-                else if (child instanceof cyoaeParser.cyoaeParser.ValueContext) {
+                else if (child instanceof cyoaeParser.ValueContext) {
                     if (tag.attributes.length === 0) {
-                        //console.log(`Got a tag value "${child.getText()}"`);
-                        tag.value = remove_escapes(child.getText());
+                        debug && console.log(`Got a tag value "${child.text}"`);
+                        tag.value = remove_escapes(child.text);
                     } else {
-                        //console.log(`Got a tag attribute value "${child.getText()}"`);
-                        tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.getText());
+                        debug && console.log(`Got a tag attribute value "${child.text}"`);
+                        tag.attributes[tag.attributes.length - 1].value = remove_escapes(child.text);
                     }
                 }
-                else if (child instanceof cyoaeParser.cyoaeParser.TagContext) {
-                    //console.log(`Got a tag attribute of type tag`);
+                else if (child instanceof cyoaeParser.TagContext) {
+                    debug && console.log(`Got a tag attribute of type tag`);
                     tag.attributes[tag.attributes.length - 1].value = extract_tag(child);
                 }
                 else {
-                    //console.log(`Skipping child of type "${typeof child}" with value "${child.getText()}"`);
+                    debug && console.log(`Skipping child of type "${typeof child}" with value "${child.text}"`);
                 }
             }
             return tag;
@@ -296,13 +288,20 @@ class Listener extends cyoaeListener {
 
 function parse_source_text(data: string, filename: string) {
     console.log(`Starting parsing source text ${filename}`);
-    const input = new antlr4.InputStream(data);
-    const lexer = new cyoaeLexer.cyoaeLexer(input);
-    const tokens = new antlr4.CommonTokenStream(lexer);
+    const input = antlr4ts.CharStreams.fromString(data, filename);
+    const lexer = new cyoaeLexer(input);
+    const tokens = new antlr4ts.CommonTokenStream(lexer);
     const parser = new cyoaeParser.cyoaeParser(tokens);
+
+    //TODO: Add error listeners
+    lexer.removeErrorListeners();
+    parser.removeErrorListeners();
+    //lexer.addErrorListener(error_listener);
+    parser.addErrorListener(new ParserErrorListener);
+    
     const tree = parser.start();
     const listener = new(Listener as any)();
-    antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
+    //antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
 }
 
 async function update_choice_availability(code: string) {
