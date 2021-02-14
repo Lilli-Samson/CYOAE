@@ -1,10 +1,10 @@
 TSC = tsc
 TSC_FLAGS = --pretty -p
-BROWSERIFY = NODE_PATH=. `npm config get prefix`/bin/browserify
-MINIFY = `npm config get prefix`/bin/uglifyjs
+BROWSERIFY = NODE_PATH=. node_modules/.bin/browserify
+MINIFY = node_modules/uglify-es/bin/uglifyjs
 ANTLR4 = node_modules/.bin/antlr4ts
 ANTLR_FILES = cyoaeLexer.interp cyoaeLexer.ts cyoaeLexer.tokens cyoae.interp cyoaeParser.ts cyoaeListener.ts cyoae.tokens
-RM = rm
+RM = rm -f
 
 all: release
 
@@ -27,4 +27,4 @@ main_debug.js: CYOAE.js $(ANTLR_FILES)
 	$(BROWSERIFY) $< > $@
 
 clean:
-	$(RM) CYOAE.js main_release.js main_debug.js main.js $(ANTLR_FILES)
+	$(RM) CYOAE.js main_release.js main_debug.js main.js $(ANTLR_FILES) cyoaeLexer.js cyoaeParser.js cyoaeListener.js
