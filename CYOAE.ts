@@ -310,7 +310,7 @@ async function update_choice_availability(code: string) {
     for (const scene of code.match(/(?<=next=)\w+/g) || []) {
         const arc_scene = `${current_arc}/${scene}`;
         debug && console.log(`Checking availabiliy for page ${arc_scene}`);
-        if (choice_available.get(scene) === undefined) {
+        if (choice_available.get(arc_scene) === undefined) {
             try {
                 await get(`${scene}.txt`);
                 choice_available.set(arc_scene, true);
