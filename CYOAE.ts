@@ -14,25 +14,6 @@ class ParserErrorListener implements antlr4ts.ANTLRErrorListener<antlr4ts.Token>
     }
 }
 
-/*
-ParserErrorListener.prototype.syntaxError = function(recognizer: any, offendingSymbol: any, line: number, column: number, msg: string, e: any) {
-    console.log(`Syntax error in line ${line}:${column}: ${msg}`);
-    console.log(`Details: recognizer: ${recognizer}, offendingSymbol: ${offendingSymbol}, e: ${e}`);
-};
-
-ParserErrorListener.prototype.reportAmbiguity = function(recognizer: any, dfa: any, startIndex: number, stopIndex: number, exact: any, ambigAlts: any, configs: any) {
-    console.log(`Ambiguity error`);
-};
-
-ParserErrorListener.prototype.reportAttemptingFullContext = function(recognizer: any, dfa: any, startIndex: number, stopIndex: number, conflictingAlts: any, configs: any) {
-    console.log(`Attempting full context`);
-};
-
-ParserErrorListener.prototype.reportContextSensitivity = function(recognizer: any, dfa: any, startIndex: number, stopIndex: number, prediction: any, configs: any) {
-    console.log(`Context sensitivity detected`);
-};
-*/
-
 function get_executor(text: string) {
     console.log(`Tag to execute: ${text}`);
     return escape_html(text);
@@ -129,24 +110,19 @@ interface Tag_replacement {
     readonly outro?: Tag_result;
 }
 
-interface Attribute {
-	name: string;
-	readonly value: Tag_result;
-}
-
 interface Tag {
 	ctx: cyoaeParser.Tag_Context;
 	name: string;
 	default_value?: Tag_result;
-	attributes: Attribute[];
+	attributes: Map<string, Tag_result>;
 }
 
-function get_attribute_value(attribute_name: string, tag: Tag) {
-    const attribute = tag.attributes.find(attribute => attribute.name === attribute_name);
-    if (!attribute) {
-        throw `Tried to obtain value "${attribute_name}" from tag "${tag.name}", but no such attribute exists. Valid attributes: [${tag.attributes.reduce((curr, attribute) => `${curr} ${attribute.name}`, "")} ]`;
+function get_required_attribute(tag: Tag, attribute: string) {
+    const result = tag.attributes.get(attribute);
+    if (!result) {
+        throw `Missing attribute "${attribute}" in tag "${tag.name}"`;
     }
-    return attribute.value;
+    return result;
 }
 
 let g = new Map<string, string | number>(); //storage for ingame variables
@@ -169,29 +145,45 @@ enum Page_availability {
 class Page_checker {
     private static debug = false;
     static page_available(arc: string, scene: string): Page_availability {
-        this.debug && console.log(`Checking availability `)
-        let available = this.choice_available.get(`${arc}/${scene}`);
+        this.debug && console.log(`Checking availability of ${arc}/${scene}`);
+        const available = this.choice_available.get(`${arc}/${scene}`);
+        if (typeof available === "boolean") {
+            this.debug && console.log(`We know that page ${arc}/${scene} is ${available ? "available" : "unavailable"}`);
+            return available ? Page_availability.Available : Page_availability.Unavailable;
+        }
+        else if (available === undefined) {
+            this.debug && console.log(`But we don't know if it's available yet, nobody has fetched it yet.`);
+        }
+        else {
+            this.debug && console.log(`But we don't know if it's available yet, but it's being fetched.`);
+        }
+        return Page_availability.Unknown;
+    }
+    static async fetch_page_available(arc: string, scene: string) {
+        const available = this.choice_available.get(`${arc}/${scene}`);
+        if (typeof available === "boolean") {
+            return available;
+        }
         if (available === undefined) {
-            this.debug && console.log(`But we don't know if it's available yet, so we assume no and add it to the list to look it up later.`);
-            return Page_availability.Unknown;
+            const promise = (async () => {
+                try {
+                    await download(`${arc}/${scene}.txt`);
+                    this.choice_available.set(`${arc}/${scene}`, true);
+                    this.debug && console.log(`Source for page ${arc}/${scene} is available`);
+                    return true;
+                }
+                catch (error) {
+                    this.choice_available.set(`${arc}/${scene}`, false);
+                    this.debug && console.log(`Source for page ${arc}/${scene} is not available because ${error}`);
+                    return false;
+                }
+            })();
+            this.choice_available.set(`${arc}/${scene}`, promise);
+            return promise;
         }
-        this.debug && console.log(`We know that page ${arc}/${scene} is ${available ? "available" : "unavailable"}`);
-        return available ? Page_availability.Available : Page_availability.Unavailable;
+        return available;
     }
-    static async update_page_available(arc: string, scene: string) {
-        try {
-            await get(`${arc}/${scene}.txt`);
-            this.choice_available.set(`${arc}/${scene}`, true);
-            this.debug && console.log(`Source for page ${arc}/${scene} is available`);
-            return true;
-        }
-        catch (error) {
-            this.choice_available.set(`${arc}/${scene}`, false);
-            this.debug && console.log(`Source for page ${arc}/${scene} is not available because ${error}`);
-            return false;
-        }
-    }
-    private static choice_available = new Map<string, boolean>();
+    private static choice_available = new Map<string, boolean | Promise<boolean>>();
 }
 
 function process_expression(expr: string) {
@@ -207,6 +199,48 @@ function strip_script_tag(expr: string) { //turns "<script>code</script>" into "
 function evaluate(code: string) { //evaluates a string that may contain variables and expressions
     //TODO
     return code;
+}
+
+function sleep(ms: number) {
+    return new Promise<void>(resolve => setTimeout(resolve, ms));
+}
+
+class Delayed_evaluation {
+    private static debug = false;
+    private static delayed_evaluation_placeholder_number = 0;
+    private static delay_evaluation_promise = (async () => {})();
+    private static active_delayed_evaluations = 0;
+
+    //returns a placeholder that will be replaced by the real thing later
+    static evaluate(replacement: Promise<Tag_result>, placeholder_text = Tag_result.from_plaintext("[loading]")): Tag_result {
+        const placeholder_id = `delayed_evaluation_placeholder_${this.delayed_evaluation_placeholder_number}`;
+        const placeholder = Tag_result.from_html(`<slot class="placeholder" id="${placeholder_id}">${placeholder_text.html}</slot>`);
+        this.active_delayed_evaluations += 1;
+        const old_promise = this.delay_evaluation_promise;
+        this.delay_evaluation_promise = (async () => {
+            const result = await replacement;
+            let link = document.querySelector(`#${placeholder_id}`);
+            if (link) {
+                this.debug && console.log(`Replacement: "${link.outerHTML}" to "${result.html}"`);
+                link.outerHTML = result.html;
+            }
+            else {
+                console.error(`Failed finding ID "${placeholder_id}" for replacement`);
+            }
+            this.active_delayed_evaluations -= 1;
+            await old_promise;
+        })();
+        this.delayed_evaluation_placeholder_number += 1;
+        return placeholder;
+    }
+
+    static get has_everything_been_evaluated() {
+        return this.active_delayed_evaluations === 0;
+    }
+
+    static async wait_for_everything_to_be_evaluated() {
+        return this.delay_evaluation_promise;
+    }
 }
 
 const replacements: Tag_replacement[] = [
@@ -231,25 +265,41 @@ const replacements: Tag_replacement[] = [
 	},
 	{ //choice
 		tag_name: "choice",
-        intro: Tag_result.from_html("<a"),
-		replacements:
-			[
-				{name: "next", replacement: next => {
-                    switch (Page_checker.page_available(current_arc, next.plaintext)) {
-                        case Page_availability.Available:
-                            return Tag_result.from_html(` class='choice' href="#${current_arc}/${next.plaintext}"`);
-                        case Page_availability.Unavailable:
-                            return Tag_result.from_html(` class='dead_choice'`);
-                        case Page_availability.Unknown:
-                            //TODO: Add async function that looks up current_arc/next and does document.querySelector("#choice_${current_arc}/${next}").class = ...;
-                            return Tag_result.from_html(` id='choice_${current_arc}/${next.plaintext}'`);
-                    }
-                }},
-                {name: "onclick", replacement: (onclick, tag) => Page_checker.page_available(current_arc, get_attribute_value("next", tag).plaintext) ?
-                    Tag_result.from_html(` onclick="${onclick.plaintext.replace(/"/g, "&quot;")};return true"`) : Tag_result.from_html(""), default_value: Tag_result.from_plaintext("")},
-                {name: "text", replacement: text => Tag_result.from_html('>' + escape_html(text.plaintext))},
-            ],
-        outro: Tag_result.from_html("</a>\n"),
+		replacements: (tag) => {
+            const next = get_required_attribute(tag, "next");
+            const text = get_required_attribute(tag, "text");
+            const onclick = tag.attributes.get("onclick");
+            //TODO: assert that tag.attributes has no attributes besides next, text and onclick
+            function get_result(page_available: boolean) {
+                //intro
+                let result = Tag_result.from_html("<a");
+                //next
+                result =
+                    page_available
+                    ? result.append_html(` class='choice' href="#${current_arc}/${next.plaintext}"`)
+                    : result.append_html(` class='dead_choice'`);
+                //onclick
+                result =
+                    page_available && onclick
+                    ? result.append_html(` onclick="${onclick.plaintext.replace(/"/g, "&quot;")};return true"`)
+                    : result;
+                //text
+                result = result.append_html(">" + text.plaintext);
+                //outro
+                result = result.append_html("</a>\n");
+                return result;
+            }
+            switch (Page_checker.page_available(current_arc, next.plaintext)) {
+                case Page_availability.Available:
+                    return get_result(true);
+                case Page_availability.Unavailable:
+                    return get_result(false);
+                case Page_availability.Unknown:
+                    return Delayed_evaluation.evaluate((async () => {
+                        return get_result(await Page_checker.fetch_page_available(current_arc, next.plaintext));
+                    })(), text);
+            }
+        },
 	},
     { //test
 		tag_name: "test",
@@ -263,6 +313,12 @@ const replacements: Tag_replacement[] = [
             ],
         outro: Tag_result.from_html("</a>\n"),
 	},
+    { //test delayed evaluation
+		tag_name: "test_delayed_evaluation",
+		replacements: (tag) => {
+            return Delayed_evaluation.evaluate((async () => Tag_result.from_plaintext("test_delayed_evaluation_result"))(), Tag_result.from_plaintext("test_delayed_evaluation_placeholder"));
+        }
+	},
 	{ //source
         tag_name: "source",
         intro: Tag_result.from_html('<hr>'),
@@ -274,10 +330,9 @@ const replacements: Tag_replacement[] = [
     { //exec
         tag_name: "exec",
         replacements: function(tag: Tag) {
-            for (const attribute of tag.attributes) {
-                const code = get_attribute_value(attribute.name, tag);
+            for (const [attribute_name, code] of tag.attributes) {
                 //TODO: Error handling
-                g.set(attribute.name, evaluate(code.plaintext));
+                g.set(attribute_name, evaluate(code.plaintext));
             }
             return Tag_result.from_plaintext("");
         },
@@ -299,10 +354,20 @@ function html_comment(content: string) {
 	return `<!-- ${content.replace(/-->/g, "~~>")} -->\n`;
 }
 
+function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value_type>, reducer: {(current_value: Accumulator_type, key_value: [Key_type, Value_type]): Accumulator_type}, accumulator: Accumulator_type) {
+    for (const key_value of map) {
+        accumulator = reducer(accumulator, key_value);
+    }
+    return accumulator;
+}
+
 function execute_tag(tag: Tag): Tag_result {
     const debug = false;
-    debug && console.log(`Executing tag "${tag.name}" with value "${tag.default_value?.current_value}" and attributes [${tag.attributes.length > 0 ?
-        tag.attributes.reduce((curr, attribute) => `${curr}\t${attribute.name}="${attribute.value.current_value}"\n`, "\n") : ""}]\n`);
+    debug && console.log(`Executing tag "${tag.name}" with value "${tag.default_value?.current_value}" and attributes [${
+        tag.attributes.size > 0
+        ? reduce(tag.attributes, (curr, [attribute_name, attribute_value]) => `${curr}\t${attribute_name}="${attribute_value.current_value}"\n`, "\n")
+        : ""
+    }]\n`);
     const replacement = replacements.find((repl) => repl.tag_name === tag.name);
     if (replacement === undefined) {
         throw "Unknown tag " + tag.name;
@@ -314,27 +379,27 @@ function execute_tag(tag: Tag): Tag_result {
     }
     else {
         if (tag.default_value?.current_value) {
-            tag.attributes.push({name: replacement.replacements[0].name, value: tag.default_value});
+            tag.attributes.set(replacement.replacements[0].name, tag.default_value);
         }
         const attributes = [...tag.attributes]; //making copy so that removing attributes doesn't affect replacement functions
         for (const attribute_replacement of replacement.replacements) {
-            const attribute_value_pos = attributes.findIndex((attribute) => attribute.name === attribute_replacement.name);
-            let attribute_value = attributes[attribute_value_pos];
+            const attribute_value_pos = attributes.findIndex(([attribute_name,]) => attribute_name === attribute_replacement.name);
+            let attribute_value = attributes[attribute_value_pos][1];
             if (!attribute_value) {
                 if (attribute_replacement.default_value !== undefined) {
-                    attribute_value = {name: attribute_replacement.name, value: attribute_replacement.default_value};
+                    attribute_value = attribute_replacement.default_value;
                 }
                 else {
                     throw `Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`;
                 }
             }
-            result = result.append(attribute_replacement.replacement(attribute_value.value, tag));
+            result = result.append(attribute_replacement.replacement(attribute_value, tag));
             if (attribute_value_pos !== -1) {
                 attributes.splice(attribute_value_pos, 1);
             }
         }
         if (attributes.length > 0) {
-            throw `Unknown attribute(s) [${attributes.reduce((curr, attr) => `${curr}${attr.name} `, " ")}] in tag "${tag.name}"`;
+            throw `Unknown attribute(s) [${attributes.reduce((curr, [attr_name, ]) => `${curr}${attr_name} `, " ")}] in tag "${tag.name}"`;
         }
     }
     if (replacement.outro) {
@@ -368,7 +433,7 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
                 let tag: Tag = {
                     ctx: ctx,
                     name: "",
-                    attributes: []
+                    attributes: new Map<string, Tag_result>()
                 };
                 for (let i = 0; i < ctx.childCount; i++) {
                     const child = ctx.getChild(i);
@@ -407,7 +472,7 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
                         if (!(rich_text_value_ctx instanceof cyoaeParser.Rich_text_Context)) {
                             throw "Internal logic error: Child of attribute value is not rich text";
                         }
-                        tag.attributes.push({name: name_ctx.text, value: Tag_result.from_ctx(rich_text_value_ctx)});
+                        tag.attributes.set(name_ctx.text, Tag_result.from_ctx(rich_text_value_ctx));
                     }
                     else if (child instanceof cyoaeParser.Tag_open_Context) {}
                     else if (child instanceof cyoaeParser.Tag_close_Context) {}
@@ -461,7 +526,7 @@ async function update_current_scene() {
     const debug = false;
     debug && console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
-        current_source = await get(`${current_scene}.txt`);
+        current_source = await download(`${current_arc}/${current_scene}.txt`);
         document.body.innerHTML = parse_source_text(current_source, `${current_scene}.txt`);
     }
     catch (err) {
@@ -490,9 +555,9 @@ function escape_html(str: string) {
 }
 
 // downloads a local resource given its path/filename
-async function get(url: string) {
+async function download(url: string) {
     const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
-    const filepath = `${current_url}story arcs/${current_arc}/${url}`;
+    const filepath = `${current_url}story arcs/${url}`;
     try {
         const request = await fetch(filepath);
         if (request.ok) {
@@ -531,58 +596,81 @@ function assert_equal(left: any, right: any, explanation?: any) {
     }
 }
 
-function tests() {
-    let text = Tag_result.from_plaintext("111");
-    text = text.append_plaintext("222");
-    assert_equal(text.plaintext, "111222", "First try");
-    let html = text.html;
-    assert_equal(html.split("111").length, 2, html);
-    assert_equal(html.split("222").length, 2, html);
-    assert_equal(text.plaintext, "111222", text.plaintext);
-    text = text.append_html("333");
-    html = text.html;
-    assert_equal(html.split("111").length, 2, html);
-    assert_equal(html.split("222").length, 2, html);
-    assert_equal(html.split("333").length, 2, html);
-    text = text.append_html("444");
-    html = text.html;
-    assert_equal(html.split("111").length, 2, html);
-    assert_equal(html.split("222").length, 2, html);
-    assert_equal(html.split("333").length, 2, html);
-    assert_equal(html.split("444").length, 2, html);
-    text = text.append_plaintext("555");
-    html = text.html;
-    assert_equal(html.split("111").length, 2, html);
-    assert_equal(html.split("222").length, 2, html);
-    assert_equal(html.split("333").length, 2, html);
-    assert_equal(html.split("444").length, 2, html);
-    assert_equal(html.split("555").length, 2, html);
-    text = text.append_plaintext("666");
-    html = text.html;
-    assert_equal(html.split("111").length, 2, html);
-    assert_equal(html.split("222").length, 2, html);
-    assert_equal(html.split("333").length, 2, html);
-    assert_equal(html.split("444").length, 2, html);
-    assert_equal(html.split("555").length, 2, html);
-    assert_equal(html.split("666").length, 2, html);
+async function tests() {
+    function test_Tag_result() {
+        let text = Tag_result.from_plaintext("111");
+        text = text.append_plaintext("222");
+        assert_equal(text.plaintext, "111222", "First try");
+        let html = text.html;
+        assert_equal(html.split("111").length, 2, html);
+        assert_equal(html.split("222").length, 2, html);
+        assert_equal(text.plaintext, "111222", text.plaintext);
+        text = text.append_html("333");
+        html = text.html;
+        assert_equal(html.split("111").length, 2, html);
+        assert_equal(html.split("222").length, 2, html);
+        assert_equal(html.split("333").length, 2, html);
+        text = text.append_html("444");
+        html = text.html;
+        assert_equal(html.split("111").length, 2, html);
+        assert_equal(html.split("222").length, 2, html);
+        assert_equal(html.split("333").length, 2, html);
+        assert_equal(html.split("444").length, 2, html);
+        text = text.append_plaintext("555");
+        html = text.html;
+        assert_equal(html.split("111").length, 2, html);
+        assert_equal(html.split("222").length, 2, html);
+        assert_equal(html.split("333").length, 2, html);
+        assert_equal(html.split("444").length, 2, html);
+        assert_equal(html.split("555").length, 2, html);
+        text = text.append_plaintext("666");
+        html = text.html;
+        assert_equal(html.split("111").length, 2, html);
+        assert_equal(html.split("222").length, 2, html);
+        assert_equal(html.split("333").length, 2, html);
+        assert_equal(html.split("444").length, 2, html);
+        assert_equal(html.split("555").length, 2, html);
+        assert_equal(html.split("666").length, 2, html);
+    }
+    test_Tag_result();
 
-    let result = parse_source_text("[test {text test1}]", "test");
-    let expected = "<a>test1</a>\n";
-    assert_equal(result, expected, `Checking test tag 1. Expected:\n>>>${expected}<<<\nActual:\n>>>${result}<<<`);
+    function test_tag_parsing() {
+        let result = parse_source_text("[test {text test1}]", "test_tag_parsing");
+        let expected = "<a>test1</a>\n";
+        assert_equal(result, expected, `Checking test tag 1. Expected:\n>>>${expected}<<<\nActual:\n>>>${result}<<<`);
 
-    result = parse_source_text("[test {text test1}]", "test");
-    expected = "<a>test1</a>\n";
-    assert_equal(result, expected, `Checking test tag 2. Expected:\n${expected}Actual:\n${result}`);
+        result = parse_source_text("[test {text test1}]", "test_tag_parsing");
+        expected = "<a>test1</a>\n";
+        assert_equal(result, expected, `Checking test tag 2. Expected:\n${expected}Actual:\n${result}`);
 
-    result = parse_source_text("[test {text test1}][test {text test2}]", "test");
-    expected = "<a>test1</a>\n<a>test2</a>\n";
-    assert_equal(result, expected, `Checking test tag 3. Expected:\n${expected}Actual:\n${result}`);
+        result = parse_source_text("[test {text test1}][test {text test2}]", "test_tag_parsing");
+        expected = "<a>test1</a>\n<a>test2</a>\n";
+        assert_equal(result, expected, `Checking test tag 3. Expected:\n${expected}Actual:\n${result}`);
+    }
+    test_tag_parsing();
+
+    async function test_delayed_evaluation() {
+        const debug = false;
+        const result = parse_source_text("[test_delayed_evaluation]", "test_delayed_evaluation");
+        assert(result.includes("test_delayed_evaluation_placeholder"), `test_delayed_evaluation_placeholder not found: ${result}`);
+        assert(!result.includes("test_delayed_evaluation_result"), `test_delayed_evaluation_result found prematurely: ${result}`);
+        document.body.innerHTML = result;
+        debug && console.log(`Result: "${result}"`);
+        debug && console.log(`HTML: "${document.body.innerHTML}"`);
+        assert(document.body.innerHTML.includes("test_delayed_evaluation_placeholder"), `test_delayed_evaluation_placeholder not found: ${document.body.innerHTML}`);
+        assert(!document.body.innerHTML.includes("test_delayed_evaluation_result"), `test_delayed_evaluation_result found prematurely: ${document.body.innerHTML}`);
+        await Delayed_evaluation.wait_for_everything_to_be_evaluated();
+        assert(Delayed_evaluation.has_everything_been_evaluated, "Everything should be evaluated after waiting for it, but isn't.");
+        assert(!document.body.innerHTML.includes("test_delayed_evaluation_placeholder"), `test_delayed_evaluation_placeholder found after evaluation: ${document.body.innerHTML}`);
+        assert(document.body.innerHTML.includes("test_delayed_evaluation_result"), `test_delayed_evaluation_result not found after evaluation: ${document.body.innerHTML}`);
+    }
+    await test_delayed_evaluation();
 }
 
 // script entry point, loading the correct state and displays errors
 async function main() {
     try {
-        tests();
+        await tests();
     }
     catch (err) {
         console.error(`Tests failed: ${err}`);
