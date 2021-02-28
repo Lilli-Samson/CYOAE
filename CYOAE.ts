@@ -88,7 +88,7 @@ class Tag_result{
         if (text.length === 0) {
             return "";
         }
-        return `<a class="plaintext">${escape_html(text)}</a>`;
+        return `${escape_html(text)}`;
     }
     private constructor(ctx: cyoaeParser.Rich_text_Context | undefined, html: string, plaintext: string) {
         this.ctx = ctx;
@@ -256,12 +256,12 @@ const replacements: Tag_replacement[] = [
 	},
 	{ //code
 		tag_name: "code",
-		intro: Tag_result.from_html("<a class='code'>"),
+		intro: Tag_result.from_html("<span class='code'>"),
 		replacements:
 			[
 				{name: "text", replacement: text => Tag_result.from_html(escape_html(text.plaintext))},
             ],
-		outro: Tag_result.from_html("</a>\n"),
+		outro: Tag_result.from_html("</span>\n"),
 	},
 	{ //choice
 		tag_name: "choice",

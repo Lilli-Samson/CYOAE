@@ -1,4 +1,4 @@
-.dead_choice {
+a.dead_choice {
     color: darkred;
 }
 
@@ -6,11 +6,7 @@ img {
     margin: 1em;
 }
 
-p.source {
-    font-family: monospace;
-}
-
-a.code {
+span.code {
     font-family: monospace;
     white-space: pre-wrap;
     tab-size: 4;
