@@ -10,7 +10,13 @@ let current_source = "";
 
 class ParserErrorListener implements antlr4ts.ANTLRErrorListener<antlr4ts.Token> {
     syntaxError(recognizer: antlr4ts.Recognizer<antlr4ts.Token, any>, offendingSymbol: antlr4ts.Token | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
-        console.error(`Syntax error: In line ${line}:${charPositionInLine}: ${msg}`);
+        console.error(`Parser error: In line ${line}:${charPositionInLine}: ${msg}`);
+    }
+}
+
+class LexerErrorListener implements antlr4ts.ANTLRErrorListener<number> {
+    syntaxError(recognizer: antlr4ts.Recognizer<number, any>, offendingSymbol: number | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
+        console.error(`Lexer error: In line ${line}:${charPositionInLine}: ${msg}`);
     }
 }
 
@@ -228,7 +234,7 @@ class Delayed_evaluation {
                 console.error(`Failed finding ID "${placeholder_id}" for replacement`);
             }
             this.active_delayed_evaluations -= 1;
-            await old_promise;
+            return old_promise;
         })();
         this.delayed_evaluation_placeholder_number += 1;
         return placeholder;
@@ -361,6 +367,11 @@ function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value
     return accumulator;
 }
 
+function evaluate_expression(expression: cyoaeParser.Evaluated_expression_Context) {
+    //TODO:
+    return Tag_result.from_plaintext("");
+}
+
 function execute_tag(tag: Tag): Tag_result {
     const debug = false;
     debug && console.log(`Executing tag "${tag.name}" with value "${tag.default_value?.current_value}" and attributes [${
@@ -370,7 +381,7 @@ function execute_tag(tag: Tag): Tag_result {
     }]\n`);
     const replacement = replacements.find((repl) => repl.tag_name === tag.name);
     if (replacement === undefined) {
-        throw "Unknown tag " + tag.name;
+        throw `Unknown tag "${tag.name}"`;
     }
     //Todo: check if there are no duplicate attributes
     let result = replacement.intro || Tag_result.from_plaintext("");
@@ -485,6 +496,9 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
             }
             result = result.append(execute_tag(extract_tag(child)));
         }
+        else if (child instanceof cyoaeParser.Evaluated_expression_Context) {
+            result = result.append(evaluate_expression(child));
+        }
         else {
             throw `Internal logic error: Found child that is neither a plain text nor a tag in rich text`;
         }
@@ -500,15 +514,12 @@ function parse_source_text(data: string, filename: string) {
     const tokens = new antlr4ts.CommonTokenStream(lexer);
     const parser = new cyoaeParser.cyoaeParser(tokens);
 
-    //TODO: Add error listeners
     lexer.removeErrorListeners();
+    lexer.addErrorListener(new LexerErrorListener);
     parser.removeErrorListeners();
-    //lexer.addErrorListener(error_listener);
     parser.addErrorListener(new ParserErrorListener);
     
     const tree = parser.start_();
-    //const listener = new(Listener as any)();
-    //ParseTreeWalker.DEFAULT.walk(listener, tree);
     const child = tree.getChild(0);
     if (!(child instanceof cyoaeParser.Rich_text_Context)) {
         throw "Internal logic error: Child of start context is not a richtext";
@@ -527,7 +538,7 @@ async function update_current_scene() {
     debug && console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
         current_source = await download(`${current_arc}/${current_scene}.txt`);
-        document.body.innerHTML = parse_source_text(current_source, `${current_scene}.txt`);
+        document.body.innerHTML = `<div class="main">${parse_source_text(current_source, `${current_scene}.txt`)}</div>`;
     }
     catch (err) {
         display_error_document(`${err}`);

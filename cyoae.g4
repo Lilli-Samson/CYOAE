@@ -1,14 +1,26 @@
 grammar cyoae;
 
-token_start: (token_text | token_tag)* EOF;
-token_text: (token_escaped_text | WORD | WS | '=')+;
-token_tag: '[' WS? token_tag_name  WS? (token_value | token_tag)? WS? (token_attribute '=' (token_value | token_tag) WS?)* ']';
-token_tag_name: WORD;
-token_attribute: WORD;
-token_value: (WS* (token_escaped_text | WORD))+;
-token_escaped_text: '\\\\' | '\\[' | '\\]' | '\\=';
+start_: rich_text_ ws_? EOF;
+rich_text_: (plain_text_ | tag_ | evaluated_expression_)*;
+plain_text_: (escaped_text_ | word_ | ws_)+;
+attribute_name_: word_;
+attribute_value_: rich_text_;
+default_value_: rich_text_;
+attribute_open_: '{';
+attribute_close_: '}';
+attribute_: attribute_open_ ws_? attribute_name_ ws_? attribute_value_ ws_? attribute_close_;
+tag_open_: '[';
+tag_close_: ']';
+tag_: tag_open_ ws_? tag_name_ ws_? default_value_ (attribute_ ws_?)* tag_close_;
+tag_name_: word_;
+escaped_text_: '\\\\' | '\\[' | '\\]' | '\\{' | '\\}';
+evaluated_expression_: '{' ws_? expression_ ws_? '}';
+identifier_: word_;
+operator: '+' | '-' | '*' | '/' | '=';
+expression_: identifier_ | identifier_ ws_? operator ws_? expression_;
+ws_: WS;
+word_: (WORDCHARACTER | '+'|'-'|'*'|'/'|'=')+; //making +-*/= explicit should not be necessary, but somehow negation does not match these characters
 
 //lexer grammar cyoa;
-
-WORD: ~('='|'\\'|'['|']'|[\p{White_Space}])+;
-WS: [\p{White_Space}]+;
+WORDCHARACTER: ~('\\'|'['|']'|'{'|'}'|' '|'\t'|'\r'|'\n');
+WS: (' '|'\t'|'\r'|'\n')+;

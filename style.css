@@ -1,3 +1,7 @@
+div.main {
+    margin: 2%;
+}
+
 a.dead_choice {
     color: darkred;
 }
