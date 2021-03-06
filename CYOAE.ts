@@ -348,10 +348,53 @@ function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value
     return accumulator;
 }
 
-function evaluate_expression(expression: cyoaeParser.Code_Context) {
-    //TODO:
-    console.log(`Need to evaluate "${expression.text}"`);
-    return Tag_result.from_plaintext("");
+function evaluate_expression(expression: cyoaeParser.Expression_Context): number | string | void {
+    if (expression._operator) {
+        switch (expression._operator.text) {
+            case "=":
+                const value = evaluate_expression(expression._expression);
+                if (typeof value === "undefined") {
+                    throw `Cannot assign value "${expression._expression.text}" to variable "${expression._identifier.text}" because the expression does not evaluate to a value.`;
+                }
+                g.set(expression._identifier.text, value);
+                break;
+            case "+":
+                const lhs = evaluate_expression(expression._left_expression);
+                const rhs = evaluate_expression(expression._right_expression);
+                if (typeof lhs === "number" && typeof rhs === "number") {
+                    return lhs + rhs;
+                }
+                if (typeof lhs === "string" && typeof rhs === "number") {
+                    return lhs + rhs;
+                }
+                throw `Failed evaluating "${expression._left_expression.text}" (evaluated to value "${lhs}" of type ${typeof lhs}) + "${expression._right_expression.text}" (evaluated to value "${rhs}" of type ${typeof rhs})`
+            default:
+                console.log(`TODO: Need to implement evaluating expression "${expression.text}"`);
+        }
+    } else {
+        if (expression._identifier) {
+            console.log(`evaluating variable "${expression._identifier.text}" to "${g.get(expression._identifier.text)}"`);
+            return g.get(expression._identifier.text);
+        }
+        else if (expression._number) {
+            return parseInt(expression._number.text);
+        }
+        else {
+            throw `Unknown expression ${expression.text}`;
+        }
+    }
+}
+
+function evaluate_code(code: cyoaeParser.Code_Context) {
+    for (let i = 0; i < code.childCount; i++) {
+        const child = code.getChild(i);
+        if (child instanceof cyoaeParser.Statement_Context) {
+            evaluate_expression(child._expression);
+        }
+        else if (child instanceof cyoaeParser.Expression_Context) {
+            return evaluate_expression(child);
+        }
+    }
 }
 
 function execute_tag(tag: Tag): Tag_result {
@@ -445,7 +488,10 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
             result = result.append(execute_tag(extract_tag(child)));
         }
         else if (child instanceof cyoaeParser.Code_Context) {
-            result = result.append(evaluate_expression(child));
+            const value = evaluate_code(child);
+            if (typeof value !== "undefined") {
+                result = result.append_plaintext(`${value}`);
+            }
         }
         else if (child instanceof cyoaeParser.Number_Context) {
             result = result.append_plaintext(child.text);
@@ -458,8 +504,7 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
     return result;
 }
 
-function parse_source_text(data: string, filename: string) {
-    console.log(`Starting parsing source text ${filename}`);
+function get_parser(data: string, filename: string) {
     const input = antlr4ts.CharStreams.fromString(data, filename);
     const lexer = new cyoaeLexer(input);
     const tokens = new antlr4ts.CommonTokenStream(lexer);
@@ -469,8 +514,14 @@ function parse_source_text(data: string, filename: string) {
     lexer.addErrorListener(new LexerErrorListener);
     parser.removeErrorListeners();
     parser.addErrorListener(new ParserErrorListener);
+
+    return parser;
+}
+
+function parse_source_text(data: string, filename: string) {
+    console.log(`Starting parsing source text ${filename}`);
     
-    const tree = parser.start_();
+    const tree = get_parser(data, filename).start_();
     const child = tree.getChild(0);
     if (!(child instanceof cyoaeParser.Rich_text_Context)) {
         throw "Internal logic error: Child of start context is not a richtext";
@@ -627,6 +678,16 @@ async function tests() {
         assert(document.body.innerHTML.includes("test_delayed_evaluation_result"), `test_delayed_evaluation_result not found after evaluation: ${document.body.innerHTML}`);
     }
     await test_delayed_evaluation();
+
+    function test_code_evaluation() {
+        function test_eval(code: string, expected: string | number | void) {
+            assert_equal(evaluate_expression(get_parser(code, `code evaluation test "${code}"`).expression_()), expected, `for code "${code}"`);
+        }
+        test_eval("x=42");
+        test_eval("x", 42);
+        test_eval("x + 27", 69);
+    }
+    test_code_evaluation();
 }
 
 // script entry point, loading the correct state and displays errors

@@ -6,17 +6,17 @@ plain_text_: (escaped_text_ | word_ | ws_)+;
 attribute_: '{' ws_? attribute_name=word_ ws_? attribute_value=rich_text_ ws_? '}';
 tag_: '[' ws_? tag_name=word_ ws_? default_value=rich_text_ (attribute=attribute_ ws_?)* ']';
 escaped_text_: '\\\\' | '\\[' | '\\]' | '\\{' | '\\}';
-code_: '{' ws_? statement_* ws_? expression=expression_ ws_? '}';
+code_: '{' ws_? statement_* ws_? expression_ ws_? '}';
 identifier_: WORDCHARACTER (WORDCHARACTER | NUMBER)*;
 expression_:
     '(' ws_? expression_ ws_? ')'
-    | identifier_
-    | number_
-    | expression_ ws_? operator=('*' | '/') ws_? expression_
-    | expression_ ws_? operator=('+' | '-') ws_? expression_
-    | identifier_ ws_? operator='=' ws_? expression_
+    | identifier=identifier_
+    | number=number_
+    | left_expression=expression_ ws_? operator=('*' | '/') ws_? right_expression=expression_
+    | left_expression=expression_ ws_? operator=('+' | '-') ws_? right_expression=expression_
+    | identifier=identifier_ ws_? operator='=' ws_? expression=expression_
     ;
-statement_: expression_ ';';
+statement_: expression=expression_ ';';
 ws_: WS;
 word_: (WORDCHARACTER | '+'|'-'|'*'|'/'|'='|'('|')'|';')+; //making +-*/=(); explicit should not be necessary, but somehow negation does not match these characters
 number_: ('+'|'-')? NUMBER;

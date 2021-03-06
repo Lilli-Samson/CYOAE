@@ -406,9 +406,57 @@ function reduce(map, reducer, accumulator) {
 }
 
 function evaluate_expression(expression) {
-  //TODO:
-  console.log(`Need to evaluate "${expression.text}"`);
-  return Tag_result.from_plaintext("");
+  if (expression._operator) {
+    switch (expression._operator.text) {
+      case "=":
+        const value = evaluate_expression(expression._expression);
+
+        if (typeof value === "undefined") {
+          throw `Cannot assign value "${expression._expression.text}" to variable "${expression._identifier.text}" because the expression does not evaluate to a value.`;
+        }
+
+        g.set(expression._identifier.text, value);
+        break;
+
+      case "+":
+        const lhs = evaluate_expression(expression._left_expression);
+        const rhs = evaluate_expression(expression._right_expression);
+
+        if (typeof lhs === "number" && typeof rhs === "number") {
+          return lhs + rhs;
+        }
+
+        if (typeof lhs === "string" && typeof rhs === "number") {
+          return lhs + rhs;
+        }
+
+        throw `Failed evaluating "${expression._left_expression.text}" (evaluated to value "${lhs}" of type ${typeof lhs}) + "${expression._right_expression.text}" (evaluated to value "${rhs}" of type ${typeof rhs})`;
+
+      default:
+        console.log(`TODO: Need to implement evaluating expression "${expression.text}"`);
+    }
+  } else {
+    if (expression._identifier) {
+      console.log(`evaluating variable "${expression._identifier.text}" to "${g.get(expression._identifier.text)}"`);
+      return g.get(expression._identifier.text);
+    } else if (expression._number) {
+      return parseInt(expression._number.text);
+    } else {
+      throw `Unknown expression ${expression.text}`;
+    }
+  }
+}
+
+function evaluate_code(code) {
+  for (let i = 0; i < code.childCount; i++) {
+    const child = code.getChild(i);
+
+    if (child instanceof cyoaeParser.Statement_Context) {
+      evaluate_expression(child._expression);
+    } else if (child instanceof cyoaeParser.Expression_Context) {
+      return evaluate_expression(child);
+    }
+  }
 }
 
 function execute_tag(tag) {
@@ -512,7 +560,11 @@ function evaluate_richtext(ctx) {
 
       result = result.append(execute_tag(extract_tag(child)));
     } else if (child instanceof cyoaeParser.Code_Context) {
-      result = result.append(evaluate_expression(child));
+      const value = evaluate_code(child);
+
+      if (typeof value !== "undefined") {
+        result = result.append_plaintext(`${value}`);
+      }
     } else if (child instanceof cyoaeParser.Number_Context) {
       result = result.append_plaintext(child.text);
     } else {
@@ -524,8 +576,7 @@ function evaluate_richtext(ctx) {
   return result;
 }
 
-function parse_source_text(data, filename) {
-  console.log(`Starting parsing source text ${filename}`);
+function get_parser(data, filename) {
   const input = antlr4ts.CharStreams.fromString(data, filename);
   const lexer = new _cyoaeLexer.cyoaeLexer(input);
   const tokens = new antlr4ts.CommonTokenStream(lexer);
@@ -534,7 +585,12 @@ function parse_source_text(data, filename) {
   lexer.addErrorListener(new LexerErrorListener());
   parser.removeErrorListeners();
   parser.addErrorListener(new ParserErrorListener());
-  const tree = parser.start_();
+  return parser;
+}
+
+function parse_source_text(data, filename) {
+  console.log(`Starting parsing source text ${filename}`);
+  const tree = get_parser(data, filename).start_();
   const child = tree.getChild(0);
 
   if (!(child instanceof cyoaeParser.Rich_text_Context)) {
@@ -715,6 +771,18 @@ function tests() {
     }
 
     yield test_delayed_evaluation();
+
+    function test_code_evaluation() {
+      function test_eval(code, expected) {
+        assert_equal(evaluate_expression(get_parser(code, `code evaluation test "${code}"`).expression_()), expected, `for code "${code}"`);
+      }
+
+      test_eval("x=42");
+      test_eval("x", 42);
+      test_eval("x + 27", 69);
+    }
+
+    test_code_evaluation();
   });
 } // script entry point, loading the correct state and displays errors
 
@@ -1406,7 +1474,7 @@ class cyoaeParser extends _Parser.Parser {
         }
 
         this.state = 97;
-        _localctx._expression = this.expression_(0);
+        this.expression_(0);
         this.state = 99;
 
         this._errHandler.sync(this);
@@ -1574,21 +1642,21 @@ class cyoaeParser extends _Parser.Parser {
           case 2:
             {
               this.state = 121;
-              this.identifier_();
+              _localctx._identifier = this.identifier_();
             }
             break;
 
           case 3:
             {
               this.state = 122;
-              this.number_();
+              _localctx._number = this.number_();
             }
             break;
 
           case 4:
             {
               this.state = 123;
-              this.identifier_();
+              _localctx._identifier = this.identifier_();
               this.state = 125;
 
               this._errHandler.sync(this);
@@ -1618,7 +1686,7 @@ class cyoaeParser extends _Parser.Parser {
               }
 
               this.state = 131;
-              this.expression_(1);
+              _localctx._expression = this.expression_(1);
             }
             break;
         }
@@ -1646,6 +1714,7 @@ class cyoaeParser extends _Parser.Parser {
                 case 1:
                   {
                     _localctx = new Expression_Context(_parentctx, _parentState);
+                    _localctx._left_expression = _prevctx;
                     this.pushNewRecursionContext(_localctx, _startState, cyoaeParser.RULE_expression_);
                     this.state = 135;
 
@@ -1696,13 +1765,14 @@ class cyoaeParser extends _Parser.Parser {
                     }
 
                     this.state = 143;
-                    this.expression_(4);
+                    _localctx._right_expression = this.expression_(4);
                   }
                   break;
 
                 case 2:
                   {
                     _localctx = new Expression_Context(_parentctx, _parentState);
+                    _localctx._left_expression = _prevctx;
                     this.pushNewRecursionContext(_localctx, _startState, cyoaeParser.RULE_expression_);
                     this.state = 144;
 
@@ -1753,7 +1823,7 @@ class cyoaeParser extends _Parser.Parser {
                     }
 
                     this.state = 152;
-                    this.expression_(3);
+                    _localctx._right_expression = this.expression_(3);
                   }
                   break;
               }
@@ -1794,7 +1864,7 @@ class cyoaeParser extends _Parser.Parser {
       this.enterOuterAlt(_localctx, 1);
       {
         this.state = 158;
-        this.expression_(0);
+        _localctx._expression = this.expression_(0);
         this.state = 159;
         this.match(cyoaeParser.T__16);
       }
@@ -2319,10 +2389,6 @@ class Escaped_text_Context extends _ParserRuleContext.ParserRuleContext {
 exports.Escaped_text_Context = Escaped_text_Context;
 
 class Code_Context extends _ParserRuleContext.ParserRuleContext {
-  constructor(parent, invokingState) {
-    super(parent, invokingState);
-  }
-
   expression_() {
     return this.getRuleContext(0, Expression_Context);
   }
@@ -2341,6 +2407,10 @@ class Code_Context extends _ParserRuleContext.ParserRuleContext {
     } else {
       return this.getRuleContext(i, Statement_Context);
     }
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
   } // @Override
 
 
@@ -2463,12 +2533,12 @@ class Expression_Context extends _ParserRuleContext.ParserRuleContext {
 exports.Expression_Context = Expression_Context;
 
 class Statement_Context extends _ParserRuleContext.ParserRuleContext {
-  expression_() {
-    return this.getRuleContext(0, Expression_Context);
-  }
-
   constructor(parent, invokingState) {
     super(parent, invokingState);
+  }
+
+  expression_() {
+    return this.getRuleContext(0, Expression_Context);
   } // @Override
 
 
