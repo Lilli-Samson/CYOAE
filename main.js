@@ -49,7 +49,10 @@ let current_source = "";
 
 class ParserErrorListener {
   syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
+    var _a;
+
     console.error(`Parser error: In line ${line}:${charPositionInLine}: ${msg}`);
+    throw `Parser error: In line ${line}:${charPositionInLine} when reading "${(_a = offendingSymbol) === null || _a === void 0 ? void 0 : _a.text}": ${msg}`;
   }
 
 }
@@ -405,6 +408,13 @@ function reduce(map, reducer, accumulator) {
   return accumulator;
 }
 
+function throw_evaluation_error(error, context) {
+  const line = context.start.line;
+  const character = context.start.charPositionInLine;
+  const length = context.sourceInterval.length;
+  throw `Error evaluating source in line ${line}:\n` + `${current_source.split('\n')[line - 1]}\n` + `${" ".repeat(character) + "^" + (length > 1 ? "~".repeat(length - 1) : "")}\n` + error;
+}
+
 function evaluate_expression(expression) {
   if (expression._operator) {
     switch (expression._operator.text) {
@@ -412,7 +422,7 @@ function evaluate_expression(expression) {
         const value = evaluate_expression(expression._expression);
 
         if (typeof value === "undefined") {
-          throw `Cannot assign value "${expression._expression.text}" to variable "${expression._identifier.text}" because the expression does not evaluate to a value.`;
+          throw_evaluation_error(`Cannot assign value "${expression._expression.text}" to variable "${expression._identifier.text}" because the expression does not evaluate to a value.`, expression);
         }
 
         g.set(expression._identifier.text, value);
@@ -438,7 +448,7 @@ function evaluate_expression(expression) {
 
             case "/":
               if (rhs === 0) {
-                throw `Zero division error: "${expression.text}" evaluated to ${lhs} / ${rhs}`;
+                throw_evaluation_error(`Zero division error: "${expression.text}" evaluated to ${lhs} / ${rhs}`, expression);
               }
 
               return lhs / rhs;
@@ -449,20 +459,26 @@ function evaluate_expression(expression) {
           return lhs + rhs;
         }
 
-        throw `Failed evaluating "${expression._left_expression.text}" (evaluated to value "${lhs}" of type ${typeof lhs}) ${expression._operator.text} "${expression._right_expression.text}" (evaluated to value "${rhs}" of type ${typeof rhs})`;
+        throw_evaluation_error(`Failed evaluating "${expression._left_expression.text}" (evaluated to value "${lhs}" of type ${typeof lhs}) ${expression._operator.text} "${expression._right_expression.text}" (evaluated to value "${rhs}" of type ${typeof rhs})`, expression);
 
       default:
-        throw `TODO: Need to implement evaluating expression "${expression.text}"`;
+        throw_evaluation_error(`TODO: Need to implement evaluating expression "${expression.text}"`, expression);
     }
   } else {
     if (expression._identifier) {
-      return g.get(expression._identifier.text);
+      const value = g.get(expression._identifier.text);
+
+      if (typeof value === "undefined") {
+        throw_evaluation_error(`Variable "${expression._identifier.text}" is undefined`, expression);
+      }
+
+      return value;
     } else if (expression._number) {
       return parseInt(expression._number.text);
     } else if (expression._expression) {
       return evaluate_expression(expression._expression);
     } else {
-      throw `Unknown expression ${expression.text}`;
+      throw_evaluation_error(`Unknown expression ${expression.text}`, expression);
     }
   }
 }
@@ -547,7 +563,7 @@ function evaluate_richtext(ctx) {
 
         if (grandchild instanceof cyoaeParser.Escaped_text_Context) {
           if (grandchild.text.length !== 2) {
-            throw `Invalid escape sequence: ${grandchild.text}`;
+            throw_evaluation_error(`Invalid escape sequence: ${grandchild.text}`, grandchild);
           }
 
           result = result.append_plaintext(grandchild.text[1]); //cut off the \
@@ -588,7 +604,7 @@ function evaluate_richtext(ctx) {
     } else if (child instanceof cyoaeParser.Number_Context) {
       result = result.append_plaintext(child.text);
     } else {
-      throw `Internal logic error: Found child that is neither a plain text nor a tag nor a number in rich text`;
+      throw_evaluation_error(`Internal logic error: Found child that is neither a plain text nor a tag nor a number in rich text`, ctx);
     }
   }
 
@@ -597,6 +613,7 @@ function evaluate_richtext(ctx) {
 }
 
 function get_parser(data, filename) {
+  current_source = data;
   const input = antlr4ts.CharStreams.fromString(data, filename);
   const lexer = new _cyoaeLexer.cyoaeLexer(input);
   const tokens = new antlr4ts.CommonTokenStream(lexer);
@@ -634,8 +651,7 @@ function update_current_scene() {
     debug && console.log(`updating scene to ${current_arc}/${current_scene}`);
 
     try {
-      current_source = yield download(`${current_arc}/${current_scene}.txt`);
-      document.body.innerHTML = `<div class="main">${parse_source_text(current_source, `${current_scene}.txt`)}</div>`;
+      document.body.innerHTML = `<div class="main">${parse_source_text(yield download(`${current_arc}/${current_scene}.txt`), `${current_scene}.txt`)}</div>`;
     } catch (err) {
       display_error_document(`${err}`);
     }
@@ -685,7 +701,7 @@ function download(url) {
 }
 
 function display_error_document(error) {
-  document.body.innerHTML = escape_html(`Error: ${error}`);
+  document.body.innerHTML = `<span class='code'>${escape_html(error)}</span>`;
 }
 
 function assert(predicate, explanation = "") {
