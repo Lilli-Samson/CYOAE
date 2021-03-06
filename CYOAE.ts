@@ -359,25 +359,42 @@ function evaluate_expression(expression: cyoaeParser.Expression_Context): number
                 g.set(expression._identifier.text, value);
                 break;
             case "+":
+            case "-":
+            case "*":
+            case "/":
                 const lhs = evaluate_expression(expression._left_expression);
                 const rhs = evaluate_expression(expression._right_expression);
                 if (typeof lhs === "number" && typeof rhs === "number") {
+                    switch (expression._operator.text) {
+                        case "+":
+                            return lhs + rhs;
+                        case "-":
+                            return lhs - rhs;
+                        case "*":
+                            return lhs * rhs;
+                        case "/":
+                            if (rhs === 0) {
+                                throw `Zero division error: "${expression.text}" evaluated to ${lhs} / ${rhs}`;
+                            }
+                            return lhs / rhs;
+                        }
+                }
+                if (typeof lhs === "string" && typeof rhs === "string" && expression._operator.text === "+") {
                     return lhs + rhs;
                 }
-                if (typeof lhs === "string" && typeof rhs === "number") {
-                    return lhs + rhs;
-                }
-                throw `Failed evaluating "${expression._left_expression.text}" (evaluated to value "${lhs}" of type ${typeof lhs}) + "${expression._right_expression.text}" (evaluated to value "${rhs}" of type ${typeof rhs})`
+                throw `Failed evaluating "${expression._left_expression.text}" (evaluated to value "${lhs}" of type ${typeof lhs}) ${expression._operator.text} "${expression._right_expression.text}" (evaluated to value "${rhs}" of type ${typeof rhs})`;
             default:
-                console.log(`TODO: Need to implement evaluating expression "${expression.text}"`);
+                throw `TODO: Need to implement evaluating expression "${expression.text}"`;
         }
     } else {
         if (expression._identifier) {
-            console.log(`evaluating variable "${expression._identifier.text}" to "${g.get(expression._identifier.text)}"`);
             return g.get(expression._identifier.text);
         }
         else if (expression._number) {
             return parseInt(expression._number.text);
+        }
+        else if (expression._expression) {
+            return evaluate_expression(expression._expression);
         }
         else {
             throw `Unknown expression ${expression.text}`;
@@ -686,6 +703,12 @@ async function tests() {
         test_eval("x=42");
         test_eval("x", 42);
         test_eval("x + 27", 69);
+        test_eval("1+2*3", 7);
+        test_eval("(1+2)*3", 9);
+        try {
+            test_eval("1/0");
+            assert(false, `Zero division error did not produce exception`);
+        } catch (e) {}
     }
     test_code_evaluation();
 }

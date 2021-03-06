@@ -9,7 +9,7 @@ escaped_text_: '\\\\' | '\\[' | '\\]' | '\\{' | '\\}';
 code_: '{' ws_? statement_* ws_? expression_ ws_? '}';
 identifier_: WORDCHARACTER (WORDCHARACTER | NUMBER)*;
 expression_:
-    '(' ws_? expression_ ws_? ')'
+    '(' ws_? expression=expression_ ws_? ')'
     | identifier=identifier_
     | number=number_
     | left_expression=expression_ ws_? operator=('*' | '/') ws_? right_expression=expression_
