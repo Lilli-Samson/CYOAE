@@ -1,11 +1,7 @@
-{test}
+You can set variables using for example [code \{x=42\}].
+To display a variable or any expression use [code \{x + 27\}].
+Separate assignments using a semicolon: [code \{x = 1; y = 2\}].
 
-You can set variables using for example [code \[exec \{code x=42\}\]] or as a shortcut [code \[exec x=42\]].
-To display a variable or any expression use for example [code \{x + 27\}].
-You can also use this to change variables like in [code \[exec \{code x=1+100/\{x\}\}\]].
-
-[exec {code x=42}]
-[exec {code x=42}]
+{x=42}
 {x + 27}
-[exec {code x=1+100/{x}}]
-{x}
+{x = 1; y = 2}

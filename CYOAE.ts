@@ -20,11 +20,6 @@ class LexerErrorListener implements antlr4ts.ANTLRErrorListener<number> {
     }
 }
 
-function get_executor(text: string) {
-    console.log(`Tag to execute: ${text}`);
-    return escape_html(text);
-}
-
 class Tag_result{
     static from_plaintext(text: string) {
         return new Tag_result(undefined, "", text);
@@ -192,16 +187,6 @@ class Page_checker {
     private static choice_available = new Map<string, boolean | Promise<boolean>>();
 }
 
-function process_expression(expr: string) {
-    //TODO: Replace this with a proper parser or maybe just a lexer at some point
-    //TODO: Ensure parenthesis and quote balance
-    return expr.replace(/((?<!["\w])[_a-zA-Z]\w*)/g, 'g.get("$1")');
-}
-
-function strip_script_tag(expr: string) { //turns "<script>code</script>" into "code"
-    return expr.replace(/<script>([^<]*)<\/script>/, "$0");
-}
-
 function evaluate(code: string) { //evaluates a string that may contain variables and expressions
     //TODO
     return code;
@@ -352,10 +337,6 @@ const replacements: Tag_replacement[] = [
     },
 ];
 
-function remove_escapes(text: string) {
-    return text.replace(/\\(.)/g, '$1');
-}
-
 function html_comment(content: string) {
 	return `<!-- ${content.replace(/-->/g, "~~>")} -->\n`;
 }
@@ -367,8 +348,9 @@ function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value
     return accumulator;
 }
 
-function evaluate_expression(expression: cyoaeParser.Evaluated_expression_Context) {
+function evaluate_expression(expression: cyoaeParser.Code_Context) {
     //TODO:
+    console.log(`Need to evaluate "${expression.text}"`);
     return Tag_result.from_plaintext("");
 }
 
@@ -443,64 +425,33 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
             function extract_tag(ctx: cyoaeParser.Tag_Context): Tag {
                 let tag: Tag = {
                     ctx: ctx,
-                    name: "",
+                    name: ctx._tag_name.text,
                     attributes: new Map<string, Tag_result>()
                 };
+
+                debug && console.log(`Got a tag default value "${ctx._default_value.text}"`);
+                tag.default_value = Tag_result.from_ctx(ctx._default_value);
+
                 for (let i = 0; i < ctx.childCount; i++) {
                     const child = ctx.getChild(i);
-                    //debug && console.log(`Tag child ${i}`);
-                    if (child instanceof cyoaeParser.Tag_name_Context) {
-                        debug && console.log(`Got a tag name "${child.text}"`);
-                        tag.name = child.text;
-                    }
-                    else if (child instanceof cyoaeParser.Default_value_Context) {
-                        debug && console.log(`Got a tag default value "${child.text}"`);
-                        const rich_text_child = child.getChild(0);
-                        if (!(rich_text_child instanceof cyoaeParser.Rich_text_Context)) {
-                            throw "Internal logic error: Child of default value is not rich text";
-                        }
-                        tag.default_value = Tag_result.from_ctx(rich_text_child);
-                    }
-                    else if (child instanceof cyoaeParser.Attribute_Context) {
-                        let name_ctx: cyoaeParser.Attribute_name_Context | undefined;
-                        let value_ctx: cyoaeParser.Attribute_value_Context | undefined;
-                        for (let i = 0; i < child.childCount; i++) {
-                            const grandchild = child.getChild(i);
-                            if (grandchild instanceof cyoaeParser.Attribute_name_Context) {
-                                name_ctx = grandchild;
-                            }
-                            else if (grandchild instanceof cyoaeParser.Attribute_value_Context) {
-                                value_ctx = grandchild;
-                            }
-                        }
-                        if (!name_ctx) {
-                            throw "Internal logic error: Failed finding attribute name in attribute";
-                        }
-                        if (!value_ctx) {
-                            throw "Internal logic error: Failed finding attribute value in attribute";
-                        }
-                        const rich_text_value_ctx = value_ctx.getChild(0);
-                        if (!(rich_text_value_ctx instanceof cyoaeParser.Rich_text_Context)) {
-                            throw "Internal logic error: Child of attribute value is not rich text";
-                        }
-                        tag.attributes.set(name_ctx.text, Tag_result.from_ctx(rich_text_value_ctx));
-                    }
-                    else if (child instanceof cyoaeParser.Tag_open_Context) {}
-                    else if (child instanceof cyoaeParser.Tag_close_Context) {}
-                    else if (child instanceof cyoaeParser.Ws_Context) {}
-                    else {
-                        throw `Internal logic error: Found unknown child in rich text: ${child.text}`;
+                    if (child instanceof cyoaeParser.Attribute_Context) {
+                        let name_ctx = child._attribute_name;
+                        let value_ctx = child._attribute_value;
+                        tag.attributes.set(name_ctx.text, Tag_result.from_ctx(value_ctx));
                     }
                 }
                 return tag;
             }
             result = result.append(execute_tag(extract_tag(child)));
         }
-        else if (child instanceof cyoaeParser.Evaluated_expression_Context) {
+        else if (child instanceof cyoaeParser.Code_Context) {
             result = result.append(evaluate_expression(child));
         }
+        else if (child instanceof cyoaeParser.Number_Context) {
+            result = result.append_plaintext(child.text);
+        }
         else {
-            throw `Internal logic error: Found child that is neither a plain text nor a tag in rich text`;
+            throw `Internal logic error: Found child that is neither a plain text nor a tag nor a number in rich text`;
         }
     }
     debug && console.log(`Tag execution result: ${result.current_value}`);
