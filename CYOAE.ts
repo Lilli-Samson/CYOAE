@@ -235,9 +235,7 @@ const replacements: Tag_replacement[] = [
 		replacements:
 			[
 				{name: "url", replacement: url => Tag_result.from_html(` src="${url.plaintext}"`)},
-				{name: "alt", replacement: alt => Tag_result.from_html(` alt="${escape_html(alt.plaintext)}"`),
-                    default_value: Tag_result.from_plaintext("image")
-                },
+				{name: "alt", replacement: alt => Tag_result.from_html(` alt="${escape_html(alt.plaintext)}"`), default_value: Tag_result.from_plaintext("image")},
             ],
 		outro: Tag_result.from_html("/>\n"),
 	},
@@ -752,11 +750,6 @@ async function tests() {
             test_eval("1/0");
             assert(false, `Zero division error did not produce exception`);
         } catch (e) {}
-
-        function test_code(code: string, expected: Tag_result) {
-            //evaluate_code get_parser(code, `code evaluation test "${code}"`).code_();
-            assert_equal(evaluate_expression(get_parser(code, `code evaluation test "${code}"`).expression_()), expected, `for code "${code}"`);
-        }
     }
     test_code_evaluation();
 }
