@@ -49,17 +49,32 @@ let current_source = "";
 
 class ParserErrorListener {
   syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
-    var _a;
+    var _a, _b;
 
-    console.error(`Parser error: In line ${line}:${charPositionInLine}: ${msg}`);
-    throw `Parser error: In line ${line}:${charPositionInLine} when reading "${(_a = offendingSymbol) === null || _a === void 0 ? void 0 : _a.text}": ${msg}`;
+    throw_evaluation_error(`Parser error: ${msg}`, {
+      start: {
+        line: line,
+        charPositionInLine: charPositionInLine
+      },
+      sourceInterval: {
+        length: ((_b = (_a = offendingSymbol) === null || _a === void 0 ? void 0 : _a.text) === null || _b === void 0 ? void 0 : _b.length) || 0
+      }
+    });
   }
 
 }
 
 class LexerErrorListener {
   syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
-    console.error(`Lexer error: In line ${line}:${charPositionInLine}: ${msg}`);
+    throw_evaluation_error(`Lexer error: ${msg}`, {
+      start: {
+        line: line,
+        charPositionInLine: charPositionInLine
+      },
+      sourceInterval: {
+        length: 1
+      }
+    });
   }
 
 }

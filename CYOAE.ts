@@ -10,15 +10,13 @@ let current_source = "";
 
 class ParserErrorListener implements antlr4ts.ANTLRErrorListener<antlr4ts.Token> {
     syntaxError(recognizer: antlr4ts.Recognizer<antlr4ts.Token, any>, offendingSymbol: antlr4ts.Token | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
-        //TODO: Somehow get the context and call throw_evaluation_error
-        console.error(`Parser error: In line ${line}:${charPositionInLine}: ${msg}`);
-        throw `Parser error: In line ${line}:${charPositionInLine} when reading "${offendingSymbol?.text}": ${msg}`;
+        throw_evaluation_error(`Parser error: ${msg}`, {start: {line: line, charPositionInLine: charPositionInLine}, sourceInterval: {length: offendingSymbol?.text?.length || 0}});
     }
 }
 
 class LexerErrorListener implements antlr4ts.ANTLRErrorListener<number> {
     syntaxError(recognizer: antlr4ts.Recognizer<number, any>, offendingSymbol: number | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
-        console.error(`Lexer error: In line ${line}:${charPositionInLine}: ${msg}`);
+        throw_evaluation_error(`Lexer error: ${msg}`, {start: {line: line, charPositionInLine: charPositionInLine}, sourceInterval: {length: 1}});
     }
 }
 
@@ -350,7 +348,12 @@ function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value
     return accumulator;
 }
 
-function throw_evaluation_error(error: string, context: antlr4ts.ParserRuleContext): never {
+interface Evaluation_error_context { //is implemented by antlr4ts.ParserRuleContext
+    readonly start: {line: number, charPositionInLine: number};
+    readonly sourceInterval: {length: number};
+}
+
+function throw_evaluation_error(error: string, context: Evaluation_error_context): never {
     const line = context.start.line;
     const character = context.start.charPositionInLine;
     const length = context.sourceInterval.length;
