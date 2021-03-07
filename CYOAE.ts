@@ -20,6 +20,17 @@ class LexerErrorListener implements antlr4ts.ANTLRErrorListener<number> {
     }
 }
 
+class Lazy_evaluated<T> {
+    private _value: T | undefined;
+    constructor(private init: () => T) {}
+    get value(): T {
+        if (typeof this._value === "undefined") {
+            this._value = this.init();
+        }
+        return this._value;
+    }
+}
+
 class Tag_result{
     static from_plaintext(text: string) {
         return new Tag_result(undefined, "", text);
@@ -31,70 +42,53 @@ class Tag_result{
         return new Tag_result(ctx, "", "");
     }
     get plaintext() {
-        if (this.is_plaintext_available) {
-            return this.current_plaintext;
+        if (this.value.is_plaintext_available) {
+            return this.value.current_plaintext;
         }
         throw "Plaintext unavailable";
     }
-    get html() {
-        this.expand_ctx();
-        return this.current_html + Tag_result.plain_to_html(this.current_plaintext);
+    get html(): string {
+        return this.value.current_html + Tag_result.plain_to_html(this.value.current_plaintext);
     }
     get is_plaintext_available() {
-        this.expand_ctx();
-        return this.current_html.length === 0;
+        return this.value.current_html.length === 0;
     }
     get current_value() {
-        if (this.ctx) {
-            return this.ctx.text;
+        if (this.value.current_html) {
+            return this.value.html;
         }
-        if (this.current_html) {
-            return this.html;
-        }
-        return this.plaintext;
+        return this.value.plaintext;
     }
     append(other: Tag_result) {
-        if (other.is_plaintext_available) {
-            return this.append_plaintext(other.plaintext);
-        }
-        else {
-            return this.append_html(other.html);
-        }
+        return other.is_plaintext_available ? this.value.append_plaintext(other.plaintext) : this.value.append_html(other.html);
     }
     append_plaintext(text: string) {
         if (text.length === 0) {
-            return this;
+            return this.value;
         }
-        this.expand_ctx();
-        return new Tag_result(undefined, this.current_html, this.current_plaintext + text);
+        return new Tag_result(undefined, this.value.current_html, this.value.current_plaintext + text);
     }
     append_html(text: string) {
         if (text.length === 0) {
-            return this;
+            return this.value;
         }
-        return new Tag_result(undefined, this.html + text, "");
+        return new Tag_result(undefined, this.value.html + text, "");
     }
-    private readonly ctx?: cyoaeParser.Rich_text_Context;
+    private readonly context_value?: Lazy_evaluated<Tag_result>;
     private readonly current_html: string;
     private readonly current_plaintext: string;
-    private expand_ctx() {
-        if (this.ctx) {
-            const other = evaluate_richtext(this.ctx);
-            (this.ctx as cyoaeParser.Rich_text_Context | undefined) = undefined;
-            (this.current_plaintext as string) = other.current_plaintext;
-            (this.current_html as string) = other.current_html;
-        }
-    }
     private static plain_to_html(text: string) {
-        if (text.length === 0) {
-            return "";
-        }
-        return `${escape_html(text)}`;
+        return escape_html(text);
     }
     private constructor(ctx: cyoaeParser.Rich_text_Context | undefined, html: string, plaintext: string) {
-        this.ctx = ctx;
+        if (ctx) {
+            this.context_value = new Lazy_evaluated(() => evaluate_richtext(ctx));
+        }
         this.current_plaintext = plaintext;
         this.current_html = html;
+    }
+    private get value() {
+        return this.context_value?.value || this;
     }
 }
 
@@ -121,7 +115,7 @@ interface Tag {
 function get_required_attribute(tag: Tag, attribute: string) {
     const result = tag.attributes.get(attribute);
     if (!result) {
-        throw `Missing attribute "${attribute}" in tag "${tag.name}"`;
+        throw_evaluation_error(`Missing attribute "${attribute}" in tag "${tag.name}"`, tag.ctx);
     }
     return result;
 }
@@ -241,7 +235,9 @@ const replacements: Tag_replacement[] = [
 		replacements:
 			[
 				{name: "url", replacement: url => Tag_result.from_html(` src="${url.plaintext}"`)},
-				{name: "alt", replacement: alt => Tag_result.from_html(` alt="${escape_html(alt.plaintext)}"`), default_value: Tag_result.from_html(" alt='image'")},
+				{name: "alt", replacement: alt => Tag_result.from_html(` alt="${escape_html(alt.plaintext)}"`),
+                    default_value: Tag_result.from_plaintext("image")
+                },
             ],
 		outro: Tag_result.from_html("/>\n"),
 	},
@@ -352,15 +348,21 @@ interface Evaluation_error_context {
     readonly start: {line: number, charPositionInLine: number};
     readonly sourceInterval: {length: number};
 }
-new class extends antlr4ts.ParserRuleContext implements Evaluation_error_context {} //assert that antlr4ts.ParserRuleContext implements Evaluation_error_context
+type Extends<Class, Interface, Message = "">  = Class extends Interface ? true : Message;
+function static_assert<T extends true>() {}
+static_assert<Extends<antlr4ts.ParserRuleContext, Evaluation_error_context, "antlr4ts.ParserRuleContext doesn't implement Evaluation_error_context anymore, need to change Evaluation_error_context so it does again">>();
 
 function throw_evaluation_error(error: string, context: Evaluation_error_context): never {
     const line = context.start.line;
     const character = context.start.charPositionInLine;
-    const length = context.sourceInterval.length;
+    const source_line = current_source.split('\n')[line - 1];
+    function min(x: number, y: number) {
+        return x < y ? x : y;
+    }
+    const length = min(context.sourceInterval.length, source_line.length - character);
 
     throw `Error evaluating source in line ${line}:\n`
-        +`${current_source.split('\n')[line - 1]}\n`
+        +`${source_line}\n`
         + `${" ".repeat(character) + "^" + (length > 1 ? "~".repeat(length - 1) : "")}\n`
         + error;
 }
@@ -447,12 +449,17 @@ function execute_tag(tag: Tag): Tag_result {
     }]\n`);
     const replacement = replacements.find((repl) => repl.tag_name === tag.name);
     if (replacement === undefined) {
-        throw `Unknown tag "${tag.name}"`;
+        throw_evaluation_error(`Unknown tag "${tag.name}"`, tag.ctx);
     }
     //Todo: check if there are no duplicate attributes
     let result = replacement.intro || Tag_result.from_plaintext("");
     if (typeof replacement.replacements === "function") {
-        result = result.append(replacement.replacements(tag));
+        try {
+            result = result.append(replacement.replacements(tag));
+        }
+        catch (error) {
+            throw_evaluation_error(`${error}`, tag.ctx);
+        }
     }
     else {
         if (tag.default_value?.current_value) {
@@ -461,22 +468,28 @@ function execute_tag(tag: Tag): Tag_result {
         const attributes = [...tag.attributes]; //making copy so that removing attributes doesn't affect replacement functions
         for (const attribute_replacement of replacement.replacements) {
             const attribute_value_pos = attributes.findIndex(([attribute_name,]) => attribute_name === attribute_replacement.name);
-            let attribute_value = attributes[attribute_value_pos][1];
+
+            let attribute_value = attributes[attribute_value_pos]?.[1];
             if (!attribute_value) {
                 if (attribute_replacement.default_value !== undefined) {
                     attribute_value = attribute_replacement.default_value;
                 }
                 else {
-                    throw `Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`;
+                    throw_evaluation_error(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`, tag.ctx);
                 }
             }
-            result = result.append(attribute_replacement.replacement(attribute_value, tag));
+            try {
+                result = result.append(attribute_replacement.replacement(attribute_value, tag));
+            }
+            catch (error) {
+                throw_evaluation_error(`${error}`, tag.ctx);
+            }
             if (attribute_value_pos !== -1) {
                 attributes.splice(attribute_value_pos, 1);
             }
         }
         if (attributes.length > 0) {
-            throw `Unknown attribute(s) [${attributes.reduce((curr, [attr_name, ]) => `${curr}${attr_name} `, " ")}] in tag "${tag.name}"`;
+            throw_evaluation_error(`Unknown attribute(s) [${attributes.reduce((curr, [attr_name, ]) => `${curr}${attr_name} `, " ")}] in tag "${tag.name}"`, tag.ctx);
         }
     }
     if (replacement.outro) {
@@ -487,11 +500,13 @@ function execute_tag(tag: Tag): Tag_result {
 
 function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
     const debug = false;
+    debug && console.log(`Evaluating richtext "${ctx.text}"`);
     let result = Tag_result.from_plaintext("");
     for (let i = 0; i < ctx.childCount; i++) {
         const child = ctx.getChild(i);
         debug && console.log(`Tag child ${i}: >>>${child.text}<<<`);
         if (child instanceof cyoaeParser.Plain_text_Context) {
+            debug && console.log(`found plaintext "${child.text}"`);
             for (let i = 0; i < child.childCount; i++) {
                 const grandchild = child.getChild(i);
                 if (grandchild instanceof cyoaeParser.Escaped_text_Context) {
@@ -506,6 +521,7 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
             }
         }
         else if (child instanceof cyoaeParser.Tag_Context) {
+            debug && console.log(`evaluating tag ${child._tag_name.text}`);
             function extract_tag(ctx: cyoaeParser.Tag_Context): Tag {
                 let tag: Tag = {
                     ctx: ctx,
@@ -529,19 +545,22 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
             result = result.append(execute_tag(extract_tag(child)));
         }
         else if (child instanceof cyoaeParser.Code_Context) {
+            debug && console.log(`Evaluating code "${child.text}"`);
             const value = evaluate_code(child);
+            debug && console.log(`Result: "${value}"`);
             if (typeof value !== "undefined") {
                 result = result.append_plaintext(`${value}`);
             }
         }
         else if (child instanceof cyoaeParser.Number_Context) {
+            debug && console.log(`Found number ${child.text}`);
             result = result.append_plaintext(child.text);
         }
         else {
             throw_evaluation_error(`Internal logic error: Found child that is neither a plain text nor a tag nor a number in rich text`, ctx);
         }
     }
-    debug && console.log(`Tag execution result: ${result.current_value}`);
+    debug && console.log(`Tag execution result: "${result.current_value}" which is ${result.is_plaintext_available ? "plaintext" : "html"}`);
     return result;
 }
 
@@ -733,6 +752,11 @@ async function tests() {
             test_eval("1/0");
             assert(false, `Zero division error did not produce exception`);
         } catch (e) {}
+
+        function test_code(code: string, expected: Tag_result) {
+            //evaluate_code get_parser(code, `code evaluation test "${code}"`).code_();
+            assert_equal(evaluate_expression(get_parser(code, `code evaluation test "${code}"`).expression_()), expected, `for code "${code}"`);
+        }
     }
     test_code_evaluation();
 }
