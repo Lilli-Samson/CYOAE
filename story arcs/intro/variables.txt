@@ -2,6 +2,8 @@ You can set variables using for example [code \{x=42\}.] This expression doesn't
 To display a variable or any expression use [code My favorite number is \{x + 27\}] which renders as My favorite number is {x + 27}.
 You can make multiple assignments using a semicolon: [code \{x = 1; y = 2\}.]{x = 1; y = 2}
 
-{123 + 456}
-{x+y}
-{2/3}
+{totallyme="https://cdn.discordapp.com/emojis/636097957304991745.png?v=1"}
+You can use variables just about anywhere. For example you might write [code \{cutie = "{totallyme}"\}] followed by [code \[img \{url \{cutie\}\} \{alt So pretty!\}\]] which renders like this:
+[img {url {totallyme}} {alt So pretty!}]
+Note that you cannot do \[img \{cutie\}\]. That would result in an error about an unknown attribute "cutie" in tag "img".
+[img {totallyme}]

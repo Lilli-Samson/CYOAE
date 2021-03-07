@@ -12,14 +12,16 @@ expression_:
     '(' ws_? expression=expression_ ws_? ')'
     | identifier=identifier_
     | number=number_
+    | '"' string=string_content_ '"'
     | left_expression=expression_ ws_? operator=('*' | '/') ws_? right_expression=expression_
     | left_expression=expression_ ws_? operator=('+' | '-') ws_? right_expression=expression_
     | identifier=identifier_ ws_? operator='=' ws_? expression=expression_
     ;
 statement_: expression=expression_ ';';
 ws_: WS;
-word_: (WORDCHARACTER | '+'|'-'|'*'|'/'|'='|'('|')'|';')+; //making +-*/=(); explicit should not be necessary, but somehow negation does not match these characters
+word_: (WORDCHARACTER | '+'|'-'|'*'|'/'|'='|'('|')'|';'|'"')+; //making +-*/=();" explicit should not be necessary, but somehow negation does not match these characters
 number_: ('+'|'-')? NUMBER;
+string_content_:  (~'"'|'\\"')*;
 
 //lexer grammar cyoa;
 NUMBER: [0-9]+;

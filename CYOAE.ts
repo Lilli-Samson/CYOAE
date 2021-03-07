@@ -348,10 +348,11 @@ function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value
     return accumulator;
 }
 
-interface Evaluation_error_context { //is implemented by antlr4ts.ParserRuleContext
+interface Evaluation_error_context {
     readonly start: {line: number, charPositionInLine: number};
     readonly sourceInterval: {length: number};
 }
+new class extends antlr4ts.ParserRuleContext implements Evaluation_error_context {} //assert that antlr4ts.ParserRuleContext implements Evaluation_error_context
 
 function throw_evaluation_error(error: string, context: Evaluation_error_context): never {
     const line = context.start.line;
@@ -415,6 +416,9 @@ function evaluate_expression(expression: cyoaeParser.Expression_Context): number
         }
         else if (expression._expression) {
             return evaluate_expression(expression._expression);
+        }
+        else if (expression._string) {
+            return expression._string.text;
         }
         else {
             throw_evaluation_error(`Unknown expression ${expression.text}`, expression);
