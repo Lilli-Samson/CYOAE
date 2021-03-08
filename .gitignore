@@ -5,7 +5,13 @@ cyoaeLexer.interp
 cyoaeLexer.js
 cyoaeLexer.tokens
 cyoaeListener.js
+cyoaeLexer.ts
+cyoaeListener.ts
+cyoaeParser.ts
 cyoaeParser.js
 package-lock.json
 node_modules
 CYOAE.js
+main_debug.js
+main_release.js
+.antlr
