@@ -1,0 +1,26 @@
+Both links on the previous page point to this page. The difference in choice is only if the weapon variable has been set, so we better make use of it.
+
+In you story a scene with a goblin might come up which you can write like this:
+
+[code
+Before you stands an ugly vicious goblin, malice in its eyes, ready to devour you.
+
+\[select
+	\{case weapon="herosword" text=You grip your sword tightly, hoping the spirit of the fallen hero lends you some strength and courage because you really need it right now.\}
+	\{case weapon text=You grip your \[print weapon\] tightly, ready to attack.\}
+	\{case text=You stand there unarmed and afraid, regretting not having picked up a weapon on the way.\}
+\]
+]
+
+Let's go through the text line by line. First there is the [code select] tag which means one of the specified [code case]s will be selected. Following that are the condition when to select the option and the result of the option. The first condition is [code case weapon="herosword"]. That means this option can activate when the variable [code weapon] is set to value [code "herosword"]. Following that is what will appear in case this option is selected, a description in which the sword is used.
+Next is an option that can trigger when the variable [code weapon] is set to something (not an empty string). This allows you to write appropriate text for whatever other weapon the character happens to have picked up at this point in the story.
+Lastly there is an option without any conditions. The way that [code select] will choose its options to first discard all options where the conditions are not met. Then the resulting options are ranked by the number of conditions. Assuming the character picked up the hero sword, all 3 options have their condition met, but the first 2 are better than the last. The result is this:
+
+[select
+	{case 1} {condition weapon=="herosword"} {text You grip your sword tightly, hoping the spirit of the fallen hero lends you some strength and courage because you really need it right now.}
+	{case 2} {condition weapon != ""} {text You grip your {weapon} tightly, ready to attack.}
+	{case 3} {text You stand there unarmed and afraid, regretting not having picked up a weapon on the way.}
+]
+
+[choice {next media} {text Let's move on to media}]
+[choice {next variables} {text More about variables}]

@@ -17,10 +17,10 @@ debug: main_debug.js
 main_release.js: main_debug.js
 	$(MINIFY) $< -cm > $@
 
-$(ANTLR_FILES) &: cyoae.g4
+$(ANTLR_FILES) &: cyoae.g4 makefile
 	$(ANTLR4) $<
 
-CYOAE.js: CYOAE.ts $(ANTLR_FILES)
+CYOAE.js: CYOAE.ts $(ANTLR_FILES) tsconfig.json makefile
 	$(TSC) $(TSC_FLAGS) .
 
 main_debug.js: CYOAE.js $(ANTLR_FILES)

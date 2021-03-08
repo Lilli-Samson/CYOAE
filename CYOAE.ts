@@ -23,11 +23,14 @@ class LexerErrorListener implements antlr4ts.ANTLRErrorListener<number> {
 class Lazy_evaluated<T> {
     private _value: T | undefined;
     constructor(private init: () => T) {}
-    get value(): T {
-        if (typeof this._value === "undefined") {
+    get value() {
+        if (!this.is_evaluated) {
             this._value = this.init();
         }
         return this._value;
+    }
+    get is_evaluated() {
+        return typeof this._value !== "undefined";
     }
 }
 
@@ -54,10 +57,13 @@ class Tag_result{
         return this.value.current_html.length === 0;
     }
     get current_value() {
-        if (this.value.current_html) {
-            return this.value.html;
+        if (this.context_value?.is_evaluated) {
+            if (this.value.current_html) {
+                return this.value.html;
+            }
+            return this.value.plaintext;
         }
-        return this.value.plaintext;
+        return "unevaluated";
     }
     append(other: Tag_result) {
         return other.is_plaintext_available ? this.value.append_plaintext(other.plaintext) : this.value.append_html(other.html);
@@ -98,24 +104,47 @@ interface Attribute_replacement {
 	default_value?: Tag_result;
 }
 
+enum Tag_type {
+    allow_duplicate_attributes,
+}
+
 interface Tag_replacement {
     readonly tag_name: string;
     readonly intro?: Tag_result;
     readonly replacements: Attribute_replacement[] | ((tag: Tag) => Tag_result);
     readonly outro?: Tag_result;
+    readonly tag_type?: Tag_type;
 }
 
 interface Tag {
 	ctx: cyoaeParser.Tag_Context;
 	name: string;
 	default_value?: Tag_result;
-	attributes: Map<string, Tag_result>;
+	attributes: [string, Tag_result][];
 }
 
-function get_required_attribute(tag: Tag, attribute: string) {
-    const result = tag.attributes.get(attribute);
-    if (!result) {
-        throw_evaluation_error(`Missing attribute "${attribute}" in tag "${tag.name}"`, tag.ctx);
+function get_optional_attributes(tag: Tag, attribute: string) {
+    let result: Tag_result[] = [];
+    for (const [attribute_name, attribute_value] of tag.attributes) {
+        if (attribute_name === attribute) {
+            result.push(attribute_value);
+        }
+    }
+    return result;
+}
+
+function get_unique_optional_attribute(tag: Tag, attribute: string) : Tag_result | undefined {
+    const result = get_optional_attributes(tag, attribute);
+    if (result.length > 1) {
+        throw_evaluation_error(`Duplicate attribute "${attribute}" in tag "${tag.name}" which doesn't allow duplicate attributes`, tag.ctx);
+    }
+    return result[0];
+}
+
+function get_unique_required_attribute(tag: Tag, attribute: string) {
+    const result = get_unique_optional_attribute(tag, attribute);
+    if (typeof result === "undefined") {
+        throw_evaluation_error(`Missing required attribute "${attribute}" in tag "${tag.name}"`, tag.ctx);
     }
     return result;
 }
@@ -179,11 +208,6 @@ class Page_checker {
         return available;
     }
     private static choice_available = new Map<string, boolean | Promise<boolean>>();
-}
-
-function evaluate(code: string) { //evaluates a string that may contain variables and expressions
-    //TODO
-    return code;
 }
 
 function sleep(ms: number) {
@@ -251,9 +275,9 @@ const replacements: Tag_replacement[] = [
 	{ //choice
 		tag_name: "choice",
 		replacements: (tag) => {
-            const next = get_required_attribute(tag, "next");
-            const text = get_required_attribute(tag, "text");
-            const onclick = tag.attributes.get("onclick");
+            const next = get_unique_required_attribute(tag, "next");
+            const text = get_unique_required_attribute(tag, "text");
+            const onclick = get_unique_optional_attribute(tag, "onclick");
             //TODO: assert that tag.attributes has no attributes besides next, text and onclick
             function get_result(page_available: boolean) {
                 //intro
@@ -312,22 +336,24 @@ const replacements: Tag_replacement[] = [
             return Tag_result.from_html(`<a href="${`${current_url}story arcs/${current_arc}/${current_scene}.txt`}">Source</a><br>\n<p class="source">${escape_html(current_source)}</p>`);
         },
     },
-    { //exec
-        tag_name: "exec",
-        replacements: function(tag: Tag) {
-            for (const [attribute_name, code] of tag.attributes) {
-                //TODO: Error handling
-                g.set(attribute_name, evaluate(code.plaintext));
-            }
-            return Tag_result.from_plaintext("");
-        },
-    },
     { //print
         tag_name: "print",
         replacements: 
         [
             {name: "variable", replacement: text => Tag_result.from_plaintext(evaluate_variable(text.plaintext))},
         ],
+    },
+    { //select
+        tag_name: "select",
+        replacements: function(tag: Tag) {
+            let debugstring = `Select attributes:\n`;
+            for (const [attribute_name, code] of tag.attributes) {
+                debugstring += `${attribute_name}: ${code.current_value}\n`;
+            }
+            console.log(debugstring);
+            return Tag_result.from_plaintext("");
+        },
+        tag_type: Tag_type.allow_duplicate_attributes,
     },
 ];
 
@@ -441,15 +467,24 @@ function evaluate_code(code: cyoaeParser.Code_Context) {
 function execute_tag(tag: Tag): Tag_result {
     const debug = false;
     debug && console.log(`Executing tag "${tag.name}" with value "${tag.default_value?.current_value}" and attributes [${
-        tag.attributes.size > 0
-        ? reduce(tag.attributes, (curr, [attribute_name, attribute_value]) => `${curr}\t${attribute_name}="${attribute_value.current_value}"\n`, "\n")
+        tag.attributes.length > 0
+        ? tag.attributes.reduce((curr, [attribute_name, attribute_value]) => `${curr}\t${attribute_name}="${attribute_value.current_value}"\n`, "\n")
         : ""
     }]\n`);
     const replacement = replacements.find((repl) => repl.tag_name === tag.name);
     if (replacement === undefined) {
         throw_evaluation_error(`Unknown tag "${tag.name}"`, tag.ctx);
     }
-    //Todo: check if there are no duplicate attributes
+    //check that there are no duplicate attributes
+    if (replacement.tag_type !== Tag_type.allow_duplicate_attributes) {
+        let attribute_names = new Set<string>();
+        for (const [attribute_name, ] of tag.attributes) {
+            if (attribute_names.has(attribute_name)) {
+                throw_evaluation_error(`Found duplicate attribute ${attribute_name} in tag ${tag.name} which doesn't support that`, tag.ctx);
+            }
+            attribute_names.add(attribute_name);
+        }
+    }
     let result = replacement.intro || Tag_result.from_plaintext("");
     if (typeof replacement.replacements === "function") {
         try {
@@ -461,9 +496,11 @@ function execute_tag(tag: Tag): Tag_result {
     }
     else {
         if (tag.default_value?.current_value) {
-            tag.attributes.set(replacement.replacements[0].name, tag.default_value);
+            debug && console.log(`Found default value ${tag.default_value?.current_value}`);
+            tag.attributes.push([replacement.replacements[0].name, tag.default_value]);
         }
-        const attributes = [...tag.attributes]; //making copy so that removing attributes doesn't affect replacement functions
+        const attributes = [...tag.attributes];
+        debug && console.log(`Found attributes that need to be looked up: ${attributes.reduce((curr, [name, ])=>`${curr} ${name}`, "")}`);
         for (const attribute_replacement of replacement.replacements) {
             const attribute_value_pos = attributes.findIndex(([attribute_name,]) => attribute_name === attribute_replacement.name);
 
@@ -524,18 +561,18 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
                 let tag: Tag = {
                     ctx: ctx,
                     name: ctx._tag_name.text,
-                    attributes: new Map<string, Tag_result>()
+                    attributes: []
                 };
 
-                debug && console.log(`Got a tag default value "${ctx._default_value.text}"`);
-                tag.default_value = Tag_result.from_ctx(ctx._default_value);
+                if (ctx._default_value.text) {
+                    debug && console.log(`Got a tag default value "${ctx._default_value.text}"`);
+                    tag.default_value = Tag_result.from_ctx(ctx._default_value);
+                }
 
                 for (let i = 0; i < ctx.childCount; i++) {
                     const child = ctx.getChild(i);
                     if (child instanceof cyoaeParser.Attribute_Context) {
-                        let name_ctx = child._attribute_name;
-                        let value_ctx = child._attribute_value;
-                        tag.attributes.set(name_ctx.text, Tag_result.from_ctx(value_ctx));
+                        tag.attributes.push([child._attribute_name.text, Tag_result.from_ctx(child._attribute_value)]);
                     }
                 }
                 return tag;
@@ -590,7 +627,7 @@ function parse_source_text(data: string, filename: string) {
 
 // plays through a story arc
 async function play_arc(name: string) {
-    window.location.hash = `#${name}/variables`;
+    window.location.hash = `#${name}/travel`;
 }
 
 // display a scene based on a source .txt file and the current arc
@@ -642,7 +679,7 @@ async function download(url: string) {
 }
 
 function display_error_document(error: string) {
-    document.body.innerHTML = `<span class='code'>${escape_html(error)}</span>`;
+    document.body.innerHTML = `<span class='error'>${escape_html(error)}</span>`;
 }
 
 function assert(predicate: any, explanation: string = "") {

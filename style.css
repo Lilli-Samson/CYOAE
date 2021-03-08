@@ -14,4 +14,15 @@ span.code {
     font-family: monospace;
     white-space: pre-wrap;
     tab-size: 4;
+    -moz-tab-size: 4;
+    -o-tab-size: 4;
+}
+
+span.error {
+    font-family: monospace;
+    white-space: pre-wrap;
+    tab-size: 1;
+    -moz-tab-size: 1;
+    -o-tab-size: 1;
+    color: darkred;
 }
