@@ -1,4 +1,4 @@
-Both links on the previous page point to this page. The difference in choice is only if the weapon variable has been set, so we better make use of it.
+Both links on the previous page point to this page. The difference in choice is only if the [code weapon] variable has been set, so we better make use of it.
 
 In you story a scene with a goblin might come up which you can write like this:
 
@@ -21,7 +21,7 @@ Lastly there is an option without any conditions. The way that [code select] wil
 Before you stands an ugly vicious goblin, malice in its eyes, ready to devour you.
 [select
 	[case
-		{condition: weapon=="herosword"}
+		{condition: weapon=="herosword", true}
 		{priority: 2.4}
 		{text:You grip your sword tightly, hoping the spirit of the fallen hero lends you some strength and courage because you really need it right now.}
 	]

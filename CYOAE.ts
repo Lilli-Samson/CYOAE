@@ -9,14 +9,16 @@ let current_scene = "";
 let current_source = "";
 
 class ParserErrorListener implements antlr4ts.ANTLRErrorListener<antlr4ts.Token> {
+    constructor(private source: string, private parser: antlr4ts.Parser) {}
     syntaxError(recognizer: antlr4ts.Recognizer<antlr4ts.Token, any>, offendingSymbol: antlr4ts.Token | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
-        throw_evaluation_error(`Parser error: ${msg}`, {start: {line: line, charPositionInLine: charPositionInLine}, sourceInterval: {length: offendingSymbol?.text?.length || 0}});
+        throw_evaluation_error(`Parser error: ${msg}${e ? `: ${e.context?.toStringTree(this.parser)}` : ""}`, {start: {line: line, charPositionInLine: charPositionInLine}, sourceInterval: {length: offendingSymbol?.text?.length || 0}}, this.source);
     }
 }
 
 class LexerErrorListener implements antlr4ts.ANTLRErrorListener<number> {
+    constructor(private source: string) {}
     syntaxError(recognizer: antlr4ts.Recognizer<number, any>, offendingSymbol: number | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
-        throw_evaluation_error(`Lexer error: ${msg}`, {start: {line: line, charPositionInLine: charPositionInLine}, sourceInterval: {length: 1}});
+        throw_evaluation_error(`Lexer error: ${msg}`, {start: {line: line, charPositionInLine: charPositionInLine}, sourceInterval: {length: 1}}, this.source);
     }
 }
 
@@ -171,7 +173,8 @@ function get_unique_required_attribute(tag: Tag, attribute: string) {
     return result;
 }
 
-let g = new Map<string, string | number>(); //storage for ingame variables
+type Game_types = number | string | Boolean;
+let g = new Map<string, Game_types>(); //storage for ingame variables
 (window as any).g = g; //make accessible to html
 
 function evaluate_variable(variable: string) : string {
@@ -367,9 +370,7 @@ const replacements: Tag_replacement[] = [
     },
     { //select
         tag_name: "select",
-        replacements: function(tag: Tag) {
-            return evaluate_select_tag(tag.ctx);
-        },
+        replacements: (tag: Tag) => evaluate_select_tag(tag.ctx),
     },
     { //case
         tag_name: "case",
@@ -403,10 +404,15 @@ interface Case_result {
     readonly text: Tag_result;
 }
 
-function throw_evaluation_error(error: string, context: Evaluation_error_context): never {
+interface Case_code_result {
+    readonly applicable: boolean;
+    readonly score: number;
+}
+
+function throw_evaluation_error(error: string, context: Evaluation_error_context, source = current_source): never {
     const line = context.start.line;
     const character = context.start.charPositionInLine;
-    const source_line = current_source.split('\n')[line - 1];
+    const source_line = source.split('\n')[line - 1];
     function min(x: number, y: number) {
         return x < y ? x : y;
     }
@@ -418,7 +424,7 @@ function throw_evaluation_error(error: string, context: Evaluation_error_context
         + error;
 }
 
-function evaluate_expression(expression: cyoaeParser.Expression_Context): number | string | void {
+function evaluate_expression(expression: cyoaeParser.Expression_Context): Game_types | void {
     if (expression._operator) {
         switch (expression._operator.text) {
             case "=":
@@ -472,6 +478,40 @@ function evaluate_expression(expression: cyoaeParser.Expression_Context): number
         }
         else if (expression._string) {
             return expression._string.text;
+        }
+        else if (expression._comparator) {
+            const lhs = evaluate_expression(expression._left_expression);
+            const rhs = evaluate_expression(expression._right_expression);
+            if (typeof lhs === "undefined") {
+                throw_evaluation_error(`Failed evaluating expression because ${expression._left_expression.text} is undefined`, expression._left_expression);
+            }
+            if (typeof rhs === "undefined") {
+                throw_evaluation_error(`Failed evaluating expression because ${expression._right_expression.text} is undefined`, expression._right_expression);
+            }
+            function get_operator() {
+                switch (expression._comparator.text) {
+                    case "==":
+                        return (lhs: Game_types, rhs: Game_types) => lhs === rhs;
+                    case "!=":
+                        return (lhs: Game_types, rhs: Game_types) => lhs !== rhs;
+                    case "<=":
+                        return (lhs: Game_types, rhs: Game_types) => lhs <= rhs;
+                    case ">=":
+                        return (lhs: Game_types, rhs: Game_types) => lhs >= rhs;
+                    case "<":
+                        return (lhs: Game_types, rhs: Game_types) => lhs < rhs;
+                    case ">":
+                        return (lhs: Game_types, rhs: Game_types) => lhs > rhs;
+                    default:
+                        throw_evaluation_error(`Invalid operator ${expression._comparator.text}`, expression._comparator);
+                }
+            }
+            if (typeof lhs === typeof rhs) {
+                return get_operator()(lhs, rhs);
+            }
+            else {
+                throw_evaluation_error(`Cannot compare ${lhs} of type ${typeof lhs} with ${rhs} of type ${typeof rhs}`, expression);
+            }
         }
         else {
             throw_evaluation_error(`Unknown expression ${expression.text}`, expression);
@@ -657,17 +697,64 @@ function evaluate_select_tag(ctx: cyoaeParser.Tag_Context): Tag_result {
             }
         }
     }
-    return Tag_result.from_plaintext("");
+    cases = cases.filter(case_ => case_.applicable);
+    const max_score = cases.reduce((curr, case_) => case_.score > curr ? case_.score : curr, 0);
+    cases = cases.filter(case_ => case_.score === max_score);
+    const total_priority = cases.reduce((curr, case_) => curr + case_.priority, 0);
+    if (cases.length === 0) {
+        return Tag_result.from_plaintext("");
+    }
+    if (cases.length === 1) {
+        return cases[0].text;
+    }
+    let choice = Math.random() * total_priority;
+    for (const case_ of cases) {
+        choice -= case_.priority;
+        if (choice <= 0) {
+            return case_.text;
+        }
+    }
+    //this should be unreachable
+    console.error(`Reached supposedly unreachable case choice`);
+    return cases[0].text;
+}
+
+function evaluate_case_code(ctx: cyoaeParser.Case_code_Context): Case_code_result {
+    const debug = false;
+    debug && console.log(`Entered case code evaluation with "${ctx.childCount}" expressions to evaluate`);
+    let result = {applicable: true, score: 0};
+    for (let i = 0; i < ctx.childCount; i++) {
+        const child = ctx.getChild(i);
+        if (child instanceof cyoaeParser.Expression_Context) {
+            debug && console.log(`Evaluating case condition ${child.text}`);
+            try {
+                const value = evaluate_expression(child);
+                if (!value) {
+                    result.applicable = false;
+                }
+            }
+            catch (error) {
+                if (`${error}`.search(/Variable "[^"]+" is undefined/) !== -1) {
+                    result.applicable = false;
+                }
+                else {
+                    throw error;
+                }
+            }
+            result.score++;
+        }
+    }
+    return result;
 }
 
 function evaluate_case(ctx: cyoaeParser.Tag_Context): Case_result {
-    const debug = true;
+    const debug = false;
     debug && console.log(`Evaluating case ${ctx.text}`);
     if (ctx._tag_name.text !== "case") {
         throw_evaluation_error(`Internal logic error: Evaluating "${ctx._tag_name.text}" as a "case" tag`, ctx);
     }
     let result = {
-        applicable: false,
+        applicable: true,
         score: 0,
         priority: 1,
         text: null as unknown as Tag_result,
@@ -675,21 +762,34 @@ function evaluate_case(ctx: cyoaeParser.Tag_Context): Case_result {
     for (let i = 0; i < ctx.childCount; i++) {
         const child = ctx.getChild(i);
         if (child instanceof cyoaeParser.Attribute_Context) {
+            debug && console.log(`Found "${child._attribute_name.text}" attribute with value "${child._attribute_value.text}"`);
             switch (child._attribute_name.text) {
                 case "text":
-                    debug && console.log(`Found "text" attribute "${child._attribute_value.text}"`);
                     result.text = Tag_result.from_ctx(child._attribute_value);
                     break;
                 case "condition":
-                    debug && console.log(`Found "condition" attribute "${child._attribute_value.text}"`);
+                    const old_source = current_source;
+                    try {
+                        current_source = child._attribute_value.text;
+                        const parser = get_parser(child._attribute_value.text, `Expression in ${child.start.line}:${child.start.charPositionInLine}`);
+                        const case_code_result = evaluate_case_code(parser.case_code_());
+                        result.applicable = result.applicable && case_code_result.applicable;
+                        result.score += case_code_result.score;
+                    }
+                    catch (err) {
+                        current_source = old_source;
+                        throw_evaluation_error(`Failed evaluating condition: ${err}`, child._attribute_value);
+                    }
                     break;
                 case "priority":
-                    debug && console.log(`Found "priority" attribute "${child._attribute_value.text}"`);
                     try {
                         const text = evaluate_richtext(child._attribute_value).plaintext;
                         const priority = parseFloat(text);
                         if (Number.isNaN(priority)) {
                             throw "NaN";
+                        }
+                        if (priority < 0) {
+                            throw "Priority cannot be negative";
                         }
                         result.priority = priority;
                     }
@@ -709,17 +809,18 @@ function evaluate_case(ctx: cyoaeParser.Tag_Context): Case_result {
     return result;
 }
 
-function get_parser(data: string, filename: string) {
-    current_source = data;
+function get_parser(data: string, filename: string, lexer_error_listener = new LexerErrorListener(data), parser_error_listener?: antlr4ts.ANTLRErrorListener<antlr4ts.Token>) {
     const input = antlr4ts.CharStreams.fromString(data, filename);
     const lexer = new cyoaeLexer(input);
     const tokens = new antlr4ts.CommonTokenStream(lexer);
     const parser = new cyoaeParser.cyoaeParser(tokens);
 
+    parser_error_listener = parser_error_listener || new ParserErrorListener(data, parser);
+
     lexer.removeErrorListeners();
-    lexer.addErrorListener(new LexerErrorListener);
+    lexer.addErrorListener(lexer_error_listener);
     parser.removeErrorListeners();
-    parser.addErrorListener(new ParserErrorListener);
+    parser.addErrorListener(parser_error_listener);
 
     return parser;
 }
@@ -727,17 +828,18 @@ function get_parser(data: string, filename: string) {
 function parse_source_text(data: string, filename: string) {
     console.log(`Starting parsing source text ${filename}`);
     
+    current_source = data;
     const tree = get_parser(data, filename).start_();
-    const child = tree.getChild(0);
-    if (!(child instanceof cyoaeParser.Rich_text_Context)) {
-        throw "Internal logic error: Child of start context is not a richtext";
+    if (tree._rich_text) {
+        return evaluate_richtext(tree._rich_text).html;
     }
-    return evaluate_richtext(child).html;
+    //TODO: Put up a proper placeholder page
+    return Tag_result.from_plaintext(`Empty file "${filename}"`).html;
 }
 
 // plays through a story arc
 async function play_arc(name: string) {
-    window.location.hash = `#${name}/travel`;
+    window.location.hash = `#${name}/start`;
 }
 
 // display a scene based on a source .txt file and the current arc

@@ -48,23 +48,32 @@ let current_scene = "";
 let current_source = "";
 
 class ParserErrorListener {
-  syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
-    var _a, _b;
+  constructor(source, parser) {
+    this.source = source;
+    this.parser = parser;
+  }
 
-    throw_evaluation_error(`Parser error: ${msg}`, {
+  syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
+    var _a, _b, _c;
+
+    throw_evaluation_error(`Parser error: ${msg}${e ? `: ${(_a = e.context) === null || _a === void 0 ? void 0 : _a.toStringTree(this.parser)}` : ""}`, {
       start: {
         line: line,
         charPositionInLine: charPositionInLine
       },
       sourceInterval: {
-        length: ((_b = (_a = offendingSymbol) === null || _a === void 0 ? void 0 : _a.text) === null || _b === void 0 ? void 0 : _b.length) || 0
+        length: ((_c = (_b = offendingSymbol) === null || _b === void 0 ? void 0 : _b.text) === null || _c === void 0 ? void 0 : _c.length) || 0
       }
-    });
+    }, this.source);
   }
 
 }
 
 class LexerErrorListener {
+  constructor(source) {
+    this.source = source;
+  }
+
   syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
     throw_evaluation_error(`Lexer error: ${msg}`, {
       start: {
@@ -74,7 +83,7 @@ class LexerErrorListener {
       sourceInterval: {
         length: 1
       }
-    });
+    }, this.source);
   }
 
 }
@@ -459,9 +468,7 @@ const replacements = [{
   }]
 }, {
   tag_name: "select",
-  replacements: function (tag) {
-    return evaluate_select_tag(tag.ctx);
-  }
+  replacements: tag => evaluate_select_tag(tag.ctx)
 }, {
   tag_name: "case",
   replacements: tag => {
@@ -485,10 +492,10 @@ function static_assert() {}
 
 static_assert();
 
-function throw_evaluation_error(error, context) {
+function throw_evaluation_error(error, context, source = current_source) {
   const line = context.start.line;
   const character = context.start.charPositionInLine;
-  const source_line = current_source.split('\n')[line - 1];
+  const source_line = source.split('\n')[line - 1];
 
   function min(x, y) {
     return x < y ? x : y;
@@ -562,6 +569,48 @@ function evaluate_expression(expression) {
       return evaluate_expression(expression._expression);
     } else if (expression._string) {
       return expression._string.text;
+    } else if (expression._comparator) {
+      const lhs = evaluate_expression(expression._left_expression);
+      const rhs = evaluate_expression(expression._right_expression);
+
+      if (typeof lhs === "undefined") {
+        throw_evaluation_error(`Failed evaluating expression because ${expression._left_expression.text} is undefined`, expression._left_expression);
+      }
+
+      if (typeof rhs === "undefined") {
+        throw_evaluation_error(`Failed evaluating expression because ${expression._right_expression.text} is undefined`, expression._right_expression);
+      }
+
+      function get_operator() {
+        switch (expression._comparator.text) {
+          case "==":
+            return (lhs, rhs) => lhs === rhs;
+
+          case "!=":
+            return (lhs, rhs) => lhs !== rhs;
+
+          case "<=":
+            return (lhs, rhs) => lhs <= rhs;
+
+          case ">=":
+            return (lhs, rhs) => lhs >= rhs;
+
+          case "<":
+            return (lhs, rhs) => lhs < rhs;
+
+          case ">":
+            return (lhs, rhs) => lhs > rhs;
+
+          default:
+            throw_evaluation_error(`Invalid operator ${expression._comparator.text}`, expression._comparator);
+        }
+      }
+
+      if (typeof lhs === typeof rhs) {
+        return get_operator()(lhs, rhs);
+      } else {
+        throw_evaluation_error(`Cannot compare ${lhs} of type ${typeof lhs} with ${rhs} of type ${typeof rhs}`, expression);
+      }
     } else {
       throw_evaluation_error(`Unknown expression ${expression.text}`, expression);
     }
@@ -763,11 +812,71 @@ function evaluate_select_tag(ctx) {
     }
   }
 
-  return Tag_result.from_plaintext("");
+  cases = cases.filter(case_ => case_.applicable);
+  const max_score = cases.reduce((curr, case_) => case_.score > curr ? case_.score : curr, 0);
+  cases = cases.filter(case_ => case_.score === max_score);
+  const total_priority = cases.reduce((curr, case_) => curr + case_.priority, 0);
+
+  if (cases.length === 0) {
+    return Tag_result.from_plaintext("");
+  }
+
+  if (cases.length === 1) {
+    return cases[0].text;
+  }
+
+  let choice = Math.random() * total_priority;
+
+  for (const case_ of cases) {
+    choice -= case_.priority;
+
+    if (choice <= 0) {
+      return case_.text;
+    }
+  } //this should be unreachable
+
+
+  console.error(`Reached supposedly unreachable case choice`);
+  return cases[0].text;
+}
+
+function evaluate_case_code(ctx) {
+  const debug = false;
+  debug && console.log(`Entered case code evaluation with "${ctx.childCount}" expressions to evaluate`);
+  let result = {
+    applicable: true,
+    score: 0
+  };
+
+  for (let i = 0; i < ctx.childCount; i++) {
+    const child = ctx.getChild(i);
+
+    if (child instanceof cyoaeParser.Expression_Context) {
+      debug && console.log(`Evaluating case condition ${child.text}`);
+
+      try {
+        const value = evaluate_expression(child);
+
+        if (!value) {
+          result.applicable = false;
+        }
+      } catch (error) {
+        if (`${error}`.search(/Variable "[^"]+" is undefined/) !== -1) {
+          result.applicable = false;
+        } else {
+          throw error;
+        }
+      }
+
+      result.score++;
+    }
+  }
+
+  return result;
 }
 
 function evaluate_case(ctx) {
-  const debug = true;
+  const debug = false;
   debug && console.log(`Evaluating case ${ctx.text}`);
 
   if (ctx._tag_name.text !== "case") {
@@ -775,7 +884,7 @@ function evaluate_case(ctx) {
   }
 
   let result = {
-    applicable: false,
+    applicable: true,
     score: 0,
     priority: 1,
     text: null
@@ -785,25 +894,40 @@ function evaluate_case(ctx) {
     const child = ctx.getChild(i);
 
     if (child instanceof cyoaeParser.Attribute_Context) {
+      debug && console.log(`Found "${child._attribute_name.text}" attribute with value "${child._attribute_value.text}"`);
+
       switch (child._attribute_name.text) {
         case "text":
-          debug && console.log(`Found "text" attribute "${child._attribute_value.text}"`);
           result.text = Tag_result.from_ctx(child._attribute_value);
           break;
 
         case "condition":
-          debug && console.log(`Found "condition" attribute "${child._attribute_value.text}"`);
+          const old_source = current_source;
+
+          try {
+            current_source = child._attribute_value.text;
+            const parser = get_parser(child._attribute_value.text, `Expression in ${child.start.line}:${child.start.charPositionInLine}`);
+            const case_code_result = evaluate_case_code(parser.case_code_());
+            result.applicable = result.applicable && case_code_result.applicable;
+            result.score += case_code_result.score;
+          } catch (err) {
+            current_source = old_source;
+            throw_evaluation_error(`Failed evaluating condition: ${err}`, child._attribute_value);
+          }
+
           break;
 
         case "priority":
-          debug && console.log(`Found "priority" attribute "${child._attribute_value.text}"`);
-
           try {
             const text = evaluate_richtext(child._attribute_value).plaintext;
             const priority = parseFloat(text);
 
             if (Number.isNaN(priority)) {
               throw "NaN";
+            }
+
+            if (priority < 0) {
+              throw "Priority cannot be negative";
             }
 
             result.priority = priority;
@@ -827,35 +951,36 @@ function evaluate_case(ctx) {
   return result;
 }
 
-function get_parser(data, filename) {
-  current_source = data;
+function get_parser(data, filename, lexer_error_listener = new LexerErrorListener(data), parser_error_listener) {
   const input = antlr4ts.CharStreams.fromString(data, filename);
   const lexer = new _cyoaeLexer.cyoaeLexer(input);
   const tokens = new antlr4ts.CommonTokenStream(lexer);
   const parser = new cyoaeParser.cyoaeParser(tokens);
+  parser_error_listener = parser_error_listener || new ParserErrorListener(data, parser);
   lexer.removeErrorListeners();
-  lexer.addErrorListener(new LexerErrorListener());
+  lexer.addErrorListener(lexer_error_listener);
   parser.removeErrorListeners();
-  parser.addErrorListener(new ParserErrorListener());
+  parser.addErrorListener(parser_error_listener);
   return parser;
 }
 
 function parse_source_text(data, filename) {
   console.log(`Starting parsing source text ${filename}`);
+  current_source = data;
   const tree = get_parser(data, filename).start_();
-  const child = tree.getChild(0);
 
-  if (!(child instanceof cyoaeParser.Rich_text_Context)) {
-    throw "Internal logic error: Child of start context is not a richtext";
-  }
+  if (tree._rich_text) {
+    return evaluate_richtext(tree._rich_text).html;
+  } //TODO: Put up a proper placeholder page
 
-  return evaluate_richtext(child).html;
+
+  return Tag_result.from_plaintext(`Empty file "${filename}"`).html;
 } // plays through a story arc
 
 
 function play_arc(name) {
   return __awaiter(this, void 0, void 0, function* () {
-    window.location.hash = `#${name}/travel`;
+    window.location.hash = `#${name}/start`;
   });
 } // display a scene based on a source .txt file and the current arc
 
@@ -1155,20 +1280,23 @@ cyoaeLexer.T__14 = 15;
 cyoaeLexer.T__15 = 16;
 cyoaeLexer.T__16 = 17;
 cyoaeLexer.T__17 = 18;
-cyoaeLexer.T__18 = 19;
-cyoaeLexer.T__19 = 20;
-cyoaeLexer.NUMBER = 21;
-cyoaeLexer.WORDCHARACTER = 22;
-cyoaeLexer.WS = 23; // tslint:disable:no-trailing-whitespace
+cyoaeLexer.NUMBER = 19;
+cyoaeLexer.COLON = 20;
+cyoaeLexer.ATTRIBUTE_OPEN = 21;
+cyoaeLexer.ATTRIBUTE_CLOSE = 22;
+cyoaeLexer.TAG_OPEN = 23;
+cyoaeLexer.TAG_CLOSE = 24;
+cyoaeLexer.WS = 25;
+cyoaeLexer.WORDCHARACTER = 26; // tslint:disable:no-trailing-whitespace
 
 cyoaeLexer.channelNames = ["DEFAULT_TOKEN_CHANNEL", "HIDDEN"]; // tslint:disable:no-trailing-whitespace
 
 cyoaeLexer.modeNames = ["DEFAULT_MODE"];
-cyoaeLexer.ruleNames = ["T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "T__7", "T__8", "T__9", "T__10", "T__11", "T__12", "T__13", "T__14", "T__15", "T__16", "T__17", "T__18", "T__19", "NUMBER", "WORDCHARACTER", "WS"];
-cyoaeLexer._LITERAL_NAMES = [undefined, "'{'", "':'", "'}'", "'['", "']'", "'\\''", "'\\'", "'\\'", "'\\'", "'\\'", "'('", "')'", "'\"'", "'*'", "'/'", "'+'", "'-'", "'='", "';'", "'\\'"];
-cyoaeLexer._SYMBOLIC_NAMES = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, "NUMBER", "WORDCHARACTER", "WS"];
+cyoaeLexer.ruleNames = ["T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "T__7", "T__8", "T__9", "T__10", "T__11", "T__12", "T__13", "T__14", "T__15", "T__16", "T__17", "NUMBER", "COLON", "ATTRIBUTE_OPEN", "ATTRIBUTE_CLOSE", "TAG_OPEN", "TAG_CLOSE", "WS", "WORDCHARACTER"];
+cyoaeLexer._LITERAL_NAMES = [undefined, "'\\''", "'\\'", "'\\'", "'\\'", "'\\'", "'('", "')'", "'\"'", "'*'", "'/'", "'+'", "'-'", "'='", "'=='", "'!='", "';'", "','", "'\\'", undefined, "':'", "'{'", "'}'", "'['", "']'"];
+cyoaeLexer._SYMBOLIC_NAMES = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, "NUMBER", "COLON", "ATTRIBUTE_OPEN", "ATTRIBUTE_CLOSE", "TAG_OPEN", "TAG_CLOSE", "WS", "WORDCHARACTER"];
 cyoaeLexer.VOCABULARY = new _VocabularyImpl.VocabularyImpl(cyoaeLexer._LITERAL_NAMES, cyoaeLexer._SYMBOLIC_NAMES, []);
-cyoaeLexer._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x02\x19k\b\x01\x04" + "\x02\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04" + "\x07\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r" + "\x04\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12" + "\x04\x13\t\x13\x04\x14\t\x14\x04\x15\t\x15\x04\x16\t\x16\x04\x17\t\x17" + "\x04\x18\t\x18\x03\x02\x03\x02\x03\x03\x03\x03\x03\x04\x03\x04\x03\x05" + "\x03\x05\x03\x06\x03\x06\x03\x07\x03\x07\x03\x07\x03\b\x03\b\x03\b\x03" + "\t\x03\t\x03\t\x03\n\x03\n\x03\n\x03\v\x03\v\x03\v\x03\f\x03\f\x03\r\x03" + "\r\x03\x0E\x03\x0E\x03\x0F\x03\x0F\x03\x10\x03\x10\x03\x11\x03\x11\x03" + "\x12\x03\x12\x03\x13\x03\x13\x03\x14\x03\x14\x03\x15\x03\x15\x03\x15\x03" + "\x16\x06\x16a\n\x16\r\x16\x0E\x16b\x03\x17\x03\x17\x03\x18\x06\x18h\n" + "\x18\r\x18\x0E\x18i\x02\x02\x02\x19\x03\x02\x03\x05\x02\x04\x07\x02\x05" + "\t\x02\x06\v\x02\x07\r\x02\b\x0F\x02\t\x11\x02\n\x13\x02\v\x15\x02\f\x17" + "\x02\r\x19\x02\x0E\x1B\x02\x0F\x1D\x02\x10\x1F\x02\x11!\x02\x12#\x02\x13" + "%\x02\x14\'\x02\x15)\x02\x16+\x02\x17-\x02\x18/\x02\x19\x03\x02\x05\x03" + "\x022;\b\x02\v\f\x0F\x0F\"\"]_}}\x7F\x7F\x05\x02\v\f\x0F\x0F\"\"\x02l" + "\x02\x03\x03\x02\x02\x02\x02\x05\x03\x02\x02\x02\x02\x07\x03\x02\x02\x02" + "\x02\t\x03\x02\x02\x02\x02\v\x03\x02\x02\x02\x02\r\x03\x02\x02\x02\x02" + "\x0F\x03\x02\x02\x02\x02\x11\x03\x02\x02\x02\x02\x13\x03\x02\x02\x02\x02" + "\x15\x03\x02\x02\x02\x02\x17\x03\x02\x02\x02\x02\x19\x03\x02\x02\x02\x02" + "\x1B\x03\x02\x02\x02\x02\x1D\x03\x02\x02\x02\x02\x1F\x03\x02\x02\x02\x02" + "!\x03\x02\x02\x02\x02#\x03\x02\x02\x02\x02%\x03\x02\x02\x02\x02\'\x03" + "\x02\x02\x02\x02)\x03\x02\x02\x02\x02+\x03\x02\x02\x02\x02-\x03\x02\x02" + "\x02\x02/\x03\x02\x02\x02\x031\x03\x02\x02\x02\x053\x03\x02\x02\x02\x07" + "5\x03\x02\x02\x02\t7\x03\x02\x02\x02\v9\x03\x02\x02\x02\r;\x03\x02\x02" + "\x02\x0F>\x03\x02\x02\x02\x11A\x03\x02\x02\x02\x13D\x03\x02\x02\x02\x15" + "G\x03\x02\x02\x02\x17J\x03\x02\x02\x02\x19L\x03\x02\x02\x02\x1BN\x03\x02" + "\x02\x02\x1DP\x03\x02\x02\x02\x1FR\x03\x02\x02\x02!T\x03\x02\x02\x02#" + "V\x03\x02\x02\x02%X\x03\x02\x02\x02\'Z\x03\x02\x02\x02)\\\x03\x02\x02" + "\x02+`\x03\x02\x02\x02-d\x03\x02\x02\x02/g\x03\x02\x02\x0212\x07}\x02" + "\x022\x04\x03\x02\x02\x0234\x07<\x02\x024\x06\x03\x02\x02\x0256\x07\x7F" + "\x02\x026\b\x03\x02\x02\x0278\x07]\x02\x028\n\x03\x02\x02\x029:\x07_\x02" + "\x02:\f\x03\x02\x02\x02;<\x07^\x02\x02<=\x07^\x02\x02=\x0E\x03\x02\x02" + "\x02>?\x07^\x02\x02?@\x07]\x02\x02@\x10\x03\x02\x02\x02AB\x07^\x02\x02" + "BC\x07_\x02\x02C\x12\x03\x02\x02\x02DE\x07^\x02\x02EF\x07}\x02\x02F\x14" + "\x03\x02\x02\x02GH\x07^\x02\x02HI\x07\x7F\x02\x02I\x16\x03\x02\x02\x02" + "JK\x07*\x02\x02K\x18\x03\x02\x02\x02LM\x07+\x02\x02M\x1A\x03\x02\x02\x02" + "NO\x07$\x02\x02O\x1C\x03\x02\x02\x02PQ\x07,\x02\x02Q\x1E\x03\x02\x02\x02" + "RS\x071\x02\x02S \x03\x02\x02\x02TU\x07-\x02\x02U\"\x03\x02\x02\x02VW" + "\x07/\x02\x02W$\x03\x02\x02\x02XY\x07?\x02\x02Y&\x03\x02\x02\x02Z[\x07" + "=\x02\x02[(\x03\x02\x02\x02\\]\x07^\x02\x02]^\x07$\x02\x02^*\x03\x02\x02" + "\x02_a\t\x02\x02\x02`_\x03\x02\x02\x02ab\x03\x02\x02\x02b`\x03\x02\x02" + "\x02bc\x03\x02\x02\x02c,\x03\x02\x02\x02de\n\x03\x02\x02e.\x03\x02\x02" + "\x02fh\t\x04\x02\x02gf\x03\x02\x02\x02hi\x03\x02\x02\x02ig\x03\x02\x02" + "\x02ij\x03\x02\x02\x02j0\x03\x02\x02\x02\x05\x02bi\x02";
+cyoaeLexer._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x02\x1Cy\b\x01\x04" + "\x02\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04" + "\x07\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r" + "\x04\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12" + "\x04\x13\t\x13\x04\x14\t\x14\x04\x15\t\x15\x04\x16\t\x16\x04\x17\t\x17" + "\x04\x18\t\x18\x04\x19\t\x19\x04\x1A\t\x1A\x04\x1B\t\x1B\x03\x02\x03\x02" + "\x03\x02\x03\x03\x03\x03\x03\x03\x03\x04\x03\x04\x03\x04\x03\x05\x03\x05" + "\x03\x05\x03\x06\x03\x06\x03\x06\x03\x07\x03\x07\x03\b\x03\b\x03\t\x03" + "\t\x03\n\x03\n\x03\v\x03\v\x03\f\x03\f\x03\r\x03\r\x03\x0E\x03\x0E\x03" + "\x0F\x03\x0F\x03\x0F\x03\x10\x03\x10\x03\x10\x03\x11\x03\x11\x03\x12\x03" + "\x12\x03\x13\x03\x13\x03\x13\x03\x14\x06\x14e\n\x14\r\x14\x0E\x14f\x03" + "\x15\x03\x15\x03\x16\x03\x16\x03\x17\x03\x17\x03\x18\x03\x18\x03\x19\x03" + "\x19\x03\x1A\x06\x1At\n\x1A\r\x1A\x0E\x1Au\x03\x1B\x03\x1B\x02\x02\x02" + "\x1C\x03\x02\x03\x05\x02\x04\x07\x02\x05\t\x02\x06\v\x02\x07\r\x02\b\x0F" + "\x02\t\x11\x02\n\x13\x02\v\x15\x02\f\x17\x02\r\x19\x02\x0E\x1B\x02\x0F" + "\x1D\x02\x10\x1F\x02\x11!\x02\x12#\x02\x13%\x02\x14\'\x02\x15)\x02\x16" + "+\x02\x17-\x02\x18/\x02\x191\x02\x1A3\x02\x1B5\x02\x1C\x03\x02\x05\x03" + "\x022;\x05\x02\v\f\x0F\x0F\"\"\x03\x02^^\x02z\x02\x03\x03\x02\x02\x02" + "\x02\x05\x03\x02\x02\x02\x02\x07\x03\x02\x02\x02\x02\t\x03\x02\x02\x02" + "\x02\v\x03\x02\x02\x02\x02\r\x03\x02\x02\x02\x02\x0F\x03\x02\x02\x02\x02" + "\x11\x03\x02\x02\x02\x02\x13\x03\x02\x02\x02\x02\x15\x03\x02\x02\x02\x02" + "\x17\x03\x02\x02\x02\x02\x19\x03\x02\x02\x02\x02\x1B\x03\x02\x02\x02\x02" + "\x1D\x03\x02\x02\x02\x02\x1F\x03\x02\x02\x02\x02!\x03\x02\x02\x02\x02" + "#\x03\x02\x02\x02\x02%\x03\x02\x02\x02\x02\'\x03\x02\x02\x02\x02)\x03" + "\x02\x02\x02\x02+\x03\x02\x02\x02\x02-\x03\x02\x02\x02\x02/\x03\x02\x02" + "\x02\x021\x03\x02\x02\x02\x023\x03\x02\x02\x02\x025\x03\x02\x02\x02\x03" + "7\x03\x02\x02\x02\x05:\x03\x02\x02\x02\x07=\x03\x02\x02\x02\t@\x03\x02" + "\x02\x02\vC\x03\x02\x02\x02\rF\x03\x02\x02\x02\x0FH\x03\x02\x02\x02\x11" + "J\x03\x02\x02\x02\x13L\x03\x02\x02\x02\x15N\x03\x02\x02\x02\x17P\x03\x02" + "\x02\x02\x19R\x03\x02\x02\x02\x1BT\x03\x02\x02\x02\x1DV\x03\x02\x02\x02" + "\x1FY\x03\x02\x02\x02!\\\x03\x02\x02\x02#^\x03\x02\x02\x02%`\x03\x02\x02" + "\x02\'d\x03\x02\x02\x02)h\x03\x02\x02\x02+j\x03\x02\x02\x02-l\x03\x02" + "\x02\x02/n\x03\x02\x02\x021p\x03\x02\x02\x023s\x03\x02\x02\x025w\x03\x02" + "\x02\x0278\x07^\x02\x0289\x07^\x02\x029\x04\x03\x02\x02\x02:;\x07^\x02" + "\x02;<\x07]\x02\x02<\x06\x03\x02\x02\x02=>\x07^\x02\x02>?\x07_\x02\x02" + "?\b\x03\x02\x02\x02@A\x07^\x02\x02AB\x07}\x02\x02B\n\x03\x02\x02\x02C" + "D\x07^\x02\x02DE\x07\x7F\x02\x02E\f\x03\x02\x02\x02FG\x07*\x02\x02G\x0E" + "\x03\x02\x02\x02HI\x07+\x02\x02I\x10\x03\x02\x02\x02JK\x07$\x02\x02K\x12" + "\x03\x02\x02\x02LM\x07,\x02\x02M\x14\x03\x02\x02\x02NO\x071\x02\x02O\x16" + "\x03\x02\x02\x02PQ\x07-\x02\x02Q\x18\x03\x02\x02\x02RS\x07/\x02\x02S\x1A" + "\x03\x02\x02\x02TU\x07?\x02\x02U\x1C\x03\x02\x02\x02VW\x07?\x02\x02WX" + "\x07?\x02\x02X\x1E\x03\x02\x02\x02YZ\x07#\x02\x02Z[\x07?\x02\x02[ \x03" + "\x02\x02\x02\\]\x07=\x02\x02]\"\x03\x02\x02\x02^_\x07.\x02\x02_$\x03\x02" + "\x02\x02`a\x07^\x02\x02ab\x07$\x02\x02b&\x03\x02\x02\x02ce\t\x02\x02\x02" + "dc\x03\x02\x02\x02ef\x03\x02\x02\x02fd\x03\x02\x02\x02fg\x03\x02\x02\x02" + "g(\x03\x02\x02\x02hi\x07<\x02\x02i*\x03\x02\x02\x02jk\x07}\x02\x02k,\x03" + "\x02\x02\x02lm\x07\x7F\x02\x02m.\x03\x02\x02\x02no\x07]\x02\x02o0\x03" + "\x02\x02\x02pq\x07_\x02\x02q2\x03\x02\x02\x02rt\t\x03\x02\x02sr\x03\x02" + "\x02\x02tu\x03\x02\x02\x02us\x03\x02\x02\x02uv\x03\x02\x02\x02v4\x03\x02" + "\x02\x02wx\n\x04\x02\x02x6\x03\x02\x02\x02\x05\x02fu\x02";
 
 },{"antlr4ts/Lexer":25,"antlr4ts/VocabularyImpl":48,"antlr4ts/atn/ATNDeserializer":54,"antlr4ts/atn/LexerATNSimulator":75,"antlr4ts/misc/Utils":136}],3:[function(require,module,exports){
 "use strict";
@@ -1176,7 +1304,7 @@ cyoaeLexer._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC24
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.String_content_Context = exports.Number_Context = exports.Word_Context = exports.Ws_Context = exports.Statement_Context = exports.Expression_Context = exports.Identifier_Context = exports.Code_Context = exports.Escaped_text_Context = exports.Tag_Context = exports.Attribute_Context = exports.Plain_text_Context = exports.Rich_text_Context = exports.Start_Context = exports.cyoaeParser = void 0;
+exports.Case_code_Context = exports.String_content_Context = exports.Number_Context = exports.Word_Context = exports.Ws_Context = exports.Statement_Context = exports.Comparator_Context = exports.Expression_Context = exports.Identifier_Context = exports.Code_Context = exports.Escaped_text_Context = exports.Tag_Context = exports.Attribute_Context = exports.Attribute_name_Context = exports.Plain_text_Context = exports.Rich_text_Context = exports.Start_Context = exports.cyoaeParser = void 0;
 
 var _ATN = require("antlr4ts/atn/ATN");
 
@@ -1248,9 +1376,9 @@ class cyoaeParser extends _Parser.Parser {
     try {
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 28;
-        this.rich_text_();
-        this.state = 30;
+        this.state = 34;
+        _localctx._rich_text = this.rich_text_();
+        this.state = 36;
 
         this._errHandler.sync(this);
 
@@ -1258,12 +1386,12 @@ class cyoaeParser extends _Parser.Parser {
 
         if (_la === cyoaeParser.WS) {
           {
-            this.state = 29;
+            this.state = 35;
             this.ws_();
           }
         }
 
-        this.state = 32;
+        this.state = 38;
         this.match(cyoaeParser.EOF);
       }
     } catch (re) {
@@ -1294,7 +1422,7 @@ class cyoaeParser extends _Parser.Parser {
 
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 40;
+        this.state = 46;
 
         this._errHandler.sync(this);
 
@@ -1303,35 +1431,35 @@ class cyoaeParser extends _Parser.Parser {
         while (_alt !== 2 && _alt !== _ATN.ATN.INVALID_ALT_NUMBER) {
           if (_alt === 1) {
             {
-              this.state = 38;
+              this.state = 44;
 
               this._errHandler.sync(this);
 
               switch (this.interpreter.adaptivePredict(this._input, 1, this._ctx)) {
                 case 1:
                   {
-                    this.state = 34;
+                    this.state = 40;
                     this.plain_text_();
                   }
                   break;
 
                 case 2:
                   {
-                    this.state = 35;
+                    this.state = 41;
                     this.tag_();
                   }
                   break;
 
                 case 3:
                   {
-                    this.state = 36;
+                    this.state = 42;
                     this.code_();
                   }
                   break;
 
                 case 4:
                   {
-                    this.state = 37;
+                    this.state = 43;
                     this.number_();
                   }
                   break;
@@ -1339,7 +1467,7 @@ class cyoaeParser extends _Parser.Parser {
             }
           }
 
-          this.state = 42;
+          this.state = 48;
 
           this._errHandler.sync(this);
 
@@ -1374,7 +1502,7 @@ class cyoaeParser extends _Parser.Parser {
 
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 46;
+        this.state = 52;
 
         this._errHandler.sync(this);
 
@@ -1384,23 +1512,27 @@ class cyoaeParser extends _Parser.Parser {
           switch (_alt) {
             case 1:
               {
-                this.state = 46;
+                this.state = 52;
 
                 this._errHandler.sync(this);
 
                 switch (this._input.LA(1)) {
+                  case cyoaeParser.T__0:
+                  case cyoaeParser.T__1:
+                  case cyoaeParser.T__2:
+                  case cyoaeParser.T__3:
+                  case cyoaeParser.T__4:
+                    {
+                      this.state = 49;
+                      _localctx._escapes = this.escaped_text_();
+                    }
+                    break;
+
                   case cyoaeParser.T__5:
                   case cyoaeParser.T__6:
                   case cyoaeParser.T__7:
                   case cyoaeParser.T__8:
                   case cyoaeParser.T__9:
-                    {
-                      this.state = 43;
-                      _localctx._escapes = this.escaped_text_();
-                    }
-                    break;
-
-                  case cyoaeParser.T__1:
                   case cyoaeParser.T__10:
                   case cyoaeParser.T__11:
                   case cyoaeParser.T__12:
@@ -1408,18 +1540,17 @@ class cyoaeParser extends _Parser.Parser {
                   case cyoaeParser.T__14:
                   case cyoaeParser.T__15:
                   case cyoaeParser.T__16:
-                  case cyoaeParser.T__17:
-                  case cyoaeParser.T__18:
+                  case cyoaeParser.COLON:
                   case cyoaeParser.WORDCHARACTER:
                     {
-                      this.state = 44;
+                      this.state = 50;
                       _localctx._word = this.word_();
                     }
                     break;
 
                   case cyoaeParser.WS:
                     {
-                      this.state = 45;
+                      this.state = 51;
                       _localctx._ws = this.ws_();
                     }
                     break;
@@ -1434,7 +1565,7 @@ class cyoaeParser extends _Parser.Parser {
               throw new _NoViableAltException.NoViableAltException(this);
           }
 
-          this.state = 48;
+          this.state = 54;
 
           this._errHandler.sync(this);
 
@@ -1459,51 +1590,67 @@ class cyoaeParser extends _Parser.Parser {
   } // @RuleVersion(0)
 
 
-  attribute_() {
-    let _localctx = new Attribute_Context(this._ctx, this.state);
+  attribute_name_() {
+    let _localctx = new Attribute_name_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 6, cyoaeParser.RULE_attribute_);
+    this.enterRule(_localctx, 6, cyoaeParser.RULE_attribute_name_);
 
     let _la;
 
     try {
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 50;
-        this.match(cyoaeParser.T__0);
-        this.state = 52;
+        this.state = 57;
 
         this._errHandler.sync(this);
 
         _la = this._input.LA(1);
 
-        if (_la === cyoaeParser.WS) {
+        do {
           {
-            this.state = 51;
-            this.ws_();
+            {
+              this.state = 56;
+              this.match(cyoaeParser.WORDCHARACTER);
+            }
           }
-        }
+          this.state = 59;
 
-        this.state = 54;
-        _localctx._attribute_name = this.word_();
-        this.state = 56;
+          this._errHandler.sync(this);
 
-        this._errHandler.sync(this);
+          _la = this._input.LA(1);
+        } while (_la === cyoaeParser.WORDCHARACTER);
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
 
-        _la = this._input.LA(1);
+        this._errHandler.reportError(this, re);
 
-        if (_la === cyoaeParser.WS) {
-          {
-            this.state = 55;
-            this.ws_();
-          }
-        }
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
 
-        this.state = 58;
-        this.match(cyoaeParser.T__1);
-        this.state = 59;
-        _localctx._attribute_value = this.rich_text_();
+    return _localctx;
+  } // @RuleVersion(0)
+
+
+  attribute_() {
+    let _localctx = new Attribute_Context(this._ctx, this.state);
+
+    this.enterRule(_localctx, 8, cyoaeParser.RULE_attribute_);
+
+    let _la;
+
+    try {
+      this.enterOuterAlt(_localctx, 1);
+      {
         this.state = 61;
+        this.match(cyoaeParser.ATTRIBUTE_OPEN);
+        this.state = 63;
 
         this._errHandler.sync(this);
 
@@ -1511,13 +1658,45 @@ class cyoaeParser extends _Parser.Parser {
 
         if (_la === cyoaeParser.WS) {
           {
-            this.state = 60;
-            this.ws_();
+            this.state = 62;
+            this.match(cyoaeParser.WS);
           }
         }
 
-        this.state = 63;
-        this.match(cyoaeParser.T__2);
+        this.state = 65;
+        _localctx._attribute_name = this.attribute_name_();
+        this.state = 67;
+
+        this._errHandler.sync(this);
+
+        _la = this._input.LA(1);
+
+        if (_la === cyoaeParser.WS) {
+          {
+            this.state = 66;
+            this.match(cyoaeParser.WS);
+          }
+        }
+
+        this.state = 69;
+        this.match(cyoaeParser.COLON);
+        this.state = 70;
+        _localctx._attribute_value = this.rich_text_();
+        this.state = 72;
+
+        this._errHandler.sync(this);
+
+        _la = this._input.LA(1);
+
+        if (_la === cyoaeParser.WS) {
+          {
+            this.state = 71;
+            this.match(cyoaeParser.WS);
+          }
+        }
+
+        this.state = 74;
+        this.match(cyoaeParser.ATTRIBUTE_CLOSE);
       }
     } catch (re) {
       if (re instanceof _RecognitionException.RecognitionException) {
@@ -1540,16 +1719,16 @@ class cyoaeParser extends _Parser.Parser {
   tag_() {
     let _localctx = new Tag_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 8, cyoaeParser.RULE_tag_);
+    this.enterRule(_localctx, 10, cyoaeParser.RULE_tag_);
 
     let _la;
 
     try {
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 65;
-        this.match(cyoaeParser.T__3);
-        this.state = 67;
+        this.state = 76;
+        this.match(cyoaeParser.TAG_OPEN);
+        this.state = 78;
 
         this._errHandler.sync(this);
 
@@ -1557,40 +1736,40 @@ class cyoaeParser extends _Parser.Parser {
 
         if (_la === cyoaeParser.WS) {
           {
-            this.state = 66;
-            this.ws_();
+            this.state = 77;
+            this.match(cyoaeParser.WS);
           }
         }
 
-        this.state = 69;
+        this.state = 80;
         _localctx._tag_name = this.word_();
-        this.state = 71;
+        this.state = 82;
 
         this._errHandler.sync(this);
 
-        switch (this.interpreter.adaptivePredict(this._input, 9, this._ctx)) {
+        switch (this.interpreter.adaptivePredict(this._input, 10, this._ctx)) {
           case 1:
             {
-              this.state = 70;
-              this.ws_();
+              this.state = 81;
+              this.match(cyoaeParser.WS);
             }
             break;
         }
 
-        this.state = 73;
+        this.state = 84;
         _localctx._default_value = this.rich_text_();
-        this.state = 80;
+        this.state = 91;
 
         this._errHandler.sync(this);
 
         _la = this._input.LA(1);
 
-        while (_la === cyoaeParser.T__0) {
+        while (_la === cyoaeParser.ATTRIBUTE_OPEN) {
           {
             {
-              this.state = 74;
+              this.state = 85;
               _localctx._attribute = this.attribute_();
-              this.state = 76;
+              this.state = 87;
 
               this._errHandler.sync(this);
 
@@ -1598,21 +1777,21 @@ class cyoaeParser extends _Parser.Parser {
 
               if (_la === cyoaeParser.WS) {
                 {
-                  this.state = 75;
-                  this.ws_();
+                  this.state = 86;
+                  this.match(cyoaeParser.WS);
                 }
               }
             }
           }
-          this.state = 82;
+          this.state = 93;
 
           this._errHandler.sync(this);
 
           _la = this._input.LA(1);
         }
 
-        this.state = 83;
-        this.match(cyoaeParser.T__4);
+        this.state = 94;
+        this.match(cyoaeParser.TAG_CLOSE);
       }
     } catch (re) {
       if (re instanceof _RecognitionException.RecognitionException) {
@@ -1635,17 +1814,17 @@ class cyoaeParser extends _Parser.Parser {
   escaped_text_() {
     let _localctx = new Escaped_text_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 10, cyoaeParser.RULE_escaped_text_);
+    this.enterRule(_localctx, 12, cyoaeParser.RULE_escaped_text_);
 
     let _la;
 
     try {
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 85;
+        this.state = 96;
         _la = this._input.LA(1);
 
-        if (!((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__5 | 1 << cyoaeParser.T__6 | 1 << cyoaeParser.T__7 | 1 << cyoaeParser.T__8 | 1 << cyoaeParser.T__9)) !== 0)) {
+        if (!((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__0 | 1 << cyoaeParser.T__1 | 1 << cyoaeParser.T__2 | 1 << cyoaeParser.T__3 | 1 << cyoaeParser.T__4)) !== 0)) {
           this._errHandler.recoverInline(this);
         } else {
           if (this._input.LA(1) === _Token.Token.EOF) {
@@ -1678,7 +1857,7 @@ class cyoaeParser extends _Parser.Parser {
   code_() {
     let _localctx = new Code_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 12, cyoaeParser.RULE_code_);
+    this.enterRule(_localctx, 14, cyoaeParser.RULE_code_);
 
     let _la;
 
@@ -1687,60 +1866,60 @@ class cyoaeParser extends _Parser.Parser {
 
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 87;
-        this.match(cyoaeParser.T__0);
-        this.state = 89;
+        this.state = 98;
+        this.match(cyoaeParser.ATTRIBUTE_OPEN);
+        this.state = 100;
 
         this._errHandler.sync(this);
 
-        switch (this.interpreter.adaptivePredict(this._input, 12, this._ctx)) {
+        switch (this.interpreter.adaptivePredict(this._input, 13, this._ctx)) {
           case 1:
             {
-              this.state = 88;
-              this.ws_();
+              this.state = 99;
+              this.match(cyoaeParser.WS);
             }
             break;
         }
 
-        this.state = 94;
+        this.state = 105;
 
         this._errHandler.sync(this);
 
-        _alt = this.interpreter.adaptivePredict(this._input, 13, this._ctx);
+        _alt = this.interpreter.adaptivePredict(this._input, 14, this._ctx);
 
         while (_alt !== 2 && _alt !== _ATN.ATN.INVALID_ALT_NUMBER) {
           if (_alt === 1) {
             {
               {
-                this.state = 91;
+                this.state = 102;
                 this.statement_();
               }
             }
           }
 
-          this.state = 96;
+          this.state = 107;
 
           this._errHandler.sync(this);
 
-          _alt = this.interpreter.adaptivePredict(this._input, 13, this._ctx);
+          _alt = this.interpreter.adaptivePredict(this._input, 14, this._ctx);
         }
 
-        this.state = 98;
+        this.state = 109;
 
         this._errHandler.sync(this);
 
-        _la = this._input.LA(1);
-
-        if (_la === cyoaeParser.WS) {
-          {
-            this.state = 97;
-            this.ws_();
-          }
+        switch (this.interpreter.adaptivePredict(this._input, 15, this._ctx)) {
+          case 1:
+            {
+              this.state = 108;
+              this.match(cyoaeParser.WS);
+            }
+            break;
         }
 
-        this.state = 100;
+        this.state = 111;
         this.expression_(0);
-        this.state = 102;
+        this.state = 113;
 
         this._errHandler.sync(this);
 
@@ -1748,13 +1927,13 @@ class cyoaeParser extends _Parser.Parser {
 
         if (_la === cyoaeParser.WS) {
           {
-            this.state = 101;
-            this.ws_();
+            this.state = 112;
+            this.match(cyoaeParser.WS);
           }
         }
 
-        this.state = 104;
-        this.match(cyoaeParser.T__2);
+        this.state = 115;
+        this.match(cyoaeParser.ATTRIBUTE_CLOSE);
       }
     } catch (re) {
       if (re instanceof _RecognitionException.RecognitionException) {
@@ -1777,7 +1956,7 @@ class cyoaeParser extends _Parser.Parser {
   identifier_() {
     let _localctx = new Identifier_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 14, cyoaeParser.RULE_identifier_);
+    this.enterRule(_localctx, 16, cyoaeParser.RULE_identifier_);
 
     let _la;
 
@@ -1786,19 +1965,19 @@ class cyoaeParser extends _Parser.Parser {
 
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 106;
+        this.state = 117;
         this.match(cyoaeParser.WORDCHARACTER);
-        this.state = 110;
+        this.state = 121;
 
         this._errHandler.sync(this);
 
-        _alt = this.interpreter.adaptivePredict(this._input, 16, this._ctx);
+        _alt = this.interpreter.adaptivePredict(this._input, 17, this._ctx);
 
         while (_alt !== 2 && _alt !== _ATN.ATN.INVALID_ALT_NUMBER) {
           if (_alt === 1) {
             {
               {
-                this.state = 107;
+                this.state = 118;
                 _la = this._input.LA(1);
 
                 if (!(_la === cyoaeParser.NUMBER || _la === cyoaeParser.WORDCHARACTER)) {
@@ -1816,11 +1995,11 @@ class cyoaeParser extends _Parser.Parser {
             }
           }
 
-          this.state = 112;
+          this.state = 123;
 
           this._errHandler.sync(this);
 
-          _alt = this.interpreter.adaptivePredict(this._input, 16, this._ctx);
+          _alt = this.interpreter.adaptivePredict(this._input, 17, this._ctx);
         }
       }
     } catch (re) {
@@ -1852,8 +2031,8 @@ class cyoaeParser extends _Parser.Parser {
     let _localctx = new Expression_Context(this._ctx, _parentState);
 
     let _prevctx = _localctx;
-    let _startState = 16;
-    this.enterRecursionRule(_localctx, 16, cyoaeParser.RULE_expression_, _p);
+    let _startState = 18;
+    this.enterRecursionRule(_localctx, 18, cyoaeParser.RULE_expression_, _p);
 
     let _la;
 
@@ -1862,93 +2041,73 @@ class cyoaeParser extends _Parser.Parser {
 
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 140;
+        this.state = 150;
 
         this._errHandler.sync(this);
 
         switch (this.interpreter.adaptivePredict(this._input, 21, this._ctx)) {
           case 1:
             {
-              this.state = 114;
-              this.match(cyoaeParser.T__10);
-              this.state = 116;
-
-              this._errHandler.sync(this);
-
-              _la = this._input.LA(1);
-
-              if (_la === cyoaeParser.WS) {
-                {
-                  this.state = 115;
-                  this.ws_();
-                }
-              }
-
-              this.state = 118;
+              this.state = 125;
+              this.match(cyoaeParser.WS);
+              this.state = 126;
               _localctx._expression = this.expression_(0);
-              this.state = 120;
+              this.state = 128;
 
               this._errHandler.sync(this);
 
-              _la = this._input.LA(1);
-
-              if (_la === cyoaeParser.WS) {
-                {
-                  this.state = 119;
-                  this.ws_();
-                }
+              switch (this.interpreter.adaptivePredict(this._input, 18, this._ctx)) {
+                case 1:
+                  {
+                    this.state = 127;
+                    this.match(cyoaeParser.WS);
+                  }
+                  break;
               }
-
-              this.state = 122;
-              this.match(cyoaeParser.T__11);
             }
             break;
 
           case 2:
             {
-              this.state = 124;
-              _localctx._identifier = this.identifier_();
+              this.state = 130;
+              this.match(cyoaeParser.T__5);
+              this.state = 131;
+              _localctx._expression = this.expression_(0);
+              this.state = 132;
+              this.match(cyoaeParser.T__6);
             }
             break;
 
           case 3:
             {
-              this.state = 125;
-              _localctx._number = this.number_();
+              this.state = 134;
+              _localctx._identifier = this.identifier_();
             }
             break;
 
           case 4:
             {
-              this.state = 126;
-              this.match(cyoaeParser.T__12);
-              this.state = 127;
-              _localctx._string = this.string_content_();
-              this.state = 128;
-              this.match(cyoaeParser.T__12);
+              this.state = 135;
+              _localctx._number = this.number_();
             }
             break;
 
           case 5:
             {
-              this.state = 130;
-              _localctx._identifier = this.identifier_();
-              this.state = 132;
-
-              this._errHandler.sync(this);
-
-              _la = this._input.LA(1);
-
-              if (_la === cyoaeParser.WS) {
-                {
-                  this.state = 131;
-                  this.ws_();
-                }
-              }
-
-              this.state = 134;
-              _localctx._operator = this.match(cyoaeParser.T__17);
               this.state = 136;
+              this.match(cyoaeParser.T__7);
+              this.state = 137;
+              _localctx._string = this.string_content_();
+              this.state = 138;
+              this.match(cyoaeParser.T__7);
+            }
+            break;
+
+          case 6:
+            {
+              this.state = 140;
+              _localctx._identifier = this.identifier_();
+              this.state = 142;
 
               this._errHandler.sync(this);
 
@@ -1956,23 +2115,38 @@ class cyoaeParser extends _Parser.Parser {
 
               if (_la === cyoaeParser.WS) {
                 {
-                  this.state = 135;
-                  this.ws_();
+                  this.state = 141;
+                  this.match(cyoaeParser.WS);
                 }
               }
 
-              this.state = 138;
+              this.state = 144;
+              _localctx._operator = this.match(cyoaeParser.T__12);
+              this.state = 146;
+
+              this._errHandler.sync(this);
+
+              switch (this.interpreter.adaptivePredict(this._input, 20, this._ctx)) {
+                case 1:
+                  {
+                    this.state = 145;
+                    this.match(cyoaeParser.WS);
+                  }
+                  break;
+              }
+
+              this.state = 148;
               _localctx._expression = this.expression_(1);
             }
             break;
         }
 
         this._ctx._stop = this._input.tryLT(-1);
-        this.state = 162;
+        this.state = 182;
 
         this._errHandler.sync(this);
 
-        _alt = this.interpreter.adaptivePredict(this._input, 27, this._ctx);
+        _alt = this.interpreter.adaptivePredict(this._input, 29, this._ctx);
 
         while (_alt !== 2 && _alt !== _ATN.ATN.INVALID_ALT_NUMBER) {
           if (_alt === 1) {
@@ -1982,23 +2156,23 @@ class cyoaeParser extends _Parser.Parser {
 
             _prevctx = _localctx;
             {
-              this.state = 160;
+              this.state = 180;
 
               this._errHandler.sync(this);
 
-              switch (this.interpreter.adaptivePredict(this._input, 26, this._ctx)) {
+              switch (this.interpreter.adaptivePredict(this._input, 28, this._ctx)) {
                 case 1:
                   {
                     _localctx = new Expression_Context(_parentctx, _parentState);
                     _localctx._left_expression = _prevctx;
                     this.pushNewRecursionContext(_localctx, _startState, cyoaeParser.RULE_expression_);
-                    this.state = 142;
+                    this.state = 152;
 
-                    if (!this.precpred(this._ctx, 3)) {
-                      throw this.createFailedPredicateException("this.precpred(this._ctx, 3)");
+                    if (!this.precpred(this._ctx, 4)) {
+                      throw this.createFailedPredicateException("this.precpred(this._ctx, 4)");
                     }
 
-                    this.state = 144;
+                    this.state = 154;
 
                     this._errHandler.sync(this);
 
@@ -2006,16 +2180,16 @@ class cyoaeParser extends _Parser.Parser {
 
                     if (_la === cyoaeParser.WS) {
                       {
-                        this.state = 143;
-                        this.ws_();
+                        this.state = 153;
+                        this.match(cyoaeParser.WS);
                       }
                     }
 
-                    this.state = 146;
+                    this.state = 156;
                     _localctx._operator = this._input.LT(1);
                     _la = this._input.LA(1);
 
-                    if (!(_la === cyoaeParser.T__13 || _la === cyoaeParser.T__14)) {
+                    if (!(_la === cyoaeParser.T__8 || _la === cyoaeParser.T__9)) {
                       _localctx._operator = this._errHandler.recoverInline(this);
                     } else {
                       if (this._input.LA(1) === _Token.Token.EOF) {
@@ -2027,21 +2201,21 @@ class cyoaeParser extends _Parser.Parser {
                       this.consume();
                     }
 
-                    this.state = 148;
+                    this.state = 158;
 
                     this._errHandler.sync(this);
 
-                    _la = this._input.LA(1);
-
-                    if (_la === cyoaeParser.WS) {
-                      {
-                        this.state = 147;
-                        this.ws_();
-                      }
+                    switch (this.interpreter.adaptivePredict(this._input, 23, this._ctx)) {
+                      case 1:
+                        {
+                          this.state = 157;
+                          this.match(cyoaeParser.WS);
+                        }
+                        break;
                     }
 
-                    this.state = 150;
-                    _localctx._right_expression = this.expression_(4);
+                    this.state = 160;
+                    _localctx._right_expression = this.expression_(5);
                   }
                   break;
 
@@ -2050,13 +2224,13 @@ class cyoaeParser extends _Parser.Parser {
                     _localctx = new Expression_Context(_parentctx, _parentState);
                     _localctx._left_expression = _prevctx;
                     this.pushNewRecursionContext(_localctx, _startState, cyoaeParser.RULE_expression_);
-                    this.state = 151;
+                    this.state = 161;
 
-                    if (!this.precpred(this._ctx, 2)) {
-                      throw this.createFailedPredicateException("this.precpred(this._ctx, 2)");
+                    if (!this.precpred(this._ctx, 3)) {
+                      throw this.createFailedPredicateException("this.precpred(this._ctx, 3)");
                     }
 
-                    this.state = 153;
+                    this.state = 163;
 
                     this._errHandler.sync(this);
 
@@ -2064,16 +2238,16 @@ class cyoaeParser extends _Parser.Parser {
 
                     if (_la === cyoaeParser.WS) {
                       {
-                        this.state = 152;
-                        this.ws_();
+                        this.state = 162;
+                        this.match(cyoaeParser.WS);
                       }
                     }
 
-                    this.state = 155;
+                    this.state = 165;
                     _localctx._operator = this._input.LT(1);
                     _la = this._input.LA(1);
 
-                    if (!(_la === cyoaeParser.T__15 || _la === cyoaeParser.T__16)) {
+                    if (!(_la === cyoaeParser.T__10 || _la === cyoaeParser.T__11)) {
                       _localctx._operator = this._errHandler.recoverInline(this);
                     } else {
                       if (this._input.LA(1) === _Token.Token.EOF) {
@@ -2085,7 +2259,36 @@ class cyoaeParser extends _Parser.Parser {
                       this.consume();
                     }
 
-                    this.state = 157;
+                    this.state = 167;
+
+                    this._errHandler.sync(this);
+
+                    switch (this.interpreter.adaptivePredict(this._input, 25, this._ctx)) {
+                      case 1:
+                        {
+                          this.state = 166;
+                          this.match(cyoaeParser.WS);
+                        }
+                        break;
+                    }
+
+                    this.state = 169;
+                    _localctx._right_expression = this.expression_(4);
+                  }
+                  break;
+
+                case 3:
+                  {
+                    _localctx = new Expression_Context(_parentctx, _parentState);
+                    _localctx._left_expression = _prevctx;
+                    this.pushNewRecursionContext(_localctx, _startState, cyoaeParser.RULE_expression_);
+                    this.state = 170;
+
+                    if (!this.precpred(this._ctx, 2)) {
+                      throw this.createFailedPredicateException("this.precpred(this._ctx, 2)");
+                    }
+
+                    this.state = 172;
 
                     this._errHandler.sync(this);
 
@@ -2093,12 +2296,27 @@ class cyoaeParser extends _Parser.Parser {
 
                     if (_la === cyoaeParser.WS) {
                       {
-                        this.state = 156;
-                        this.ws_();
+                        this.state = 171;
+                        this.match(cyoaeParser.WS);
                       }
                     }
 
-                    this.state = 159;
+                    this.state = 174;
+                    _localctx._comparator = this.comparator_();
+                    this.state = 176;
+
+                    this._errHandler.sync(this);
+
+                    switch (this.interpreter.adaptivePredict(this._input, 27, this._ctx)) {
+                      case 1:
+                        {
+                          this.state = 175;
+                          this.match(cyoaeParser.WS);
+                        }
+                        break;
+                    }
+
+                    this.state = 178;
                     _localctx._right_expression = this.expression_(3);
                   }
                   break;
@@ -2106,11 +2324,11 @@ class cyoaeParser extends _Parser.Parser {
             }
           }
 
-          this.state = 164;
+          this.state = 184;
 
           this._errHandler.sync(this);
 
-          _alt = this.interpreter.adaptivePredict(this._input, 27, this._ctx);
+          _alt = this.interpreter.adaptivePredict(this._input, 29, this._ctx);
         }
       }
     } catch (re) {
@@ -2131,18 +2349,61 @@ class cyoaeParser extends _Parser.Parser {
   } // @RuleVersion(0)
 
 
-  statement_() {
-    let _localctx = new Statement_Context(this._ctx, this.state);
+  comparator_() {
+    let _localctx = new Comparator_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 18, cyoaeParser.RULE_statement_);
+    this.enterRule(_localctx, 20, cyoaeParser.RULE_comparator_);
+
+    let _la;
 
     try {
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 165;
+        this.state = 185;
+        _la = this._input.LA(1);
+
+        if (!(_la === cyoaeParser.T__13 || _la === cyoaeParser.T__14)) {
+          this._errHandler.recoverInline(this);
+        } else {
+          if (this._input.LA(1) === _Token.Token.EOF) {
+            this.matchedEOF = true;
+          }
+
+          this._errHandler.reportMatch(this);
+
+          this.consume();
+        }
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
+  } // @RuleVersion(0)
+
+
+  statement_() {
+    let _localctx = new Statement_Context(this._ctx, this.state);
+
+    this.enterRule(_localctx, 22, cyoaeParser.RULE_statement_);
+
+    try {
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 187;
         _localctx._expression = this.expression_(0);
-        this.state = 166;
-        this.match(cyoaeParser.T__18);
+        this.state = 188;
+        this.match(cyoaeParser.T__15);
       }
     } catch (re) {
       if (re instanceof _RecognitionException.RecognitionException) {
@@ -2165,12 +2426,12 @@ class cyoaeParser extends _Parser.Parser {
   ws_() {
     let _localctx = new Ws_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 20, cyoaeParser.RULE_ws_);
+    this.enterRule(_localctx, 24, cyoaeParser.RULE_ws_);
 
     try {
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 168;
+        this.state = 190;
         this.match(cyoaeParser.WS);
       }
     } catch (re) {
@@ -2194,7 +2455,7 @@ class cyoaeParser extends _Parser.Parser {
   word_() {
     let _localctx = new Word_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 22, cyoaeParser.RULE_word_);
+    this.enterRule(_localctx, 26, cyoaeParser.RULE_word_);
 
     let _la;
 
@@ -2203,7 +2464,7 @@ class cyoaeParser extends _Parser.Parser {
 
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 171;
+        this.state = 193;
 
         this._errHandler.sync(this);
 
@@ -2214,10 +2475,10 @@ class cyoaeParser extends _Parser.Parser {
             case 1:
               {
                 {
-                  this.state = 170;
+                  this.state = 192;
                   _la = this._input.LA(1);
 
-                  if (!((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__1 | 1 << cyoaeParser.T__10 | 1 << cyoaeParser.T__11 | 1 << cyoaeParser.T__12 | 1 << cyoaeParser.T__13 | 1 << cyoaeParser.T__14 | 1 << cyoaeParser.T__15 | 1 << cyoaeParser.T__16 | 1 << cyoaeParser.T__17 | 1 << cyoaeParser.T__18 | 1 << cyoaeParser.WORDCHARACTER)) !== 0)) {
+                  if (!((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__5 | 1 << cyoaeParser.T__6 | 1 << cyoaeParser.T__7 | 1 << cyoaeParser.T__8 | 1 << cyoaeParser.T__9 | 1 << cyoaeParser.T__10 | 1 << cyoaeParser.T__11 | 1 << cyoaeParser.T__12 | 1 << cyoaeParser.T__13 | 1 << cyoaeParser.T__14 | 1 << cyoaeParser.T__15 | 1 << cyoaeParser.T__16 | 1 << cyoaeParser.COLON | 1 << cyoaeParser.WORDCHARACTER)) !== 0)) {
                     this._errHandler.recoverInline(this);
                   } else {
                     if (this._input.LA(1) === _Token.Token.EOF) {
@@ -2236,11 +2497,11 @@ class cyoaeParser extends _Parser.Parser {
               throw new _NoViableAltException.NoViableAltException(this);
           }
 
-          this.state = 173;
+          this.state = 195;
 
           this._errHandler.sync(this);
 
-          _alt = this.interpreter.adaptivePredict(this._input, 28, this._ctx);
+          _alt = this.interpreter.adaptivePredict(this._input, 30, this._ctx);
         } while (_alt !== 2 && _alt !== _ATN.ATN.INVALID_ALT_NUMBER);
       }
     } catch (re) {
@@ -2264,25 +2525,25 @@ class cyoaeParser extends _Parser.Parser {
   number_() {
     let _localctx = new Number_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 24, cyoaeParser.RULE_number_);
+    this.enterRule(_localctx, 28, cyoaeParser.RULE_number_);
 
     let _la;
 
     try {
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 176;
+        this.state = 198;
 
         this._errHandler.sync(this);
 
         _la = this._input.LA(1);
 
-        if (_la === cyoaeParser.T__15 || _la === cyoaeParser.T__16) {
+        if (_la === cyoaeParser.T__10 || _la === cyoaeParser.T__11) {
           {
-            this.state = 175;
+            this.state = 197;
             _la = this._input.LA(1);
 
-            if (!(_la === cyoaeParser.T__15 || _la === cyoaeParser.T__16)) {
+            if (!(_la === cyoaeParser.T__10 || _la === cyoaeParser.T__11)) {
               this._errHandler.recoverInline(this);
             } else {
               if (this._input.LA(1) === _Token.Token.EOF) {
@@ -2296,7 +2557,7 @@ class cyoaeParser extends _Parser.Parser {
           }
         }
 
-        this.state = 178;
+        this.state = 200;
         this.match(cyoaeParser.NUMBER);
       }
     } catch (re) {
@@ -2320,32 +2581,32 @@ class cyoaeParser extends _Parser.Parser {
   string_content_() {
     let _localctx = new String_content_Context(this._ctx, this.state);
 
-    this.enterRule(_localctx, 26, cyoaeParser.RULE_string_content_);
+    this.enterRule(_localctx, 30, cyoaeParser.RULE_string_content_);
 
     let _la;
 
     try {
       this.enterOuterAlt(_localctx, 1);
       {
-        this.state = 184;
+        this.state = 206;
 
         this._errHandler.sync(this);
 
         _la = this._input.LA(1);
 
-        while ((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__0 | 1 << cyoaeParser.T__1 | 1 << cyoaeParser.T__2 | 1 << cyoaeParser.T__3 | 1 << cyoaeParser.T__4 | 1 << cyoaeParser.T__5 | 1 << cyoaeParser.T__6 | 1 << cyoaeParser.T__7 | 1 << cyoaeParser.T__8 | 1 << cyoaeParser.T__9 | 1 << cyoaeParser.T__10 | 1 << cyoaeParser.T__11 | 1 << cyoaeParser.T__13 | 1 << cyoaeParser.T__14 | 1 << cyoaeParser.T__15 | 1 << cyoaeParser.T__16 | 1 << cyoaeParser.T__17 | 1 << cyoaeParser.T__18 | 1 << cyoaeParser.T__19 | 1 << cyoaeParser.NUMBER | 1 << cyoaeParser.WORDCHARACTER | 1 << cyoaeParser.WS)) !== 0) {
+        while ((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__0 | 1 << cyoaeParser.T__1 | 1 << cyoaeParser.T__2 | 1 << cyoaeParser.T__3 | 1 << cyoaeParser.T__4 | 1 << cyoaeParser.T__5 | 1 << cyoaeParser.T__6 | 1 << cyoaeParser.T__8 | 1 << cyoaeParser.T__9 | 1 << cyoaeParser.T__10 | 1 << cyoaeParser.T__11 | 1 << cyoaeParser.T__12 | 1 << cyoaeParser.T__13 | 1 << cyoaeParser.T__14 | 1 << cyoaeParser.T__15 | 1 << cyoaeParser.T__16 | 1 << cyoaeParser.T__17 | 1 << cyoaeParser.NUMBER | 1 << cyoaeParser.COLON | 1 << cyoaeParser.ATTRIBUTE_OPEN | 1 << cyoaeParser.ATTRIBUTE_CLOSE | 1 << cyoaeParser.TAG_OPEN | 1 << cyoaeParser.TAG_CLOSE | 1 << cyoaeParser.WS | 1 << cyoaeParser.WORDCHARACTER)) !== 0) {
           {
-            this.state = 182;
+            this.state = 204;
 
             this._errHandler.sync(this);
 
-            switch (this.interpreter.adaptivePredict(this._input, 30, this._ctx)) {
+            switch (this.interpreter.adaptivePredict(this._input, 32, this._ctx)) {
               case 1:
                 {
-                  this.state = 180;
+                  this.state = 202;
                   _la = this._input.LA(1);
 
-                  if (_la <= 0 || _la === cyoaeParser.T__12) {
+                  if (_la <= 0 || _la === cyoaeParser.T__7) {
                     this._errHandler.recoverInline(this);
                   } else {
                     if (this._input.LA(1) === _Token.Token.EOF) {
@@ -2361,13 +2622,13 @@ class cyoaeParser extends _Parser.Parser {
 
               case 2:
                 {
-                  this.state = 181;
-                  this.match(cyoaeParser.T__19);
+                  this.state = 203;
+                  this.match(cyoaeParser.T__17);
                 }
                 break;
             }
           }
-          this.state = 186;
+          this.state = 208;
 
           this._errHandler.sync(this);
 
@@ -2389,11 +2650,87 @@ class cyoaeParser extends _Parser.Parser {
     }
 
     return _localctx;
+  } // @RuleVersion(0)
+
+
+  case_code_() {
+    let _localctx = new Case_code_Context(this._ctx, this.state);
+
+    this.enterRule(_localctx, 32, cyoaeParser.RULE_case_code_);
+
+    let _la;
+
+    try {
+      this.enterOuterAlt(_localctx, 1);
+      {
+        this.state = 210;
+
+        this._errHandler.sync(this);
+
+        _la = this._input.LA(1);
+
+        if ((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__5 | 1 << cyoaeParser.T__7 | 1 << cyoaeParser.T__10 | 1 << cyoaeParser.T__11 | 1 << cyoaeParser.NUMBER | 1 << cyoaeParser.WS | 1 << cyoaeParser.WORDCHARACTER)) !== 0) {
+          {
+            this.state = 209;
+            this.expression_(0);
+          }
+        }
+
+        this.state = 218;
+
+        this._errHandler.sync(this);
+
+        _la = this._input.LA(1);
+
+        while (_la === cyoaeParser.T__16) {
+          {
+            {
+              this.state = 212;
+              this.match(cyoaeParser.T__16);
+              this.state = 214;
+
+              this._errHandler.sync(this);
+
+              _la = this._input.LA(1);
+
+              if ((_la & ~0x1F) === 0 && (1 << _la & (1 << cyoaeParser.T__5 | 1 << cyoaeParser.T__7 | 1 << cyoaeParser.T__10 | 1 << cyoaeParser.T__11 | 1 << cyoaeParser.NUMBER | 1 << cyoaeParser.WS | 1 << cyoaeParser.WORDCHARACTER)) !== 0) {
+                {
+                  this.state = 213;
+                  this.expression_(0);
+                }
+              }
+            }
+          }
+          this.state = 220;
+
+          this._errHandler.sync(this);
+
+          _la = this._input.LA(1);
+        }
+
+        this.state = 221;
+        this.match(cyoaeParser.EOF);
+      }
+    } catch (re) {
+      if (re instanceof _RecognitionException.RecognitionException) {
+        _localctx.exception = re;
+
+        this._errHandler.reportError(this, re);
+
+        this._errHandler.recover(this, re);
+      } else {
+        throw re;
+      }
+    } finally {
+      this.exitRule();
+    }
+
+    return _localctx;
   }
 
   sempred(_localctx, ruleIndex, predIndex) {
     switch (ruleIndex) {
-      case 8:
+      case 9:
         return this.expression__sempred(_localctx, predIndex);
     }
 
@@ -2403,9 +2740,12 @@ class cyoaeParser extends _Parser.Parser {
   expression__sempred(_localctx, predIndex) {
     switch (predIndex) {
       case 0:
-        return this.precpred(this._ctx, 3);
+        return this.precpred(this._ctx, 4);
 
       case 1:
+        return this.precpred(this._ctx, 3);
+
+      case 2:
         return this.precpred(this._ctx, 2);
     }
 
@@ -2441,47 +2781,53 @@ cyoaeParser.T__14 = 15;
 cyoaeParser.T__15 = 16;
 cyoaeParser.T__16 = 17;
 cyoaeParser.T__17 = 18;
-cyoaeParser.T__18 = 19;
-cyoaeParser.T__19 = 20;
-cyoaeParser.NUMBER = 21;
-cyoaeParser.WORDCHARACTER = 22;
-cyoaeParser.WS = 23;
+cyoaeParser.NUMBER = 19;
+cyoaeParser.COLON = 20;
+cyoaeParser.ATTRIBUTE_OPEN = 21;
+cyoaeParser.ATTRIBUTE_CLOSE = 22;
+cyoaeParser.TAG_OPEN = 23;
+cyoaeParser.TAG_CLOSE = 24;
+cyoaeParser.WS = 25;
+cyoaeParser.WORDCHARACTER = 26;
 cyoaeParser.RULE_start_ = 0;
 cyoaeParser.RULE_rich_text_ = 1;
 cyoaeParser.RULE_plain_text_ = 2;
-cyoaeParser.RULE_attribute_ = 3;
-cyoaeParser.RULE_tag_ = 4;
-cyoaeParser.RULE_escaped_text_ = 5;
-cyoaeParser.RULE_code_ = 6;
-cyoaeParser.RULE_identifier_ = 7;
-cyoaeParser.RULE_expression_ = 8;
-cyoaeParser.RULE_statement_ = 9;
-cyoaeParser.RULE_ws_ = 10;
-cyoaeParser.RULE_word_ = 11;
-cyoaeParser.RULE_number_ = 12;
-cyoaeParser.RULE_string_content_ = 13; // tslint:disable:no-trailing-whitespace
+cyoaeParser.RULE_attribute_name_ = 3;
+cyoaeParser.RULE_attribute_ = 4;
+cyoaeParser.RULE_tag_ = 5;
+cyoaeParser.RULE_escaped_text_ = 6;
+cyoaeParser.RULE_code_ = 7;
+cyoaeParser.RULE_identifier_ = 8;
+cyoaeParser.RULE_expression_ = 9;
+cyoaeParser.RULE_comparator_ = 10;
+cyoaeParser.RULE_statement_ = 11;
+cyoaeParser.RULE_ws_ = 12;
+cyoaeParser.RULE_word_ = 13;
+cyoaeParser.RULE_number_ = 14;
+cyoaeParser.RULE_string_content_ = 15;
+cyoaeParser.RULE_case_code_ = 16; // tslint:disable:no-trailing-whitespace
 
-cyoaeParser.ruleNames = ["start_", "rich_text_", "plain_text_", "attribute_", "tag_", "escaped_text_", "code_", "identifier_", "expression_", "statement_", "ws_", "word_", "number_", "string_content_"];
-cyoaeParser._LITERAL_NAMES = [undefined, "'{'", "':'", "'}'", "'['", "']'", "'\\''", "'\\'", "'\\'", "'\\'", "'\\'", "'('", "')'", "'\"'", "'*'", "'/'", "'+'", "'-'", "'='", "';'", "'\\'"];
-cyoaeParser._SYMBOLIC_NAMES = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, "NUMBER", "WORDCHARACTER", "WS"];
+cyoaeParser.ruleNames = ["start_", "rich_text_", "plain_text_", "attribute_name_", "attribute_", "tag_", "escaped_text_", "code_", "identifier_", "expression_", "comparator_", "statement_", "ws_", "word_", "number_", "string_content_", "case_code_"];
+cyoaeParser._LITERAL_NAMES = [undefined, "'\\''", "'\\'", "'\\'", "'\\'", "'\\'", "'('", "')'", "'\"'", "'*'", "'/'", "'+'", "'-'", "'='", "'=='", "'!='", "';'", "','", "'\\'", undefined, "':'", "'{'", "'}'", "'['", "']'"];
+cyoaeParser._SYMBOLIC_NAMES = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, "NUMBER", "COLON", "ATTRIBUTE_OPEN", "ATTRIBUTE_CLOSE", "TAG_OPEN", "TAG_CLOSE", "WS", "WORDCHARACTER"];
 cyoaeParser.VOCABULARY = new _VocabularyImpl.VocabularyImpl(cyoaeParser._LITERAL_NAMES, cyoaeParser._SYMBOLIC_NAMES, []);
-cyoaeParser._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\x19\xBE\x04\x02" + "\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" + "\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" + "\x0E\t\x0E\x04\x0F\t\x0F\x03\x02\x03\x02\x05\x02!\n\x02\x03\x02\x03\x02" + "\x03\x03\x03\x03\x03\x03\x03\x03\x07\x03)\n\x03\f\x03\x0E\x03,\v\x03\x03" + "\x04\x03\x04\x03\x04\x06\x041\n\x04\r\x04\x0E\x042\x03\x05\x03\x05\x05" + "\x057\n\x05\x03\x05\x03\x05\x05\x05;\n\x05\x03\x05\x03\x05\x03\x05\x05" + "\x05@\n\x05\x03\x05\x03\x05\x03\x06\x03\x06\x05\x06F\n\x06\x03\x06\x03" + "\x06\x05\x06J\n\x06\x03\x06\x03\x06\x03\x06\x05\x06O\n\x06\x07\x06Q\n" + "\x06\f\x06\x0E\x06T\v\x06\x03\x06\x03\x06\x03\x07\x03\x07\x03\b\x03\b" + "\x05\b\\\n\b\x03\b\x07\b_\n\b\f\b\x0E\bb\v\b\x03\b\x05\be\n\b\x03\b\x03" + "\b\x05\bi\n\b\x03\b\x03\b\x03\t\x03\t\x07\to\n\t\f\t\x0E\tr\v\t\x03\n" + "\x03\n\x03\n\x05\nw\n\n\x03\n\x03\n\x05\n{\n\n\x03\n\x03\n\x03\n\x03\n" + "\x03\n\x03\n\x03\n\x03\n\x03\n\x03\n\x05\n\x87\n\n\x03\n\x03\n\x05\n\x8B" + "\n\n\x03\n\x03\n\x05\n\x8F\n\n\x03\n\x03\n\x05\n\x93\n\n\x03\n\x03\n\x05" + "\n\x97\n\n\x03\n\x03\n\x03\n\x05\n\x9C\n\n\x03\n\x03\n\x05\n\xA0\n\n\x03" + "\n\x07\n\xA3\n\n\f\n\x0E\n\xA6\v\n\x03\v\x03\v\x03\v\x03\f\x03\f\x03\r" + "\x06\r\xAE\n\r\r\r\x0E\r\xAF\x03\x0E\x05\x0E\xB3\n\x0E\x03\x0E\x03\x0E" + "\x03\x0F\x03\x0F\x07\x0F\xB9\n\x0F\f\x0F\x0E\x0F\xBC\v\x0F\x03\x0F\x02" + "\x02\x03\x12\x10\x02\x02\x04\x02\x06\x02\b\x02\n\x02\f\x02\x0E\x02\x10" + "\x02\x12\x02\x14\x02\x16\x02\x18\x02\x1A\x02\x1C\x02\x02\b\x03\x02\b\f" + "\x03\x02\x17\x18\x03\x02\x10\x11\x03\x02\x12\x13\x05\x02\x04\x04\r\x15" + "\x18\x18\x03\x02\x0F\x0F\x02\xD5\x02\x1E\x03\x02\x02\x02\x04*\x03\x02" + "\x02\x02\x060\x03\x02\x02\x02\b4\x03\x02\x02\x02\nC\x03\x02\x02\x02\f" + "W\x03\x02\x02\x02\x0EY\x03\x02\x02\x02\x10l\x03\x02\x02\x02\x12\x8E\x03" + "\x02\x02\x02\x14\xA7\x03\x02\x02\x02\x16\xAA\x03\x02\x02\x02\x18\xAD\x03" + "\x02\x02\x02\x1A\xB2\x03\x02\x02\x02\x1C\xBA\x03\x02\x02\x02\x1E \x05" + "\x04\x03\x02\x1F!\x05\x16\f\x02 \x1F\x03\x02\x02\x02 !\x03\x02\x02\x02" + "!\"\x03\x02\x02\x02\"#\x07\x02\x02\x03#\x03\x03\x02\x02\x02$)\x05\x06" + "\x04\x02%)\x05\n\x06\x02&)\x05\x0E\b\x02\')\x05\x1A\x0E\x02($\x03\x02" + "\x02\x02(%\x03\x02\x02\x02(&\x03\x02\x02\x02(\'\x03\x02\x02\x02),\x03" + "\x02\x02\x02*(\x03\x02\x02\x02*+\x03\x02\x02\x02+\x05\x03\x02\x02\x02" + ",*\x03\x02\x02\x02-1\x05\f\x07\x02.1\x05\x18\r\x02/1\x05\x16\f\x020-\x03" + "\x02\x02\x020.\x03\x02\x02\x020/\x03\x02\x02\x0212\x03\x02\x02\x0220\x03" + "\x02\x02\x0223\x03\x02\x02\x023\x07\x03\x02\x02\x0246\x07\x03\x02\x02" + "57\x05\x16\f\x0265\x03\x02\x02\x0267\x03\x02\x02\x0278\x03\x02\x02\x02" + "8:\x05\x18\r\x029;\x05\x16\f\x02:9\x03\x02\x02\x02:;\x03\x02\x02\x02;" + "<\x03\x02\x02\x02<=\x07\x04\x02\x02=?\x05\x04\x03\x02>@\x05\x16\f\x02" + "?>\x03\x02\x02\x02?@\x03\x02\x02\x02@A\x03\x02\x02\x02AB\x07\x05\x02\x02" + "B\t\x03\x02\x02\x02CE\x07\x06\x02\x02DF\x05\x16\f\x02ED\x03\x02\x02\x02" + "EF\x03\x02\x02\x02FG\x03\x02\x02\x02GI\x05\x18\r\x02HJ\x05\x16\f\x02I" + "H\x03\x02\x02\x02IJ\x03\x02\x02\x02JK\x03\x02\x02\x02KR\x05\x04\x03\x02" + "LN\x05\b\x05\x02MO\x05\x16\f\x02NM\x03\x02\x02\x02NO\x03\x02\x02\x02O" + "Q\x03\x02\x02\x02PL\x03\x02\x02\x02QT\x03\x02\x02\x02RP\x03\x02\x02\x02" + "RS\x03\x02\x02\x02SU\x03\x02\x02\x02TR\x03\x02\x02\x02UV\x07\x07\x02\x02" + "V\v\x03\x02\x02\x02WX\t\x02\x02\x02X\r\x03\x02\x02\x02Y[\x07\x03\x02\x02" + "Z\\\x05\x16\f\x02[Z\x03\x02\x02\x02[\\\x03\x02\x02\x02\\`\x03\x02\x02" + "\x02]_\x05\x14\v\x02^]\x03\x02\x02\x02_b\x03\x02\x02\x02`^\x03\x02\x02" + "\x02`a\x03\x02\x02\x02ad\x03\x02\x02\x02b`\x03\x02\x02\x02ce\x05\x16\f" + "\x02dc\x03\x02\x02\x02de\x03\x02\x02\x02ef\x03\x02\x02\x02fh\x05\x12\n" + "\x02gi\x05\x16\f\x02hg\x03\x02\x02\x02hi\x03\x02\x02\x02ij\x03\x02\x02" + "\x02jk\x07\x05\x02\x02k\x0F\x03\x02\x02\x02lp\x07\x18\x02\x02mo\t\x03" + "\x02\x02nm\x03\x02\x02\x02or\x03\x02\x02\x02pn\x03\x02\x02\x02pq\x03\x02" + "\x02\x02q\x11\x03\x02\x02\x02rp\x03\x02\x02\x02st\b\n\x01\x02tv\x07\r" + "\x02\x02uw\x05\x16\f\x02vu\x03\x02\x02\x02vw\x03\x02\x02\x02wx\x03\x02" + "\x02\x02xz\x05\x12\n\x02y{\x05\x16\f\x02zy\x03\x02\x02\x02z{\x03\x02\x02" + "\x02{|\x03\x02\x02\x02|}\x07\x0E\x02\x02}\x8F\x03\x02\x02\x02~\x8F\x05" + "\x10\t\x02\x7F\x8F\x05\x1A\x0E\x02\x80\x81\x07\x0F\x02\x02\x81\x82\x05" + "\x1C\x0F\x02\x82\x83\x07\x0F\x02\x02\x83\x8F\x03\x02\x02\x02\x84\x86\x05" + "\x10\t\x02\x85\x87\x05\x16\f\x02\x86\x85\x03\x02\x02\x02\x86\x87\x03\x02" + "\x02\x02\x87\x88\x03\x02\x02\x02\x88\x8A\x07\x14\x02\x02\x89\x8B\x05\x16" + "\f\x02\x8A\x89\x03\x02\x02\x02\x8A\x8B\x03\x02\x02\x02\x8B\x8C\x03\x02" + "\x02\x02\x8C\x8D\x05\x12\n\x03\x8D\x8F\x03\x02\x02\x02\x8Es\x03\x02\x02" + "\x02\x8E~\x03\x02\x02\x02\x8E\x7F\x03\x02\x02\x02\x8E\x80\x03\x02\x02" + "\x02\x8E\x84\x03\x02\x02\x02\x8F\xA4\x03\x02\x02\x02\x90\x92\f\x05\x02" + "\x02\x91\x93\x05\x16\f\x02\x92\x91\x03\x02\x02\x02\x92\x93\x03\x02\x02" + "\x02\x93\x94\x03\x02\x02\x02\x94\x96\t\x04\x02\x02\x95\x97\x05\x16\f\x02" + "\x96\x95\x03\x02\x02\x02\x96\x97\x03\x02\x02\x02\x97\x98\x03\x02\x02\x02" + "\x98\xA3\x05\x12\n\x06\x99\x9B\f\x04\x02\x02\x9A\x9C\x05\x16\f\x02\x9B" + "\x9A\x03\x02\x02\x02\x9B\x9C\x03\x02\x02\x02\x9C\x9D\x03\x02\x02\x02\x9D" + "\x9F\t\x05\x02\x02\x9E\xA0\x05\x16\f\x02\x9F\x9E\x03\x02\x02\x02\x9F\xA0" + "\x03\x02\x02\x02\xA0\xA1\x03\x02\x02\x02\xA1\xA3\x05\x12\n\x05\xA2\x90" + "\x03\x02\x02\x02\xA2\x99\x03\x02\x02\x02\xA3\xA6\x03\x02\x02\x02\xA4\xA2" + "\x03\x02\x02\x02\xA4\xA5\x03\x02\x02\x02\xA5\x13\x03\x02\x02\x02\xA6\xA4" + "\x03\x02\x02\x02\xA7\xA8\x05\x12\n\x02\xA8\xA9\x07\x15\x02\x02\xA9\x15" + "\x03\x02\x02\x02\xAA\xAB\x07\x19\x02\x02\xAB\x17\x03\x02\x02\x02\xAC\xAE" + "\t\x06\x02\x02\xAD\xAC\x03\x02\x02\x02\xAE\xAF\x03\x02\x02\x02\xAF\xAD" + "\x03\x02\x02\x02\xAF\xB0\x03\x02\x02\x02\xB0\x19\x03\x02\x02\x02\xB1\xB3" + "\t\x05\x02\x02\xB2\xB1\x03\x02\x02\x02\xB2\xB3\x03\x02\x02\x02\xB3\xB4" + "\x03\x02\x02\x02\xB4\xB5\x07\x17\x02\x02\xB5\x1B\x03\x02\x02\x02\xB6\xB9" + "\n\x07\x02\x02\xB7\xB9\x07\x16\x02\x02\xB8\xB6\x03\x02\x02\x02\xB8\xB7" + "\x03\x02\x02\x02\xB9\xBC\x03\x02\x02\x02\xBA\xB8\x03\x02\x02\x02\xBA\xBB" + "\x03\x02\x02\x02\xBB\x1D\x03\x02\x02\x02\xBC\xBA\x03\x02\x02\x02\" (*" + "026:?EINR[`dhpvz\x86\x8A\x8E\x92\x96\x9B\x9F\xA2\xA4\xAF\xB2\xB8\xBA";
+cyoaeParser._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\x1C\xE2\x04\x02" + "\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" + "\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" + "\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12\x03" + "\x02\x03\x02\x05\x02\'\n\x02\x03\x02\x03\x02\x03\x03\x03\x03\x03\x03\x03" + "\x03\x07\x03/\n\x03\f\x03\x0E\x032\v\x03\x03\x04\x03\x04\x03\x04\x06\x04" + "7\n\x04\r\x04\x0E\x048\x03\x05\x06\x05<\n\x05\r\x05\x0E\x05=\x03\x06\x03" + "\x06\x05\x06B\n\x06\x03\x06\x03\x06\x05\x06F\n\x06\x03\x06\x03\x06\x03" + "\x06\x05\x06K\n\x06\x03\x06\x03\x06\x03\x07\x03\x07\x05\x07Q\n\x07\x03" + "\x07\x03\x07\x05\x07U\n\x07\x03\x07\x03\x07\x03\x07\x05\x07Z\n\x07\x07" + "\x07\\\n\x07\f\x07\x0E\x07_\v\x07\x03\x07\x03\x07\x03\b\x03\b\x03\t\x03" + "\t\x05\tg\n\t\x03\t\x07\tj\n\t\f\t\x0E\tm\v\t\x03\t\x05\tp\n\t\x03\t\x03" + "\t\x05\tt\n\t\x03\t\x03\t\x03\n\x03\n\x07\nz\n\n\f\n\x0E\n}\v\n\x03\v" + "\x03\v\x03\v\x03\v\x05\v\x83\n\v\x03\v\x03\v\x03\v\x03\v\x03\v\x03\v\x03" + "\v\x03\v\x03\v\x03\v\x03\v\x03\v\x05\v\x91\n\v\x03\v\x03\v\x05\v\x95\n" + "\v\x03\v\x03\v\x05\v\x99\n\v\x03\v\x03\v\x05\v\x9D\n\v\x03\v\x03\v\x05" + "\v\xA1\n\v\x03\v\x03\v\x03\v\x05\v\xA6\n\v\x03\v\x03\v\x05\v\xAA\n\v\x03" + "\v\x03\v\x03\v\x05\v\xAF\n\v\x03\v\x03\v\x05\v\xB3\n\v\x03\v\x03\v\x07" + "\v\xB7\n\v\f\v\x0E\v\xBA\v\v\x03\f\x03\f\x03\r\x03\r\x03\r\x03\x0E\x03" + "\x0E\x03\x0F\x06\x0F\xC4\n\x0F\r\x0F\x0E\x0F\xC5\x03\x10\x05\x10\xC9\n" + "\x10\x03\x10\x03\x10\x03\x11\x03\x11\x07\x11\xCF\n\x11\f\x11\x0E\x11\xD2" + "\v\x11\x03\x12\x05\x12\xD5\n\x12\x03\x12\x03\x12\x05\x12\xD9\n\x12\x07" + "\x12\xDB\n\x12\f\x12\x0E\x12\xDE\v\x12\x03\x12\x03\x12\x03\x12\x02\x02" + "\x03\x14\x13\x02\x02\x04\x02\x06\x02\b\x02\n\x02\f\x02\x0E\x02\x10\x02" + "\x12\x02\x14\x02\x16\x02\x18\x02\x1A\x02\x1C\x02\x1E\x02 \x02\"\x02\x02" + "\t\x03\x02\x03\x07\x04\x02\x15\x15\x1C\x1C\x03\x02\v\f\x03\x02\r\x0E\x03" + "\x02\x10\x11\x05\x02\b\x13\x16\x16\x1C\x1C\x03\x02\n\n\x02\xFD\x02$\x03" + "\x02\x02\x02\x040\x03\x02\x02\x02\x066\x03\x02\x02\x02\b;\x03\x02\x02" + "\x02\n?\x03\x02\x02\x02\fN\x03\x02\x02\x02\x0Eb\x03\x02\x02\x02\x10d\x03" + "\x02\x02\x02\x12w\x03\x02\x02\x02\x14\x98\x03\x02\x02\x02\x16\xBB\x03" + "\x02\x02\x02\x18\xBD\x03\x02\x02\x02\x1A\xC0\x03\x02\x02\x02\x1C\xC3\x03" + "\x02\x02\x02\x1E\xC8\x03\x02\x02\x02 \xD0\x03\x02\x02\x02\"\xD4\x03\x02" + "\x02\x02$&\x05\x04\x03\x02%\'\x05\x1A\x0E\x02&%\x03\x02\x02\x02&\'\x03" + "\x02\x02\x02\'(\x03\x02\x02\x02()\x07\x02\x02\x03)\x03\x03\x02\x02\x02" + "*/\x05\x06\x04\x02+/\x05\f\x07\x02,/\x05\x10\t\x02-/\x05\x1E\x10\x02." + "*\x03\x02\x02\x02.+\x03\x02\x02\x02.,\x03\x02\x02\x02.-\x03\x02\x02\x02" + "/2\x03\x02\x02\x020.\x03\x02\x02\x0201\x03\x02\x02\x021\x05\x03\x02\x02" + "\x0220\x03\x02\x02\x0237\x05\x0E\b\x0247\x05\x1C\x0F\x0257\x05\x1A\x0E" + "\x0263\x03\x02\x02\x0264\x03\x02\x02\x0265\x03\x02\x02\x0278\x03\x02\x02" + "\x0286\x03\x02\x02\x0289\x03\x02\x02\x029\x07\x03\x02\x02\x02:<\x07\x1C" + "\x02\x02;:\x03\x02\x02\x02<=\x03\x02\x02\x02=;\x03\x02\x02\x02=>\x03\x02" + "\x02\x02>\t\x03\x02\x02\x02?A\x07\x17\x02\x02@B\x07\x1B\x02\x02A@\x03" + "\x02\x02\x02AB\x03\x02\x02\x02BC\x03\x02\x02\x02CE\x05\b\x05\x02DF\x07" + "\x1B\x02\x02ED\x03\x02\x02\x02EF\x03\x02\x02\x02FG\x03\x02\x02\x02GH\x07" + "\x16\x02\x02HJ\x05\x04\x03\x02IK\x07\x1B\x02\x02JI\x03\x02\x02\x02JK\x03" + "\x02\x02\x02KL\x03\x02\x02\x02LM\x07\x18\x02\x02M\v\x03\x02\x02\x02NP" + "\x07\x19\x02\x02OQ\x07\x1B\x02\x02PO\x03\x02\x02\x02PQ\x03\x02\x02\x02" + "QR\x03\x02\x02\x02RT\x05\x1C\x0F\x02SU\x07\x1B\x02\x02TS\x03\x02\x02\x02" + "TU\x03\x02\x02\x02UV\x03\x02\x02\x02V]\x05\x04\x03\x02WY\x05\n\x06\x02" + "XZ\x07\x1B\x02\x02YX\x03\x02\x02\x02YZ\x03\x02\x02\x02Z\\\x03\x02\x02" + "\x02[W\x03\x02\x02\x02\\_\x03\x02\x02\x02][\x03\x02\x02\x02]^\x03\x02" + "\x02\x02^`\x03\x02\x02\x02_]\x03\x02\x02\x02`a\x07\x1A\x02\x02a\r\x03" + "\x02\x02\x02bc\t\x02\x02\x02c\x0F\x03\x02\x02\x02df\x07\x17\x02\x02eg" + "\x07\x1B\x02\x02fe\x03\x02\x02\x02fg\x03\x02\x02\x02gk\x03\x02\x02\x02" + "hj\x05\x18\r\x02ih\x03\x02\x02\x02jm\x03\x02\x02\x02ki\x03\x02\x02\x02" + "kl\x03\x02\x02\x02lo\x03\x02\x02\x02mk\x03\x02\x02\x02np\x07\x1B\x02\x02" + "on\x03\x02\x02\x02op\x03\x02\x02\x02pq\x03\x02\x02\x02qs\x05\x14\v\x02" + "rt\x07\x1B\x02\x02sr\x03\x02\x02\x02st\x03\x02\x02\x02tu\x03\x02\x02\x02" + "uv\x07\x18\x02\x02v\x11\x03\x02\x02\x02w{\x07\x1C\x02\x02xz\t\x03\x02" + "\x02yx\x03\x02\x02\x02z}\x03\x02\x02\x02{y\x03\x02\x02\x02{|\x03\x02\x02" + "\x02|\x13\x03\x02\x02\x02}{\x03\x02\x02\x02~\x7F\b\v\x01\x02\x7F\x80\x07" + "\x1B\x02\x02\x80\x82\x05\x14\v\x02\x81\x83\x07\x1B\x02\x02\x82\x81\x03" + "\x02\x02\x02\x82\x83\x03\x02\x02\x02\x83\x99\x03\x02\x02\x02\x84\x85\x07" + "\b\x02\x02\x85\x86\x05\x14\v\x02\x86\x87\x07\t\x02\x02\x87\x99\x03\x02" + "\x02\x02\x88\x99\x05\x12\n\x02\x89\x99\x05\x1E\x10\x02\x8A\x8B\x07\n\x02" + "\x02\x8B\x8C\x05 \x11\x02\x8C\x8D\x07\n\x02\x02\x8D\x99\x03\x02\x02\x02" + "\x8E\x90\x05\x12\n\x02\x8F\x91\x07\x1B\x02\x02\x90\x8F\x03\x02\x02\x02" + "\x90\x91\x03\x02\x02\x02\x91\x92\x03\x02\x02\x02\x92\x94\x07\x0F\x02\x02" + "\x93\x95\x07\x1B\x02\x02\x94\x93\x03\x02\x02\x02\x94\x95\x03\x02\x02\x02" + "\x95\x96\x03\x02\x02\x02\x96\x97\x05\x14\v\x03\x97\x99\x03\x02\x02\x02" + "\x98~\x03\x02\x02\x02\x98\x84\x03\x02\x02\x02\x98\x88\x03\x02\x02\x02" + "\x98\x89\x03\x02\x02\x02\x98\x8A\x03\x02\x02\x02\x98\x8E\x03\x02\x02\x02" + "\x99\xB8\x03\x02\x02\x02\x9A\x9C\f\x06\x02\x02\x9B\x9D\x07\x1B\x02\x02" + "\x9C\x9B\x03\x02\x02\x02\x9C\x9D\x03\x02\x02\x02\x9D\x9E\x03\x02\x02\x02" + "\x9E\xA0\t\x04\x02\x02\x9F\xA1\x07\x1B\x02\x02\xA0\x9F\x03\x02\x02\x02" + "\xA0\xA1\x03\x02\x02\x02\xA1\xA2\x03\x02\x02\x02\xA2\xB7\x05\x14\v\x07" + "\xA3\xA5\f\x05\x02\x02\xA4\xA6\x07\x1B\x02\x02\xA5\xA4\x03\x02\x02\x02" + "\xA5\xA6\x03\x02\x02\x02\xA6\xA7\x03\x02\x02\x02\xA7\xA9\t\x05\x02\x02" + "\xA8\xAA\x07\x1B\x02\x02\xA9\xA8\x03\x02\x02\x02\xA9\xAA\x03\x02\x02\x02" + "\xAA\xAB\x03\x02\x02\x02\xAB\xB7\x05\x14\v\x06\xAC\xAE\f\x04\x02\x02\xAD" + "\xAF\x07\x1B\x02\x02\xAE\xAD\x03\x02\x02\x02\xAE\xAF\x03\x02\x02\x02\xAF" + "\xB0\x03\x02\x02\x02\xB0\xB2\x05\x16\f\x02\xB1\xB3\x07\x1B\x02\x02\xB2" + "\xB1\x03\x02\x02\x02\xB2\xB3\x03\x02\x02\x02\xB3\xB4\x03\x02\x02\x02\xB4" + "\xB5\x05\x14\v\x05\xB5\xB7\x03\x02\x02\x02\xB6\x9A\x03\x02\x02\x02\xB6" + "\xA3\x03\x02\x02\x02\xB6\xAC\x03\x02\x02\x02\xB7\xBA\x03\x02\x02\x02\xB8" + "\xB6\x03\x02\x02\x02\xB8\xB9\x03\x02\x02\x02\xB9\x15\x03\x02\x02\x02\xBA" + "\xB8\x03\x02\x02\x02\xBB\xBC\t\x06\x02\x02\xBC\x17\x03\x02\x02\x02\xBD" + "\xBE\x05\x14\v\x02\xBE\xBF\x07\x12\x02\x02\xBF\x19\x03\x02\x02\x02\xC0" + "\xC1\x07\x1B\x02\x02\xC1\x1B\x03\x02\x02\x02\xC2\xC4\t\x07\x02\x02\xC3" + "\xC2\x03\x02\x02\x02\xC4\xC5\x03\x02\x02\x02\xC5\xC3\x03\x02\x02\x02\xC5" + "\xC6\x03\x02\x02\x02\xC6\x1D\x03\x02\x02\x02\xC7\xC9\t\x05\x02\x02\xC8" + "\xC7\x03\x02\x02\x02\xC8\xC9\x03\x02\x02\x02\xC9\xCA\x03\x02\x02\x02\xCA" + "\xCB\x07\x15\x02\x02\xCB\x1F\x03\x02\x02\x02\xCC\xCF\n\b\x02\x02\xCD\xCF" + "\x07\x14\x02\x02\xCE\xCC\x03\x02\x02\x02\xCE\xCD\x03\x02\x02\x02\xCF\xD2" + "\x03\x02\x02\x02\xD0\xCE\x03\x02\x02\x02\xD0\xD1\x03\x02\x02\x02\xD1!" + "\x03\x02\x02\x02\xD2\xD0\x03\x02\x02\x02\xD3\xD5\x05\x14\v\x02\xD4\xD3" + "\x03\x02\x02\x02\xD4\xD5\x03\x02\x02\x02\xD5\xDC\x03\x02\x02\x02\xD6\xD8" + "\x07\x13\x02\x02\xD7\xD9\x05\x14\v\x02\xD8\xD7\x03\x02\x02\x02\xD8\xD9" + "\x03\x02\x02\x02\xD9\xDB\x03\x02\x02\x02\xDA\xD6\x03\x02\x02\x02\xDB\xDE" + "\x03\x02\x02\x02\xDC\xDA\x03\x02\x02\x02\xDC\xDD\x03\x02\x02\x02\xDD\xDF" + "\x03\x02\x02\x02\xDE\xDC\x03\x02\x02\x02\xDF\xE0\x07\x02\x02\x03\xE0#" + "\x03\x02\x02\x02\'&.068=AEJPTY]fkos{\x82\x90\x94\x98\x9C\xA0\xA5\xA9\xAE" + "\xB2\xB6\xB8\xC5\xC8\xCE\xD0\xD4\xD8\xDC";
 
 class Start_Context extends _ParserRuleContext.ParserRuleContext {
-  rich_text_() {
-    return this.getRuleContext(0, Rich_text_Context);
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
   }
 
   EOF() {
     return this.getToken(cyoaeParser.EOF, 0);
   }
 
-  ws_() {
-    return this.tryGetRuleContext(0, Ws_Context);
+  rich_text_() {
+    return this.getRuleContext(0, Rich_text_Context);
   }
 
-  constructor(parent, invokingState) {
-    super(parent, invokingState);
+  ws_() {
+    return this.tryGetRuleContext(0, Ws_Context);
   } // @Override
 
 
@@ -2619,24 +2965,72 @@ class Plain_text_Context extends _ParserRuleContext.ParserRuleContext {
 
 exports.Plain_text_Context = Plain_text_Context;
 
+class Attribute_name_Context extends _ParserRuleContext.ParserRuleContext {
+  WORDCHARACTER(i) {
+    if (i === undefined) {
+      return this.getTokens(cyoaeParser.WORDCHARACTER);
+    } else {
+      return this.getToken(cyoaeParser.WORDCHARACTER, i);
+    }
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_attribute_name_;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterAttribute_name_) {
+      listener.enterAttribute_name_(this);
+    }
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitAttribute_name_) {
+      listener.exitAttribute_name_(this);
+    }
+  }
+
+}
+
+exports.Attribute_name_Context = Attribute_name_Context;
+
 class Attribute_Context extends _ParserRuleContext.ParserRuleContext {
   constructor(parent, invokingState) {
     super(parent, invokingState);
   }
 
-  word_() {
-    return this.getRuleContext(0, Word_Context);
+  ATTRIBUTE_OPEN() {
+    return this.getToken(cyoaeParser.ATTRIBUTE_OPEN, 0);
+  }
+
+  COLON() {
+    return this.getToken(cyoaeParser.COLON, 0);
+  }
+
+  ATTRIBUTE_CLOSE() {
+    return this.getToken(cyoaeParser.ATTRIBUTE_CLOSE, 0);
+  }
+
+  attribute_name_() {
+    return this.getRuleContext(0, Attribute_name_Context);
   }
 
   rich_text_() {
     return this.getRuleContext(0, Rich_text_Context);
   }
 
-  ws_(i) {
+  WS(i) {
     if (i === undefined) {
-      return this.getRuleContexts(Ws_Context);
+      return this.getTokens(cyoaeParser.WS);
     } else {
-      return this.getRuleContext(i, Ws_Context);
+      return this.getToken(cyoaeParser.WS, i);
     }
   } // @Override
 
@@ -2668,6 +3062,14 @@ class Tag_Context extends _ParserRuleContext.ParserRuleContext {
     super(parent, invokingState);
   }
 
+  TAG_OPEN() {
+    return this.getToken(cyoaeParser.TAG_OPEN, 0);
+  }
+
+  TAG_CLOSE() {
+    return this.getToken(cyoaeParser.TAG_CLOSE, 0);
+  }
+
   word_() {
     return this.getRuleContext(0, Word_Context);
   }
@@ -2676,11 +3078,11 @@ class Tag_Context extends _ParserRuleContext.ParserRuleContext {
     return this.getRuleContext(0, Rich_text_Context);
   }
 
-  ws_(i) {
+  WS(i) {
     if (i === undefined) {
-      return this.getRuleContexts(Ws_Context);
+      return this.getTokens(cyoaeParser.WS);
     } else {
-      return this.getRuleContext(i, Ws_Context);
+      return this.getToken(cyoaeParser.WS, i);
     }
   }
 
@@ -2744,15 +3146,23 @@ class Escaped_text_Context extends _ParserRuleContext.ParserRuleContext {
 exports.Escaped_text_Context = Escaped_text_Context;
 
 class Code_Context extends _ParserRuleContext.ParserRuleContext {
+  ATTRIBUTE_OPEN() {
+    return this.getToken(cyoaeParser.ATTRIBUTE_OPEN, 0);
+  }
+
   expression_() {
     return this.getRuleContext(0, Expression_Context);
   }
 
-  ws_(i) {
+  ATTRIBUTE_CLOSE() {
+    return this.getToken(cyoaeParser.ATTRIBUTE_CLOSE, 0);
+  }
+
+  WS(i) {
     if (i === undefined) {
-      return this.getRuleContexts(Ws_Context);
+      return this.getTokens(cyoaeParser.WS);
     } else {
-      return this.getRuleContext(i, Ws_Context);
+      return this.getToken(cyoaeParser.WS, i);
     }
   }
 
@@ -2840,19 +3250,19 @@ class Expression_Context extends _ParserRuleContext.ParserRuleContext {
     super(parent, invokingState);
   }
 
+  WS(i) {
+    if (i === undefined) {
+      return this.getTokens(cyoaeParser.WS);
+    } else {
+      return this.getToken(cyoaeParser.WS, i);
+    }
+  }
+
   expression_(i) {
     if (i === undefined) {
       return this.getRuleContexts(Expression_Context);
     } else {
       return this.getRuleContext(i, Expression_Context);
-    }
-  }
-
-  ws_(i) {
-    if (i === undefined) {
-      return this.getRuleContexts(Ws_Context);
-    } else {
-      return this.getRuleContext(i, Ws_Context);
     }
   }
 
@@ -2866,6 +3276,10 @@ class Expression_Context extends _ParserRuleContext.ParserRuleContext {
 
   string_content_() {
     return this.tryGetRuleContext(0, String_content_Context);
+  }
+
+  comparator_() {
+    return this.tryGetRuleContext(0, Comparator_Context);
   } // @Override
 
 
@@ -2890,6 +3304,34 @@ class Expression_Context extends _ParserRuleContext.ParserRuleContext {
 }
 
 exports.Expression_Context = Expression_Context;
+
+class Comparator_Context extends _ParserRuleContext.ParserRuleContext {
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_comparator_;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterComparator_) {
+      listener.enterComparator_(this);
+    }
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitComparator_) {
+      listener.exitComparator_(this);
+    }
+  }
+
+}
+
+exports.Comparator_Context = Comparator_Context;
 
 class Statement_Context extends _ParserRuleContext.ParserRuleContext {
   constructor(parent, invokingState) {
@@ -2961,6 +3403,14 @@ class Word_Context extends _ParserRuleContext.ParserRuleContext {
       return this.getTokens(cyoaeParser.WORDCHARACTER);
     } else {
       return this.getToken(cyoaeParser.WORDCHARACTER, i);
+    }
+  }
+
+  COLON(i) {
+    if (i === undefined) {
+      return this.getTokens(cyoaeParser.COLON);
+    } else {
+      return this.getToken(cyoaeParser.COLON, i);
     }
   }
 
@@ -3050,6 +3500,46 @@ class String_content_Context extends _ParserRuleContext.ParserRuleContext {
 }
 
 exports.String_content_Context = String_content_Context;
+
+class Case_code_Context extends _ParserRuleContext.ParserRuleContext {
+  EOF() {
+    return this.getToken(cyoaeParser.EOF, 0);
+  }
+
+  expression_(i) {
+    if (i === undefined) {
+      return this.getRuleContexts(Expression_Context);
+    } else {
+      return this.getRuleContext(i, Expression_Context);
+    }
+  }
+
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  } // @Override
+
+
+  get ruleIndex() {
+    return cyoaeParser.RULE_case_code_;
+  } // @Override
+
+
+  enterRule(listener) {
+    if (listener.enterCase_code_) {
+      listener.enterCase_code_(this);
+    }
+  } // @Override
+
+
+  exitRule(listener) {
+    if (listener.exitCase_code_) {
+      listener.exitCase_code_(this);
+    }
+  }
+
+}
+
+exports.Case_code_Context = Case_code_Context;
 
 },{"antlr4ts/FailedPredicateException":21,"antlr4ts/NoViableAltException":29,"antlr4ts/Parser":30,"antlr4ts/ParserRuleContext":33,"antlr4ts/RecognitionException":36,"antlr4ts/Token":42,"antlr4ts/VocabularyImpl":48,"antlr4ts/atn/ATN":50,"antlr4ts/atn/ATNDeserializer":54,"antlr4ts/atn/ParserATNSimulator":91,"antlr4ts/misc/Utils":136}],4:[function(require,module,exports){
 "use strict";
