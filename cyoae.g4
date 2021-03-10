@@ -3,7 +3,7 @@ grammar cyoae;
 start_: rich_text_ ws_? EOF;
 rich_text_: (plain_text_ | tag_ | code_ | number_)*;
 plain_text_: (escaped_text_ | word_ | ws_)+;
-attribute_: '{' ws_? attribute_name=word_ ws_? attribute_value=rich_text_ ws_? '}';
+attribute_: '{' ws_? attribute_name=word_ ws_?':' attribute_value=rich_text_ ws_? '}';
 tag_: '[' ws_? tag_name=word_ ws_? default_value=rich_text_ (attribute=attribute_ ws_?)* ']';
 escaped_text_: '\\\\' | '\\[' | '\\]' | '\\{' | '\\}';
 code_: '{' ws_? statement_* ws_? expression_ ws_? '}';
@@ -19,7 +19,7 @@ expression_:
     ;
 statement_: expression=expression_ ';';
 ws_: WS;
-word_: (WORDCHARACTER | '+'|'-'|'*'|'/'|'='|'('|')'|';'|'"')+; //making +-*/=();" explicit should not be necessary, but somehow negation does not match these characters
+word_: (WORDCHARACTER | '+'|'-'|'*'|'/'|'='|'('|')'|';'|'"'|':')+; //making +-*/=();": explicit should not be necessary, but somehow negation does not match these characters
 number_: ('+'|'-')? NUMBER;
 string_content_:  (~'"'|'\\"')*;
 

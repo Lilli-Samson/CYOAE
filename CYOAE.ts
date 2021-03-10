@@ -346,14 +346,12 @@ const replacements: Tag_replacement[] = [
     { //select
         tag_name: "select",
         replacements: function(tag: Tag) {
-            let debugstring = `Select attributes:\n`;
-            for (const [attribute_name, code] of tag.attributes) {
-                debugstring += `${attribute_name}: ${code.current_value}\n`;
-            }
-            console.log(debugstring);
-            return Tag_result.from_plaintext("");
+            return evaluate_case(tag.ctx);
         },
-        tag_type: Tag_type.allow_duplicate_attributes,
+    },
+    { //case
+        tag_name: "case",
+        replacements: (tag: Tag) => {throw `"case" tag cannot be outside of "switch" tag`}
     },
 ];
 
@@ -599,6 +597,10 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
     return result;
 }
 
+function evaluate_case(ctx: cyoaeParser.Tag_Context): Tag_result {
+    return Tag_result.from_plaintext("");
+}
+
 function get_parser(data: string, filename: string) {
     current_source = data;
     const input = antlr4ts.CharStreams.fromString(data, filename);
@@ -743,15 +745,15 @@ async function tests() {
     test_Tag_result();
 
     function test_tag_parsing() {
-        let result = parse_source_text("[test {text test1}]", "test_tag_parsing");
+        let result = parse_source_text("[test {text:test1}]", "test_tag_parsing");
         let expected = "<a>test1</a>\n";
         assert_equal(result, expected, `Checking test tag 1. Expected:\n>>>${expected}<<<\nActual:\n>>>${result}<<<`);
 
-        result = parse_source_text("[test {text test1}]", "test_tag_parsing");
+        result = parse_source_text("[test {text:test1}]", "test_tag_parsing");
         expected = "<a>test1</a>\n";
         assert_equal(result, expected, `Checking test tag 2. Expected:\n${expected}Actual:\n${result}`);
 
-        result = parse_source_text("[test {text test1}][test {text test2}]", "test_tag_parsing");
+        result = parse_source_text("[test {text:test1}][test {text:test2}]", "test_tag_parsing");
         expected = "<a>test1</a>\n<a>test2</a>\n";
         assert_equal(result, expected, `Checking test tag 3. Expected:\n${expected}Actual:\n${result}`);
     }
