@@ -2,7 +2,7 @@ grammar cyoae;
 
 start_: rich_text_ ws_? EOF;
 rich_text_: (plain_text_ | tag_ | code_ | number_)*;
-plain_text_: (escaped_text_ | word_ | ws_)+;
+plain_text_: (escapes=escaped_text_ | word=word_ | ws=ws_)+;
 attribute_: '{' ws_? attribute_name=word_ ws_?':' attribute_value=rich_text_ ws_? '}';
 tag_: '[' ws_? tag_name=word_ ws_? default_value=rich_text_ (attribute=attribute_ ws_?)* ']';
 escaped_text_: '\\\\' | '\\[' | '\\]' | '\\{' | '\\}';

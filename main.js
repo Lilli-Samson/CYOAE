@@ -98,10 +98,37 @@ class Lazy_evaluated {
 
 }
 
+class Lazy_evaluated_rich_text {
+  constructor(ctx) {
+    this._value = ctx;
+  }
+
+  get is_evaluated() {
+    return this._value instanceof Tag_result;
+  }
+
+  get value() {
+    if (this._value instanceof cyoaeParser.Rich_text_Context) {
+      this._value = evaluate_richtext(this._value);
+    }
+
+    return this._value;
+  }
+
+  get maybe_unevaluated_value() {
+    if (this._value instanceof cyoaeParser.Rich_text_Context) {
+      return `(unevaluated)${this._value.text}`;
+    }
+
+    return this._value.current_value;
+  }
+
+}
+
 class Tag_result {
   constructor(ctx, html, plaintext) {
     if (ctx) {
-      this.context_value = new Lazy_evaluated(() => evaluate_richtext(ctx));
+      this.context_value = new Lazy_evaluated_rich_text(ctx);
     }
 
     this.current_plaintext = plaintext;
@@ -137,17 +164,15 @@ class Tag_result {
   }
 
   get current_value() {
-    var _a;
-
-    if ((_a = this.context_value) === null || _a === void 0 ? void 0 : _a.is_evaluated) {
-      if (this.value.current_html) {
-        return this.value.html;
-      }
-
-      return this.value.plaintext;
+    if (this.context_value) {
+      return this.context_value.maybe_unevaluated_value;
     }
 
-    return "unevaluated";
+    if (this.value.current_html) {
+      return this.value.html;
+    }
+
+    return this.value.plaintext;
   }
 
   append(other) {
@@ -435,7 +460,7 @@ const replacements = [{
 }, {
   tag_name: "select",
   replacements: function (tag) {
-    return evaluate_case(tag.ctx);
+    return evaluate_select_tag(tag.ctx);
   }
 }, {
   tag_name: "case",
@@ -555,7 +580,7 @@ function evaluate_code(code) {
   }
 }
 
-function execute_tag(tag) {
+function evaluate_tag(tag) {
   var _a, _b, _c, _d;
 
   const debug = false;
@@ -682,7 +707,7 @@ function evaluate_richtext(ctx) {
         return tag;
       }
 
-      result = result.append(execute_tag(extract_tag(child)));
+      result = result.append(evaluate_tag(extract_tag(child)));
     } else if (child instanceof cyoaeParser.Code_Context) {
       debug && console.log(`Evaluating code "${child.text}"`);
       const value = evaluate_code(child);
@@ -703,8 +728,103 @@ function evaluate_richtext(ctx) {
   return result;
 }
 
-function evaluate_case(ctx) {
+function evaluate_select_tag(ctx) {
+  if (ctx._tag_name.text !== "select") {
+    throw_evaluation_error(`Internal logic error: Evaluating "${ctx._tag_name.text}" as a "select" tag`, ctx);
+  }
+
+  if (ctx._attribute) {
+    throw_evaluation_error(`The "select" tag may not have attributes`, ctx._attribute);
+  }
+
+  let cases = [];
+
+  for (let i = 0; i < ctx._default_value.childCount; i++) {
+    const child = ctx._default_value.getChild(i);
+
+    if (child instanceof cyoaeParser.Tag_Context) {
+      if (child._tag_name.text !== "case") {
+        throw_evaluation_error(`Syntax error in "switch" tag: Only "case" tags are allowed as direct children of "switch" tag`, child);
+      }
+
+      cases.push(evaluate_case(child));
+    } else if (child instanceof cyoaeParser.Plain_text_Context) {
+      if (child._escapes || child._word) {
+        throw_evaluation_error(`Syntax error in "switch" tag: Unexpected tokens "${child.text}"`, child);
+      }
+
+      continue;
+    } else {
+      if (child instanceof antlr4ts.ParserRuleContext) {
+        throw_evaluation_error(`Syntax error in "switch" tag: Unexpected tokens "${child.text}"`, child);
+      } else {
+        throw `Syntax error in "switch" tag: Unexpected tokens "${child.text}"`;
+      }
+    }
+  }
+
   return Tag_result.from_plaintext("");
+}
+
+function evaluate_case(ctx) {
+  const debug = true;
+  debug && console.log(`Evaluating case ${ctx.text}`);
+
+  if (ctx._tag_name.text !== "case") {
+    throw_evaluation_error(`Internal logic error: Evaluating "${ctx._tag_name.text}" as a "case" tag`, ctx);
+  }
+
+  let result = {
+    applicable: false,
+    score: 0,
+    priority: 1,
+    text: null
+  };
+
+  for (let i = 0; i < ctx.childCount; i++) {
+    const child = ctx.getChild(i);
+
+    if (child instanceof cyoaeParser.Attribute_Context) {
+      switch (child._attribute_name.text) {
+        case "text":
+          debug && console.log(`Found "text" attribute "${child._attribute_value.text}"`);
+          result.text = Tag_result.from_ctx(child._attribute_value);
+          break;
+
+        case "condition":
+          debug && console.log(`Found "condition" attribute "${child._attribute_value.text}"`);
+          break;
+
+        case "priority":
+          debug && console.log(`Found "priority" attribute "${child._attribute_value.text}"`);
+
+          try {
+            const text = evaluate_richtext(child._attribute_value).plaintext;
+            const priority = parseFloat(text);
+
+            if (Number.isNaN(priority)) {
+              throw "NaN";
+            }
+
+            result.priority = priority;
+          } catch (err) {
+            throw_evaluation_error(`Attribute "${child._attribute_name}" did not evaluate to a number: ${err}`, child._attribute_name);
+          }
+
+          break;
+
+        default:
+          throw_evaluation_error(`Unknown attribute "${child._attribute_name.text}" in tag "case"`, child._attribute_name);
+      }
+    }
+  }
+
+  if (!result.text) {
+    result.text = Tag_result.from_ctx(ctx._default_value);
+  }
+
+  debug && console.log(`Result: applicable: ${result.applicable}, priority: ${result.priority}, score: ${result.score}, text: ${result.text.current_value}`);
+  return result;
 }
 
 function get_parser(data, filename) {
@@ -1276,7 +1396,7 @@ class cyoaeParser extends _Parser.Parser {
                   case cyoaeParser.T__9:
                     {
                       this.state = 43;
-                      this.escaped_text_();
+                      _localctx._escapes = this.escaped_text_();
                     }
                     break;
 
@@ -1293,14 +1413,14 @@ class cyoaeParser extends _Parser.Parser {
                   case cyoaeParser.WORDCHARACTER:
                     {
                       this.state = 44;
-                      this.word_();
+                      _localctx._word = this.word_();
                     }
                     break;
 
                   case cyoaeParser.WS:
                     {
                       this.state = 45;
-                      this.ws_();
+                      _localctx._ws = this.ws_();
                     }
                     break;
 
@@ -2448,6 +2568,10 @@ class Rich_text_Context extends _ParserRuleContext.ParserRuleContext {
 exports.Rich_text_Context = Rich_text_Context;
 
 class Plain_text_Context extends _ParserRuleContext.ParserRuleContext {
+  constructor(parent, invokingState) {
+    super(parent, invokingState);
+  }
+
   escaped_text_(i) {
     if (i === undefined) {
       return this.getRuleContexts(Escaped_text_Context);
@@ -2470,10 +2594,6 @@ class Plain_text_Context extends _ParserRuleContext.ParserRuleContext {
     } else {
       return this.getRuleContext(i, Ws_Context);
     }
-  }
-
-  constructor(parent, invokingState) {
-    super(parent, invokingState);
   } // @Override
 
 

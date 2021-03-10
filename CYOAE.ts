@@ -34,6 +34,28 @@ class Lazy_evaluated<T> {
     }
 }
 
+class Lazy_evaluated_rich_text {
+    private _value: Tag_result | cyoaeParser.Rich_text_Context;
+    constructor(ctx: cyoaeParser.Rich_text_Context) {
+        this._value = ctx;
+    }
+    get is_evaluated() {
+        return this._value instanceof Tag_result;
+    }
+    get value() {
+        if (this._value instanceof cyoaeParser.Rich_text_Context) {
+            this._value = evaluate_richtext(this._value);
+        }
+        return this._value;
+    }
+    get maybe_unevaluated_value() {
+        if (this._value instanceof cyoaeParser.Rich_text_Context) {
+            return `(unevaluated)${this._value.text}`;
+        }
+        return this._value.current_value;
+    }
+}
+
 class Tag_result{
     static from_plaintext(text: string) {
         return new Tag_result(undefined, "", text);
@@ -56,14 +78,14 @@ class Tag_result{
     get is_plaintext_available() {
         return this.value.current_html.length === 0;
     }
-    get current_value() {
-        if (this.context_value?.is_evaluated) {
-            if (this.value.current_html) {
-                return this.value.html;
-            }
-            return this.value.plaintext;
+    get current_value(): string {
+        if (this.context_value) {
+            return this.context_value.maybe_unevaluated_value;
         }
-        return "unevaluated";
+        if (this.value.current_html) {
+            return this.value.html;
+        }
+        return this.value.plaintext;
     }
     append(other: Tag_result) {
         return other.is_plaintext_available ? this.value.append_plaintext(other.plaintext) : this.value.append_html(other.html);
@@ -80,7 +102,7 @@ class Tag_result{
         }
         return new Tag_result(undefined, this.value.html + text, "");
     }
-    private readonly context_value?: Lazy_evaluated<Tag_result>;
+    private readonly context_value?: Lazy_evaluated_rich_text;
     private readonly current_html: string;
     private readonly current_plaintext: string;
     private static plain_to_html(text: string) {
@@ -88,7 +110,7 @@ class Tag_result{
     }
     private constructor(ctx: cyoaeParser.Rich_text_Context | undefined, html: string, plaintext: string) {
         if (ctx) {
-            this.context_value = new Lazy_evaluated(() => evaluate_richtext(ctx));
+            this.context_value = new Lazy_evaluated_rich_text(ctx);
         }
         this.current_plaintext = plaintext;
         this.current_html = html;
@@ -346,7 +368,7 @@ const replacements: Tag_replacement[] = [
     { //select
         tag_name: "select",
         replacements: function(tag: Tag) {
-            return evaluate_case(tag.ctx);
+            return evaluate_select_tag(tag.ctx);
         },
     },
     { //case
@@ -373,6 +395,13 @@ interface Evaluation_error_context {
 type Extends<Class, Interface, Message = "">  = Class extends Interface ? true : Message;
 function static_assert<T extends true>() {}
 static_assert<Extends<antlr4ts.ParserRuleContext, Evaluation_error_context, "antlr4ts.ParserRuleContext doesn't implement Evaluation_error_context anymore, need to change Evaluation_error_context so it does again">>();
+
+interface Case_result {
+    readonly applicable: boolean;
+    readonly score: number;
+    readonly priority: number;
+    readonly text: Tag_result;
+}
 
 function throw_evaluation_error(error: string, context: Evaluation_error_context): never {
     const line = context.start.line;
@@ -462,7 +491,7 @@ function evaluate_code(code: cyoaeParser.Code_Context) {
     }
 }
 
-function execute_tag(tag: Tag): Tag_result {
+function evaluate_tag(tag: Tag): Tag_result {
     const debug = false;
     debug && console.log(`Executing tag "${tag.name}" with value "${tag.default_value?.current_value}" and attributes [${
         tag.attributes.length > 0
@@ -575,7 +604,7 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
                 }
                 return tag;
             }
-            result = result.append(execute_tag(extract_tag(child)));
+            result = result.append(evaluate_tag(extract_tag(child)));
         }
         else if (child instanceof cyoaeParser.Code_Context) {
             debug && console.log(`Evaluating code "${child.text}"`);
@@ -597,8 +626,87 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
     return result;
 }
 
-function evaluate_case(ctx: cyoaeParser.Tag_Context): Tag_result {
+function evaluate_select_tag(ctx: cyoaeParser.Tag_Context): Tag_result {
+    if (ctx._tag_name.text !== "select") {
+        throw_evaluation_error(`Internal logic error: Evaluating "${ctx._tag_name.text}" as a "select" tag`, ctx);
+    }
+    if (ctx._attribute) {
+        throw_evaluation_error(`The "select" tag may not have attributes`, ctx._attribute);
+    }
+    let cases: Case_result[] = [];
+    for (let i = 0; i < ctx._default_value.childCount; i++) {
+        const child = ctx._default_value.getChild(i);
+        if (child instanceof cyoaeParser.Tag_Context) {
+            if (child._tag_name.text !== "case") {
+                throw_evaluation_error(`Syntax error in "switch" tag: Only "case" tags are allowed as direct children of "switch" tag`, child);
+            }
+            cases.push(evaluate_case(child));
+        }
+        else if (child instanceof cyoaeParser.Plain_text_Context) {
+            if (child._escapes || child._word) {
+                throw_evaluation_error(`Syntax error in "switch" tag: Unexpected tokens "${child.text}"`, child);
+            }
+            continue;
+        }
+        else {
+            if (child instanceof antlr4ts.ParserRuleContext) {
+                throw_evaluation_error(`Syntax error in "switch" tag: Unexpected tokens "${child.text}"`, child);
+            }
+            else {
+                throw `Syntax error in "switch" tag: Unexpected tokens "${child.text}"`;
+            }
+        }
+    }
     return Tag_result.from_plaintext("");
+}
+
+function evaluate_case(ctx: cyoaeParser.Tag_Context): Case_result {
+    const debug = true;
+    debug && console.log(`Evaluating case ${ctx.text}`);
+    if (ctx._tag_name.text !== "case") {
+        throw_evaluation_error(`Internal logic error: Evaluating "${ctx._tag_name.text}" as a "case" tag`, ctx);
+    }
+    let result = {
+        applicable: false,
+        score: 0,
+        priority: 1,
+        text: null as unknown as Tag_result,
+    };
+    for (let i = 0; i < ctx.childCount; i++) {
+        const child = ctx.getChild(i);
+        if (child instanceof cyoaeParser.Attribute_Context) {
+            switch (child._attribute_name.text) {
+                case "text":
+                    debug && console.log(`Found "text" attribute "${child._attribute_value.text}"`);
+                    result.text = Tag_result.from_ctx(child._attribute_value);
+                    break;
+                case "condition":
+                    debug && console.log(`Found "condition" attribute "${child._attribute_value.text}"`);
+                    break;
+                case "priority":
+                    debug && console.log(`Found "priority" attribute "${child._attribute_value.text}"`);
+                    try {
+                        const text = evaluate_richtext(child._attribute_value).plaintext;
+                        const priority = parseFloat(text);
+                        if (Number.isNaN(priority)) {
+                            throw "NaN";
+                        }
+                        result.priority = priority;
+                    }
+                    catch (err) {
+                        throw_evaluation_error(`Attribute "${child._attribute_name}" did not evaluate to a number: ${err}`, child._attribute_name);
+                    }
+                    break;
+                default:
+                    throw_evaluation_error(`Unknown attribute "${child._attribute_name.text}" in tag "case"`, child._attribute_name);
+            }
+        }
+    }
+    if (!result.text) {
+        result.text = Tag_result.from_ctx(ctx._default_value);
+    }
+    debug && console.log(`Result: applicable: ${result.applicable}, priority: ${result.priority}, score: ${result.score}, text: ${result.text.current_value}`);
+    return result;
 }
 
 function get_parser(data: string, filename: string) {
