@@ -14,11 +14,11 @@ expression_:
     | '(' expression=expression_ ')'
     | identifier=identifier_
     | number=number_
-    | '"' string=string_content_ '"'
+    | quote='"' string=string_content_ quote='"'
     | left_expression=expression_ WS? operator=('*' | '/') WS? right_expression=expression_
     | left_expression=expression_ WS? operator=('+' | '-') WS? right_expression=expression_
     | left_expression=expression_ WS? comparator=comparator_ WS? right_expression=expression_
-    | identifier=identifier_ WS? operator='=' WS? expression=expression_
+    | identifier=identifier_ WS? assignment='=' WS? expression=expression_
     ;
 comparator_: '==' | '!=';
 statement_: expression=expression_ ';';
@@ -29,7 +29,7 @@ string_content_:  (~'"'|'\\"')*;
 case_code_: expression_? (',' expression_?)* EOF;
 
 //lexer grammar cyoa;
-NUMBER: [0-9]+;
+NUMBER: [0-9]+('.' [0-9]+)?;
 COLON: ':';
 ATTRIBUTE_OPEN: '{';
 ATTRIBUTE_CLOSE: '}';

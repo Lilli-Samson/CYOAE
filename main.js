@@ -48,8 +48,7 @@ let current_scene = "";
 let current_source = "";
 
 class ParserErrorListener {
-  constructor(source, parser) {
-    this.source = source;
+  constructor(parser) {
     this.parser = parser;
   }
 
@@ -64,16 +63,12 @@ class ParserErrorListener {
       sourceInterval: {
         length: ((_c = (_b = offendingSymbol) === null || _b === void 0 ? void 0 : _b.text) === null || _c === void 0 ? void 0 : _c.length) || 0
       }
-    }, this.source);
+    }, current_source);
   }
 
 }
 
 class LexerErrorListener {
-  constructor(source) {
-    this.source = source;
-  }
-
   syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
     throw_evaluation_error(`Lexer error: ${msg}`, {
       start: {
@@ -83,7 +78,7 @@ class LexerErrorListener {
       sourceInterval: {
         length: 1
       }
-    }, this.source);
+    }, current_source);
   }
 
 }
@@ -254,24 +249,78 @@ function get_unique_required_attribute(tag, attribute) {
   return result;
 }
 
-let g = new Map(); //storage for ingame variables
-
-window.g = g; //make accessible to html
-
-function evaluate_variable(variable) {
-  const value = g.get(variable);
-
-  if (typeof value === "undefined") {
-    return "";
+class Game_variables {
+  static init() {
+    window.gv = Game_variables.get_variable;
+    window.sv = Game_variables.set_variable;
+    window.dv = Game_variables.delete_variable;
   }
 
-  if (typeof value === "string") {
-    return value;
+  static get_variable(variable_name) {
+    const stored = localStorage.getItem(variable_name);
+
+    if (typeof stored !== "string") {
+      Game_variables.debug && console.log(`Getting variable "${variable_name}" (value: undefined)`);
+      console.error(`Tried to fetch undefined variable ${variable_name}`);
+      return;
+    }
+
+    Game_variables.debug && console.log(`Getting variable "${variable_name}" with value: ${Game_variables.string_to_value(stored)} (encoded: ${stored})`);
+    return Game_variables.string_to_value(stored);
   }
 
-  return `${value}`;
+  static set_variable(variable_name, value) {
+    Game_variables.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${Game_variables.value_to_string(value)})`);
+    localStorage.setItem(variable_name, Game_variables.value_to_string(value));
+  }
+
+  static delete_variable(variable_name) {
+    Game_variables.debug && console.log(`Deleting variable "${variable_name}"`);
+    localStorage.removeItem(variable_name);
+  }
+
+  static clear() {
+    Game_variables.debug && console.log(`Clearing all variables`);
+    localStorage.clear();
+  }
+
+  static value_to_string(value) {
+    switch (typeof value) {
+      case "string":
+        return `s${value}`;
+
+      case "number":
+        return `n${value}`;
+
+      case "boolean":
+        return value ? "b1" : "b0";
+    }
+  }
+
+  static string_to_value(str) {
+    const type = str[0];
+    const value = str.substring(1, str.length);
+
+    switch (type) {
+      case 's':
+        //string
+        return value;
+
+      case 'n':
+        //number
+        return parseFloat(value);
+
+      case 'b':
+        //boolean
+        return value === "1" ? true : false;
+    }
+
+    throw `invalid value: ${str}`;
+  }
+
 }
 
+Game_variables.debug = true;
 var Page_availability;
 
 (function (Page_availability) {
@@ -282,16 +331,16 @@ var Page_availability;
 
 class Page_checker {
   static page_available(arc, scene) {
-    this.debug && console.log(`Checking availability of ${arc}/${scene}`);
-    const available = this.choice_available.get(`${arc}/${scene}`);
+    Page_checker.debug && console.log(`Checking availability of ${arc}/${scene}`);
+    const available = Page_checker.choice_available.get(`${arc}/${scene}`);
 
     if (typeof available === "boolean") {
-      this.debug && console.log(`We know that page ${arc}/${scene} is ${available ? "available" : "unavailable"}`);
+      Page_checker.debug && console.log(`We know that page ${arc}/${scene} is ${available ? "available" : "unavailable"}`);
       return available ? Page_availability.Available : Page_availability.Unavailable;
     } else if (available === undefined) {
-      this.debug && console.log(`But we don't know if it's available yet, nobody has fetched it yet.`);
+      Page_checker.debug && console.log(`But we don't know if it's available yet, nobody has fetched it yet.`);
     } else {
-      this.debug && console.log(`But we don't know if it's available yet, but it's being fetched.`);
+      Page_checker.debug && console.log(`But we don't know if it's available yet, but it's being fetched.`);
     }
 
     return Page_availability.Unknown;
@@ -310,16 +359,16 @@ class Page_checker {
           try {
             yield download(`${arc}/${scene}.txt`);
             this.choice_available.set(`${arc}/${scene}`, true);
-            this.debug && console.log(`Source for page ${arc}/${scene} is available`);
+            Page_checker.debug && console.log(`Source for page ${arc}/${scene} is available`);
             return true;
           } catch (error) {
             this.choice_available.set(`${arc}/${scene}`, false);
-            this.debug && console.log(`Source for page ${arc}/${scene} is not available because ${error}`);
+            Page_checker.debug && console.log(`Source for page ${arc}/${scene} is not available because ${error}`);
             return false;
           }
         }))();
 
-        this.choice_available.set(`${arc}/${scene}`, promise);
+        Page_checker.choice_available.set(`${arc}/${scene}`, promise);
         return promise;
       }
 
@@ -381,6 +430,40 @@ Delayed_evaluation.delayed_evaluation_placeholder_number = 0;
 Delayed_evaluation.delay_evaluation_promise = (() => __awaiter(void 0, void 0, void 0, function* () {}))();
 
 Delayed_evaluation.active_delayed_evaluations = 0;
+
+function expression_to_html_js(expression) {
+  if (expression._assignment) {
+    return `sv('${expression._identifier.text}', ${expression_to_html_js(expression._expression)})`;
+  } else if (expression._quote) {
+    return `'${expression._string.text}'`;
+  }
+
+  let result = "";
+
+  for (let i = 0; i < expression.childCount; i++) {
+    const child = expression.getChild(i);
+
+    if (child instanceof cyoaeParser.Identifier_Context) {
+      //reading an identifier
+      result += `gv('${child.text}')`;
+    } else {
+      result += child.text;
+    }
+  }
+
+  return result;
+}
+
+function create_onclick_action(code) {
+  return run_parser({
+    filename: "onclick evaluator",
+    code: code,
+    evaluator: parser => {
+      return expression_to_html_js(parser.expression_());
+    }
+  });
+}
+
 const replacements = [{
   tag_name: "img",
   intro: Tag_result.from_html("<img"),
@@ -406,7 +489,8 @@ const replacements = [{
   replacements: tag => {
     const next = get_unique_required_attribute(tag, "next");
     const text = get_unique_required_attribute(tag, "text");
-    const onclick = get_unique_optional_attribute(tag, "onclick"); //TODO: assert that tag.attributes has no attributes besides next, text and onclick
+    const onclick = get_unique_optional_attribute(tag, "onclick");
+    const onclick_action = onclick ? create_onclick_action(onclick.plaintext) : undefined; //TODO: assert that tag.attributes has no attributes besides next, text and onclick
 
     function get_result(page_available) {
       //intro
@@ -414,7 +498,7 @@ const replacements = [{
 
       result = page_available ? result.append_html(` class='choice' href="#${current_arc}/${next.plaintext}"`) : result.append_html(` class='dead_choice'`); //onclick
 
-      result = page_available && onclick ? result.append_html(` onclick="${onclick.plaintext.replace(/"/g, "&quot;")};return true"`) : result; //text
+      result = onclick_action ? result.append_html(` onclick="try{${onclick_action}}catch(e){console.error(e)};return false"`) : result; //text
 
       result = result.append_html(">" + text.plaintext); //outro
 
@@ -464,7 +548,7 @@ const replacements = [{
   tag_name: "print",
   replacements: [{
     name: "variable",
-    replacement: text => Tag_result.from_plaintext(evaluate_variable(text.plaintext))
+    replacement: text => Tag_result.from_plaintext(`${Game_variables.get_variable(text.plaintext)}`)
   }]
 }, {
   tag_name: "select",
@@ -508,16 +592,6 @@ function throw_evaluation_error(error, context, source = current_source) {
 function evaluate_expression(expression) {
   if (expression._operator) {
     switch (expression._operator.text) {
-      case "=":
-        const value = evaluate_expression(expression._expression);
-
-        if (typeof value === "undefined") {
-          throw_evaluation_error(`Cannot assign value "${expression._expression.text}" to variable "${expression._identifier.text}" because the expression does not evaluate to a value.`, expression);
-        }
-
-        g.set(expression._identifier.text, value);
-        break;
-
       case "+":
       case "-":
       case "*":
@@ -554,9 +628,17 @@ function evaluate_expression(expression) {
       default:
         throw_evaluation_error(`TODO: Need to implement evaluating expression "${expression.text}"`, expression);
     }
+  } else if (expression._assignment) {
+    const value = evaluate_expression(expression._expression);
+
+    if (typeof value === "undefined") {
+      throw_evaluation_error(`Cannot assign value "${expression._expression.text}" to variable "${expression._identifier.text}" because the expression does not evaluate to a value.`, expression);
+    }
+
+    Game_variables.set_variable(expression._identifier.text, value);
   } else {
     if (expression._identifier) {
-      const value = g.get(expression._identifier.text);
+      const value = Game_variables.get_variable(expression._identifier.text);
 
       if (typeof value === "undefined") {
         throw_evaluation_error(`Variable "${expression._identifier.text}" is undefined`, expression);
@@ -564,7 +646,7 @@ function evaluate_expression(expression) {
 
       return value;
     } else if (expression._number) {
-      return parseInt(expression._number.text);
+      return parseFloat(expression._number.text);
     } else if (expression._expression) {
       return evaluate_expression(expression._expression);
     } else if (expression._string) {
@@ -778,6 +860,8 @@ function evaluate_richtext(ctx) {
 }
 
 function evaluate_select_tag(ctx) {
+  const debug = true;
+
   if (ctx._tag_name.text !== "select") {
     throw_evaluation_error(`Internal logic error: Evaluating "${ctx._tag_name.text}" as a "select" tag`, ctx);
   }
@@ -812,10 +896,15 @@ function evaluate_select_tag(ctx) {
     }
   }
 
+  debug && console.log(`All found cases: ${cases.reduce((curr, case_) => `${curr}\nApplicable: ${case_.applicable}, Score: ${case_.score}, Priority: ${case_.priority}, Text: ${case_.text.current_value}`, "")}`);
   cases = cases.filter(case_ => case_.applicable);
+  debug && console.log(`Applicable cases: ${cases.reduce((curr, case_) => `${curr}\nApplicable: ${case_.applicable}, Score: ${case_.score}, Priority: ${case_.priority}, Text: ${case_.text.current_value}`, "")}`);
   const max_score = cases.reduce((curr, case_) => case_.score > curr ? case_.score : curr, 0);
+  debug && console.log(`Max score: ${max_score}`);
   cases = cases.filter(case_ => case_.score === max_score);
+  debug && debug && console.log(`Max score cases: ${cases.reduce((curr, case_) => `${curr}\nApplicable: ${case_.applicable}, Score: ${case_.score}, Priority: ${case_.priority}, Text: ${case_.text.current_value}`, "")}`);
   const total_priority = cases.reduce((curr, case_) => curr + case_.priority, 0);
+  debug && console.log(`Total priority: ${total_priority}`);
 
   if (cases.length === 0) {
     return Tag_result.from_plaintext("");
@@ -902,16 +991,15 @@ function evaluate_case(ctx) {
           break;
 
         case "condition":
-          const old_source = current_source;
-
           try {
-            current_source = child._attribute_value.text;
-            const parser = get_parser(child._attribute_value.text, `Expression in ${child.start.line}:${child.start.charPositionInLine}`);
-            const case_code_result = evaluate_case_code(parser.case_code_());
+            const case_code_result = run_parser({
+              code: child._attribute_value.text,
+              filename: `Expression in ${child.start.line}:${child.start.charPositionInLine}`,
+              evaluator: parser => evaluate_case_code(parser.case_code_())
+            });
             result.applicable = result.applicable && case_code_result.applicable;
             result.score += case_code_result.score;
           } catch (err) {
-            current_source = old_source;
             throw_evaluation_error(`Failed evaluating condition: ${err}`, child._attribute_value);
           }
 
@@ -951,30 +1039,43 @@ function evaluate_case(ctx) {
   return result;
 }
 
-function get_parser(data, filename, lexer_error_listener = new LexerErrorListener(data), parser_error_listener) {
-  const input = antlr4ts.CharStreams.fromString(data, filename);
-  const lexer = new _cyoaeLexer.cyoaeLexer(input);
-  const tokens = new antlr4ts.CommonTokenStream(lexer);
-  const parser = new cyoaeParser.cyoaeParser(tokens);
-  parser_error_listener = parser_error_listener || new ParserErrorListener(data, parser);
-  lexer.removeErrorListeners();
-  lexer.addErrorListener(lexer_error_listener);
-  parser.removeErrorListeners();
-  parser.addErrorListener(parser_error_listener);
-  return parser;
+function run_parser(parameters) {
+  const old_source = current_source;
+  current_source = parameters.code;
+
+  try {
+    const input = antlr4ts.CharStreams.fromString(current_source, parameters.filename || "???");
+    const lexer = new _cyoaeLexer.cyoaeLexer(input);
+    const tokens = new antlr4ts.CommonTokenStream(lexer);
+    const parser = new cyoaeParser.cyoaeParser(tokens);
+    parameters.parser_error_listener = parameters.parser_error_listener || new ParserErrorListener(parser);
+    parameters.lexer_error_listener = parameters.lexer_error_listener || new LexerErrorListener();
+    lexer.removeErrorListeners();
+    lexer.addErrorListener(parameters.lexer_error_listener);
+    parser.removeErrorListeners();
+    parser.addErrorListener(parameters.parser_error_listener);
+    return parameters.evaluator(parser);
+  } finally {
+    current_source = old_source;
+  }
 }
 
 function parse_source_text(data, filename) {
   console.log(`Starting parsing source text ${filename}`);
-  current_source = data;
-  const tree = get_parser(data, filename).start_();
+  return run_parser({
+    code: data,
+    filename: filename,
+    evaluator: parser => {
+      const tree = parser.start_();
 
-  if (tree._rich_text) {
-    return evaluate_richtext(tree._rich_text).html;
-  } //TODO: Put up a proper placeholder page
+      if (tree._rich_text) {
+        return evaluate_richtext(tree._rich_text).html;
+      } //TODO: Put up a proper placeholder page for an empty source
 
 
-  return Tag_result.from_plaintext(`Empty file "${filename}"`).html;
+      return Tag_result.from_plaintext(`Empty file "${filename}"`).html;
+    }
+  });
 } // plays through a story arc
 
 
@@ -1150,7 +1251,13 @@ function tests() {
 
     function test_code_evaluation() {
       function test_eval(code, expected) {
-        assert_equal(evaluate_expression(get_parser(code, `code evaluation test "${code}"`).expression_()), expected, `for code "${code}"`);
+        run_parser({
+          code: code,
+          filename: `code evaluation test "${code}"`,
+          evaluator: parser => {
+            assert_equal(evaluate_expression(parser.expression_()), expected, `for code "${code}"`);
+          }
+        });
       }
 
       test_eval("x=42");
@@ -1180,6 +1287,7 @@ function main() {
     }
 
     try {
+      Game_variables.init();
       yield play_arc("intro");
       yield url_hash_change();
     } catch (err) {
@@ -1296,7 +1404,7 @@ cyoaeLexer.ruleNames = ["T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", 
 cyoaeLexer._LITERAL_NAMES = [undefined, "'\\''", "'\\'", "'\\'", "'\\'", "'\\'", "'('", "')'", "'\"'", "'*'", "'/'", "'+'", "'-'", "'='", "'=='", "'!='", "';'", "','", "'\\'", undefined, "':'", "'{'", "'}'", "'['", "']'"];
 cyoaeLexer._SYMBOLIC_NAMES = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, "NUMBER", "COLON", "ATTRIBUTE_OPEN", "ATTRIBUTE_CLOSE", "TAG_OPEN", "TAG_CLOSE", "WS", "WORDCHARACTER"];
 cyoaeLexer.VOCABULARY = new _VocabularyImpl.VocabularyImpl(cyoaeLexer._LITERAL_NAMES, cyoaeLexer._SYMBOLIC_NAMES, []);
-cyoaeLexer._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x02\x1Cy\b\x01\x04" + "\x02\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04" + "\x07\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r" + "\x04\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12" + "\x04\x13\t\x13\x04\x14\t\x14\x04\x15\t\x15\x04\x16\t\x16\x04\x17\t\x17" + "\x04\x18\t\x18\x04\x19\t\x19\x04\x1A\t\x1A\x04\x1B\t\x1B\x03\x02\x03\x02" + "\x03\x02\x03\x03\x03\x03\x03\x03\x03\x04\x03\x04\x03\x04\x03\x05\x03\x05" + "\x03\x05\x03\x06\x03\x06\x03\x06\x03\x07\x03\x07\x03\b\x03\b\x03\t\x03" + "\t\x03\n\x03\n\x03\v\x03\v\x03\f\x03\f\x03\r\x03\r\x03\x0E\x03\x0E\x03" + "\x0F\x03\x0F\x03\x0F\x03\x10\x03\x10\x03\x10\x03\x11\x03\x11\x03\x12\x03" + "\x12\x03\x13\x03\x13\x03\x13\x03\x14\x06\x14e\n\x14\r\x14\x0E\x14f\x03" + "\x15\x03\x15\x03\x16\x03\x16\x03\x17\x03\x17\x03\x18\x03\x18\x03\x19\x03" + "\x19\x03\x1A\x06\x1At\n\x1A\r\x1A\x0E\x1Au\x03\x1B\x03\x1B\x02\x02\x02" + "\x1C\x03\x02\x03\x05\x02\x04\x07\x02\x05\t\x02\x06\v\x02\x07\r\x02\b\x0F" + "\x02\t\x11\x02\n\x13\x02\v\x15\x02\f\x17\x02\r\x19\x02\x0E\x1B\x02\x0F" + "\x1D\x02\x10\x1F\x02\x11!\x02\x12#\x02\x13%\x02\x14\'\x02\x15)\x02\x16" + "+\x02\x17-\x02\x18/\x02\x191\x02\x1A3\x02\x1B5\x02\x1C\x03\x02\x05\x03" + "\x022;\x05\x02\v\f\x0F\x0F\"\"\x03\x02^^\x02z\x02\x03\x03\x02\x02\x02" + "\x02\x05\x03\x02\x02\x02\x02\x07\x03\x02\x02\x02\x02\t\x03\x02\x02\x02" + "\x02\v\x03\x02\x02\x02\x02\r\x03\x02\x02\x02\x02\x0F\x03\x02\x02\x02\x02" + "\x11\x03\x02\x02\x02\x02\x13\x03\x02\x02\x02\x02\x15\x03\x02\x02\x02\x02" + "\x17\x03\x02\x02\x02\x02\x19\x03\x02\x02\x02\x02\x1B\x03\x02\x02\x02\x02" + "\x1D\x03\x02\x02\x02\x02\x1F\x03\x02\x02\x02\x02!\x03\x02\x02\x02\x02" + "#\x03\x02\x02\x02\x02%\x03\x02\x02\x02\x02\'\x03\x02\x02\x02\x02)\x03" + "\x02\x02\x02\x02+\x03\x02\x02\x02\x02-\x03\x02\x02\x02\x02/\x03\x02\x02" + "\x02\x021\x03\x02\x02\x02\x023\x03\x02\x02\x02\x025\x03\x02\x02\x02\x03" + "7\x03\x02\x02\x02\x05:\x03\x02\x02\x02\x07=\x03\x02\x02\x02\t@\x03\x02" + "\x02\x02\vC\x03\x02\x02\x02\rF\x03\x02\x02\x02\x0FH\x03\x02\x02\x02\x11" + "J\x03\x02\x02\x02\x13L\x03\x02\x02\x02\x15N\x03\x02\x02\x02\x17P\x03\x02" + "\x02\x02\x19R\x03\x02\x02\x02\x1BT\x03\x02\x02\x02\x1DV\x03\x02\x02\x02" + "\x1FY\x03\x02\x02\x02!\\\x03\x02\x02\x02#^\x03\x02\x02\x02%`\x03\x02\x02" + "\x02\'d\x03\x02\x02\x02)h\x03\x02\x02\x02+j\x03\x02\x02\x02-l\x03\x02" + "\x02\x02/n\x03\x02\x02\x021p\x03\x02\x02\x023s\x03\x02\x02\x025w\x03\x02" + "\x02\x0278\x07^\x02\x0289\x07^\x02\x029\x04\x03\x02\x02\x02:;\x07^\x02" + "\x02;<\x07]\x02\x02<\x06\x03\x02\x02\x02=>\x07^\x02\x02>?\x07_\x02\x02" + "?\b\x03\x02\x02\x02@A\x07^\x02\x02AB\x07}\x02\x02B\n\x03\x02\x02\x02C" + "D\x07^\x02\x02DE\x07\x7F\x02\x02E\f\x03\x02\x02\x02FG\x07*\x02\x02G\x0E" + "\x03\x02\x02\x02HI\x07+\x02\x02I\x10\x03\x02\x02\x02JK\x07$\x02\x02K\x12" + "\x03\x02\x02\x02LM\x07,\x02\x02M\x14\x03\x02\x02\x02NO\x071\x02\x02O\x16" + "\x03\x02\x02\x02PQ\x07-\x02\x02Q\x18\x03\x02\x02\x02RS\x07/\x02\x02S\x1A" + "\x03\x02\x02\x02TU\x07?\x02\x02U\x1C\x03\x02\x02\x02VW\x07?\x02\x02WX" + "\x07?\x02\x02X\x1E\x03\x02\x02\x02YZ\x07#\x02\x02Z[\x07?\x02\x02[ \x03" + "\x02\x02\x02\\]\x07=\x02\x02]\"\x03\x02\x02\x02^_\x07.\x02\x02_$\x03\x02" + "\x02\x02`a\x07^\x02\x02ab\x07$\x02\x02b&\x03\x02\x02\x02ce\t\x02\x02\x02" + "dc\x03\x02\x02\x02ef\x03\x02\x02\x02fd\x03\x02\x02\x02fg\x03\x02\x02\x02" + "g(\x03\x02\x02\x02hi\x07<\x02\x02i*\x03\x02\x02\x02jk\x07}\x02\x02k,\x03" + "\x02\x02\x02lm\x07\x7F\x02\x02m.\x03\x02\x02\x02no\x07]\x02\x02o0\x03" + "\x02\x02\x02pq\x07_\x02\x02q2\x03\x02\x02\x02rt\t\x03\x02\x02sr\x03\x02" + "\x02\x02tu\x03\x02\x02\x02us\x03\x02\x02\x02uv\x03\x02\x02\x02v4\x03\x02" + "\x02\x02wx\n\x04\x02\x02x6\x03\x02\x02\x02\x05\x02fu\x02";
+cyoaeLexer._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x02\x1C\x81\b\x01" + "\x04\x02\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06" + "\x04\x07\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r" + "\t\r\x04\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t" + "\x12\x04\x13\t\x13\x04\x14\t\x14\x04\x15\t\x15\x04\x16\t\x16\x04\x17\t" + "\x17\x04\x18\t\x18\x04\x19\t\x19\x04\x1A\t\x1A\x04\x1B\t\x1B\x03\x02\x03" + "\x02\x03\x02\x03\x03\x03\x03\x03\x03\x03\x04\x03\x04\x03\x04\x03\x05\x03" + "\x05\x03\x05\x03\x06\x03\x06\x03\x06\x03\x07\x03\x07\x03\b\x03\b\x03\t" + "\x03\t\x03\n\x03\n\x03\v\x03\v\x03\f\x03\f\x03\r\x03\r\x03\x0E\x03\x0E" + "\x03\x0F\x03\x0F\x03\x0F\x03\x10\x03\x10\x03\x10\x03\x11\x03\x11\x03\x12" + "\x03\x12\x03\x13\x03\x13\x03\x13\x03\x14\x06\x14e\n\x14\r\x14\x0E\x14" + "f\x03\x14\x03\x14\x06\x14k\n\x14\r\x14\x0E\x14l\x05\x14o\n\x14\x03\x15" + "\x03\x15\x03\x16\x03\x16\x03\x17\x03\x17\x03\x18\x03\x18\x03\x19\x03\x19" + "\x03\x1A\x06\x1A|\n\x1A\r\x1A\x0E\x1A}\x03\x1B\x03\x1B\x02\x02\x02\x1C" + "\x03\x02\x03\x05\x02\x04\x07\x02\x05\t\x02\x06\v\x02\x07\r\x02\b\x0F\x02" + "\t\x11\x02\n\x13\x02\v\x15\x02\f\x17\x02\r\x19\x02\x0E\x1B\x02\x0F\x1D" + "\x02\x10\x1F\x02\x11!\x02\x12#\x02\x13%\x02\x14\'\x02\x15)\x02\x16+\x02" + "\x17-\x02\x18/\x02\x191\x02\x1A3\x02\x1B5\x02\x1C\x03\x02\x05\x03\x02" + "2;\x05\x02\v\f\x0F\x0F\"\"\x03\x02^^\x02\x84\x02\x03\x03\x02\x02\x02\x02" + "\x05\x03\x02\x02\x02\x02\x07\x03\x02\x02\x02\x02\t\x03\x02\x02\x02\x02" + "\v\x03\x02\x02\x02\x02\r\x03\x02\x02\x02\x02\x0F\x03\x02\x02\x02\x02\x11" + "\x03\x02\x02\x02\x02\x13\x03\x02\x02\x02\x02\x15\x03\x02\x02\x02\x02\x17" + "\x03\x02\x02\x02\x02\x19\x03\x02\x02\x02\x02\x1B\x03\x02\x02\x02\x02\x1D" + "\x03\x02\x02\x02\x02\x1F\x03\x02\x02\x02\x02!\x03\x02\x02\x02\x02#\x03" + "\x02\x02\x02\x02%\x03\x02\x02\x02\x02\'\x03\x02\x02\x02\x02)\x03\x02\x02" + "\x02\x02+\x03\x02\x02\x02\x02-\x03\x02\x02\x02\x02/\x03\x02\x02\x02\x02" + "1\x03\x02\x02\x02\x023\x03\x02\x02\x02\x025\x03\x02\x02\x02\x037\x03\x02" + "\x02\x02\x05:\x03\x02\x02\x02\x07=\x03\x02\x02\x02\t@\x03\x02\x02\x02" + "\vC\x03\x02\x02\x02\rF\x03\x02\x02\x02\x0FH\x03\x02\x02\x02\x11J\x03\x02" + "\x02\x02\x13L\x03\x02\x02\x02\x15N\x03\x02\x02\x02\x17P\x03\x02\x02\x02" + "\x19R\x03\x02\x02\x02\x1BT\x03\x02\x02\x02\x1DV\x03\x02\x02\x02\x1FY\x03" + "\x02\x02\x02!\\\x03\x02\x02\x02#^\x03\x02\x02\x02%`\x03\x02\x02\x02\'" + "d\x03\x02\x02\x02)p\x03\x02\x02\x02+r\x03\x02\x02\x02-t\x03\x02\x02\x02" + "/v\x03\x02\x02\x021x\x03\x02\x02\x023{\x03\x02\x02\x025\x7F\x03\x02\x02" + "\x0278\x07^\x02\x0289\x07^\x02\x029\x04\x03\x02\x02\x02:;\x07^\x02\x02" + ";<\x07]\x02\x02<\x06\x03\x02\x02\x02=>\x07^\x02\x02>?\x07_\x02\x02?\b" + "\x03\x02\x02\x02@A\x07^\x02\x02AB\x07}\x02\x02B\n\x03\x02\x02\x02CD\x07" + "^\x02\x02DE\x07\x7F\x02\x02E\f\x03\x02\x02\x02FG\x07*\x02\x02G\x0E\x03" + "\x02\x02\x02HI\x07+\x02\x02I\x10\x03\x02\x02\x02JK\x07$\x02\x02K\x12\x03" + "\x02\x02\x02LM\x07,\x02\x02M\x14\x03\x02\x02\x02NO\x071\x02\x02O\x16\x03" + "\x02\x02\x02PQ\x07-\x02\x02Q\x18\x03\x02\x02\x02RS\x07/\x02\x02S\x1A\x03" + "\x02\x02\x02TU\x07?\x02\x02U\x1C\x03\x02\x02\x02VW\x07?\x02\x02WX\x07" + "?\x02\x02X\x1E\x03\x02\x02\x02YZ\x07#\x02\x02Z[\x07?\x02\x02[ \x03\x02" + "\x02\x02\\]\x07=\x02\x02]\"\x03\x02\x02\x02^_\x07.\x02\x02_$\x03\x02\x02" + "\x02`a\x07^\x02\x02ab\x07$\x02\x02b&\x03\x02\x02\x02ce\t\x02\x02\x02d" + "c\x03\x02\x02\x02ef\x03\x02\x02\x02fd\x03\x02\x02\x02fg\x03\x02\x02\x02" + "gn\x03\x02\x02\x02hj\x070\x02\x02ik\t\x02\x02\x02ji\x03\x02\x02\x02kl" + "\x03\x02\x02\x02lj\x03\x02\x02\x02lm\x03\x02\x02\x02mo\x03\x02\x02\x02" + "nh\x03\x02\x02\x02no\x03\x02\x02\x02o(\x03\x02\x02\x02pq\x07<\x02\x02" + "q*\x03\x02\x02\x02rs\x07}\x02\x02s,\x03\x02\x02\x02tu\x07\x7F\x02\x02" + "u.\x03\x02\x02\x02vw\x07]\x02\x02w0\x03\x02\x02\x02xy\x07_\x02\x02y2\x03" + "\x02\x02\x02z|\t\x03\x02\x02{z\x03\x02\x02\x02|}\x03\x02\x02\x02}{\x03" + "\x02\x02\x02}~\x03\x02\x02\x02~4\x03\x02\x02\x02\x7F\x80\n\x04\x02\x02" + "\x806\x03\x02\x02\x02\x07\x02fln}\x02";
 
 },{"antlr4ts/Lexer":25,"antlr4ts/VocabularyImpl":48,"antlr4ts/atn/ATNDeserializer":54,"antlr4ts/atn/LexerATNSimulator":75,"antlr4ts/misc/Utils":136}],3:[function(require,module,exports){
 "use strict";
@@ -2095,11 +2203,11 @@ class cyoaeParser extends _Parser.Parser {
           case 5:
             {
               this.state = 136;
-              this.match(cyoaeParser.T__7);
+              _localctx._quote = this.match(cyoaeParser.T__7);
               this.state = 137;
               _localctx._string = this.string_content_();
               this.state = 138;
-              this.match(cyoaeParser.T__7);
+              _localctx._quote = this.match(cyoaeParser.T__7);
             }
             break;
 
@@ -2121,7 +2229,7 @@ class cyoaeParser extends _Parser.Parser {
               }
 
               this.state = 144;
-              _localctx._operator = this.match(cyoaeParser.T__12);
+              _localctx._assignment = this.match(cyoaeParser.T__12);
               this.state = 146;
 
               this._errHandler.sync(this);
