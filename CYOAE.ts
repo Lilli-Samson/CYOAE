@@ -174,7 +174,7 @@ function get_unique_required_attribute(tag: Tag, attribute: string) {
 
 type Game_types = number | string | boolean;
 class Game_variables{
-    private static debug = true;
+    private static debug = false;
     static init() {
         (window as any).gv = Game_variables.get_variable;
         (window as any).sv = Game_variables.set_variable;
@@ -193,10 +193,12 @@ class Game_variables{
     static set_variable(variable_name: string, value: Game_types) {
         Game_variables.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${Game_variables.value_to_string(value)})`);
         localStorage.setItem(variable_name, Game_variables.value_to_string(value));
+        return true;
     }
     static delete_variable(variable_name: string) {
         Game_variables.debug && console.log(`Deleting variable "${variable_name}"`);
         localStorage.removeItem(variable_name);
+        return true;
     }
     static clear() {
         Game_variables.debug && console.log(`Clearing all variables`);
@@ -381,7 +383,7 @@ const replacements: Tag_replacement[] = [
                 //onclick
                 result =
                     onclick_action
-                    ? result.append_html(` onclick="try{${onclick_action}}catch(e){console.error(e)};return false"`)
+                    ? result.append_html(` onclick="${onclick_action}"`)
                     : result;
                 //text
                 result = result.append_html(">" + text.plaintext);
@@ -733,7 +735,7 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
 }
 
 function evaluate_select_tag(ctx: cyoaeParser.Tag_Context): Tag_result {
-    const debug = true;
+    const debug = false;
     if (ctx._tag_name.text !== "select") {
         throw_evaluation_error(`Internal logic error: Evaluating "${ctx._tag_name.text}" as a "select" tag`, ctx);
     }
@@ -1095,12 +1097,30 @@ async function tests() {
             test_eval("1/0");
             assert(false, `Zero division error did not produce exception`);
         } catch (e) {}
+        Game_variables.delete_variable("x");
     }
     test_code_evaluation();
+
+    function test_game_variables() {
+        assert_equal(typeof Game_variables.get_variable("test"), "undefined");
+        Game_variables.set_variable("test", "yo");
+        assert_equal(typeof Game_variables.get_variable("test"), "string");
+        assert_equal(Game_variables.get_variable("test"), "yo");
+        Game_variables.set_variable("test", 42);
+        assert_equal(typeof Game_variables.get_variable("test"), "number");
+        assert_equal(Game_variables.get_variable("test"), 42);
+        Game_variables.set_variable("test", true);
+        assert_equal(typeof Game_variables.get_variable("test"), "boolean");
+        assert_equal(Game_variables.get_variable("test"), true);
+        Game_variables.delete_variable("test");
+        assert_equal(typeof Game_variables.get_variable("test"), "undefined");
+    }
+    test_game_variables();
 }
 
 // script entry point, loading the correct state and displays errors
 async function main() {
+    Game_variables.init();
     try {
         await tests();
     }
@@ -1109,7 +1129,6 @@ async function main() {
         return;
     }
     try {
-        Game_variables.init();
         await play_arc("intro");
         await url_hash_change();
     }

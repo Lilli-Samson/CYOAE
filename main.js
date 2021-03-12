@@ -272,11 +272,13 @@ class Game_variables {
   static set_variable(variable_name, value) {
     Game_variables.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${Game_variables.value_to_string(value)})`);
     localStorage.setItem(variable_name, Game_variables.value_to_string(value));
+    return true;
   }
 
   static delete_variable(variable_name) {
     Game_variables.debug && console.log(`Deleting variable "${variable_name}"`);
     localStorage.removeItem(variable_name);
+    return true;
   }
 
   static clear() {
@@ -320,7 +322,7 @@ class Game_variables {
 
 }
 
-Game_variables.debug = true;
+Game_variables.debug = false;
 var Page_availability;
 
 (function (Page_availability) {
@@ -498,7 +500,7 @@ const replacements = [{
 
       result = page_available ? result.append_html(` class='choice' href="#${current_arc}/${next.plaintext}"`) : result.append_html(` class='dead_choice'`); //onclick
 
-      result = onclick_action ? result.append_html(` onclick="try{${onclick_action}}catch(e){console.error(e)};return false"`) : result; //text
+      result = onclick_action ? result.append_html(` onclick="${onclick_action}"`) : result; //text
 
       result = result.append_html(">" + text.plaintext); //outro
 
@@ -1270,15 +1272,38 @@ function tests() {
         test_eval("1/0");
         assert(false, `Zero division error did not produce exception`);
       } catch (e) {}
+
+      Game_variables.delete_variable("x");
     }
 
     test_code_evaluation();
+
+    function test_game_variables() {
+      assert_equal(typeof Game_variables.get_variable("test"), "undefined");
+      Game_variables.set_variable("test", "yo");
+      assert_equal(typeof Game_variables.get_variable("test"), "string");
+      assert_equal(Game_variables.get_variable("test"), "yo");
+      Game_variables.set_variable("test", 42);
+      assert_equal(typeof Game_variables.get_variable("test"), "number");
+      assert_equal(Game_variables.get_variable("test"), 42);
+      Game_variables.set_variable("test", true);
+      assert_equal(typeof Game_variables.get_variable("test"), "boolean");
+      assert_equal(Game_variables.get_variable("test"), true);
+      Game_variables.delete_variable("test");
+      assert_equal(typeof Game_variables.get_variable("test"), "undefined");
+    }
+
+    console.log(Game_variables.get_variable("Restarttest"));
+    Game_variables.set_variable("Restarttest", "Successfully loaded from local storage");
+    test_game_variables();
   });
 } // script entry point, loading the correct state and displays errors
 
 
 function main() {
   return __awaiter(this, void 0, void 0, function* () {
+    Game_variables.init();
+
     try {
       yield tests();
     } catch (err) {
@@ -1287,7 +1312,6 @@ function main() {
     }
 
     try {
-      Game_variables.init();
       yield play_arc("intro");
       yield url_hash_change();
     } catch (err) {
