@@ -55,7 +55,7 @@ class ParserErrorListener {
   }
 
   syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
-    var _a, _b, _c;
+    var _a, _b;
 
     throw_evaluation_error(`Parser error: ${msg}${e ? `: ${(_a = e.context) === null || _a === void 0 ? void 0 : _a.toStringTree(this.parser)}` : ""}`, {
       start: {
@@ -63,7 +63,7 @@ class ParserErrorListener {
         charPositionInLine: charPositionInLine
       },
       sourceInterval: {
-        length: ((_c = (_b = offendingSymbol) === null || _b === void 0 ? void 0 : _b.text) === null || _c === void 0 ? void 0 : _c.length) || 0
+        length: ((_b = offendingSymbol === null || offendingSymbol === void 0 ? void 0 : offendingSymbol.text) === null || _b === void 0 ? void 0 : _b.length) || 0
       }
     }, current_source);
   }
@@ -1022,7 +1022,9 @@ function update_current_scene() {
     debug && console.log(`updating scene to ${current_arc}/${current_scene}`);
 
     try {
-      document.body.innerHTML = `<div class="main">${parse_source_text(yield download(`${current_arc}/${current_scene}.txt`), `${current_scene}.txt`)}</div>`;
+      _storage.Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
+
+      document.body.innerHTML = `<div class="main">${parse_source_text(yield download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`)}</div>`;
     } catch (err) {
       display_error_document(`${err}`);
     }
@@ -1246,7 +1248,14 @@ function main() {
     }
 
     try {
-      yield play_arc("intro");
+      const value = _storage.Variable_storage.get_internal_string("current_scene");
+
+      if (value) {
+        window.location.hash = `#${value}`;
+      } else {
+        yield play_arc("intro");
+      }
+
       yield url_hash_change();
     } catch (err) {
       display_error_document(`${err}`);
@@ -30805,6 +30814,44 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.Variable_storage = void 0;
 
+function variable_to_string(value) {
+  switch (typeof value) {
+    case "string":
+      return `s${value}`;
+
+    case "number":
+      return `n${value}`;
+
+    case "boolean":
+      return value ? "b1" : "b0";
+  }
+}
+
+function string_to_variable(vv) {
+  const prefix = vv[0];
+  const value = vv.substring(1);
+
+  switch (prefix) {
+    case 's':
+      //string
+      return value;
+
+    case 'n':
+      //number
+      return parseFloat(value);
+
+    case 'b':
+      //boolean
+      return value === "1" ? true : false;
+  }
+
+  throw `invalid value: ${vv}`;
+}
+
+function is_storage_value(key) {
+  return key.length >= 1 && "snb".includes(key[0]);
+}
+
 class Variable_storage {
   static init() {
     window.gv = Variable_storage.get_variable;
@@ -30813,7 +30860,7 @@ class Variable_storage {
   }
 
   static get_variable(variable_name) {
-    const stored = localStorage.getItem(variable_name);
+    const stored = localStorage.getItem(`v${variable_name}`);
 
     if (typeof stored !== "string") {
       Variable_storage.debug && console.log(`Getting variable "${variable_name}" (value: undefined)`);
@@ -30821,59 +30868,97 @@ class Variable_storage {
       return;
     }
 
-    Variable_storage.debug && console.log(`Getting variable "${variable_name}" with value: ${Variable_storage.string_to_value(stored)} (encoded: ${stored})`);
-    return Variable_storage.string_to_value(stored);
+    if (!is_storage_value(stored)) {
+      return;
+    }
+
+    Variable_storage.debug && console.log(`Getting variable "${variable_name}" with value: ${string_to_variable(stored)} (encoded: ${stored})`);
+    return string_to_variable(stored);
   }
 
   static set_variable(variable_name, value) {
-    Variable_storage.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${Variable_storage.value_to_string(value)})`);
-    localStorage.setItem(variable_name, Variable_storage.value_to_string(value));
+    Variable_storage.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${variable_to_string(value)})`);
+    localStorage.setItem(`v${variable_name}`, variable_to_string(value));
     return true;
   }
 
   static delete_variable(variable_name) {
     Variable_storage.debug && console.log(`Deleting variable "${variable_name}"`);
-    localStorage.removeItem(variable_name);
+    localStorage.removeItem(`v${variable_name}`);
     return true;
   }
 
-  static clear() {
-    Variable_storage.debug && console.log(`Clearing all variables`);
+  static get_internal(internal_name) {
+    const stored = localStorage.getItem(`i${internal_name}`);
+
+    if (typeof stored !== "string") {
+      Variable_storage.debug && console.log(`Getting internal "${internal_name}" (value: undefined)`);
+      console.error(`Tried to fetch undefined internal ${internal_name}`);
+      return;
+    }
+
+    if (!is_storage_value(stored)) {
+      throw `Invalid value for internal key ${internal_name}: "${stored}"`;
+    }
+
+    Variable_storage.debug && console.log(`Getting internal "${internal_name}" with value: ${string_to_variable(stored)} (encoded: ${stored})`);
+    return string_to_variable(stored);
+  }
+
+  static get_internal_string(internal_name) {
+    const value = this.get_internal(internal_name);
+
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+
+  static set_internal(internal_name, value) {
+    Variable_storage.debug && console.log(`Setting internal "${internal_name}" to value ${value} (encoded: ${variable_to_string(value)})`);
+    localStorage.setItem(`i${internal_name}`, variable_to_string(value));
+    return true;
+  }
+
+  static delete_internal(internal_name) {
+    Variable_storage.debug && console.log(`Deleting internal "${internal_name}"`);
+    localStorage.removeItem(`i${internal_name}`);
+    return true;
+  }
+
+  static clear_all() {
+    Variable_storage.debug && console.log(`Clearing all variables and internals`);
     localStorage.clear();
   }
 
-  static value_to_string(value) {
-    switch (typeof value) {
-      case "string":
-        return `s${value}`;
+  static get variables() {
+    let result = new Map();
 
-      case "number":
-        return `n${value}`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
 
-      case "boolean":
-        return value ? "b1" : "b0";
-    }
-  }
+      if (typeof key !== "string") {
+        throw `localStorage logic error: Failed finding key ${i}`;
+      }
 
-  static string_to_value(str) {
-    const type = str[0];
-    const value = str.substring(1, str.length);
+      if (!(key[0] === "v")) {
+        //not a variable
+        continue;
+      }
 
-    switch (type) {
-      case 's':
-        //string
-        return value;
+      const value = localStorage.getItem(key);
 
-      case 'n':
-        //number
-        return parseFloat(value);
+      if (typeof value !== "string") {
+        throw `localStorage logic error: Failed finding value for key ${key}`;
+      }
 
-      case 'b':
-        //boolean
-        return value === "1" ? true : false;
+      if (!is_storage_value(value)) {
+        throw `localStorage logic error: Invalid value ${value}`;
+      }
+
+      result.set(key.substr(1), string_to_variable(value));
     }
 
-    throw `invalid value: ${str}`;
+    return result;
   }
 
 }

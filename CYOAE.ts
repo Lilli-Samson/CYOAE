@@ -883,7 +883,8 @@ async function update_current_scene() {
     const debug = false;
     debug && console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
-        document.body.innerHTML = `<div class="main">${parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_scene}.txt`)}</div>`;
+        Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
+        document.body.innerHTML = `<div class="main">${parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`)}</div>`;
     }
     catch (err) {
         display_error_document(`${err}`);
@@ -1073,7 +1074,13 @@ async function main() {
         return;
     }
     try {
-        await play_arc("intro");
+        const value = Variable_storage.get_internal_string("current_scene");
+        if (value) {
+            window.location.hash = `#${value}`;
+        }
+        else {
+            await play_arc("intro");
+        }
         await url_hash_change();
     }
     catch (err) {
