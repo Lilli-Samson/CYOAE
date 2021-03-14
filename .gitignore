@@ -12,6 +12,7 @@ cyoaeParser.js
 package-lock.json
 node_modules
 CYOAE.js
+storage.js
 main_debug.js
 main_release.js
 .antlr

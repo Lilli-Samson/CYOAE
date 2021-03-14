@@ -3,6 +3,7 @@
 import * as antlr4ts from 'antlr4ts';
 import { cyoaeLexer } from './cyoaeLexer';
 import * as cyoaeParser from './cyoaeParser';
+import {Variable_storage, Variable_storage_types} from './storage';
 
 let current_arc = "";
 let current_scene = "";
@@ -170,63 +171,6 @@ function get_unique_required_attribute(tag: Tag, attribute: string) {
         throw_evaluation_error(`Missing required attribute "${attribute}" in tag "${tag.name}"`, tag.ctx);
     }
     return result;
-}
-
-type Game_types = number | string | boolean;
-class Game_variables{
-    private static debug = false;
-    static init() {
-        (window as any).gv = Game_variables.get_variable;
-        (window as any).sv = Game_variables.set_variable;
-        (window as any).dv = Game_variables.delete_variable;
-    }
-    static get_variable(variable_name: string) {
-        const stored = localStorage.getItem(variable_name);
-        if (typeof stored !== "string") {
-            Game_variables.debug && console.log(`Getting variable "${variable_name}" (value: undefined)`);
-            console.error(`Tried to fetch undefined variable ${variable_name}`);
-            return;
-        }
-        Game_variables.debug && console.log(`Getting variable "${variable_name}" with value: ${Game_variables.string_to_value(stored)} (encoded: ${stored})`);
-        return Game_variables.string_to_value(stored);
-    }
-    static set_variable(variable_name: string, value: Game_types) {
-        Game_variables.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${Game_variables.value_to_string(value)})`);
-        localStorage.setItem(variable_name, Game_variables.value_to_string(value));
-        return true;
-    }
-    static delete_variable(variable_name: string) {
-        Game_variables.debug && console.log(`Deleting variable "${variable_name}"`);
-        localStorage.removeItem(variable_name);
-        return true;
-    }
-    static clear() {
-        Game_variables.debug && console.log(`Clearing all variables`);
-        localStorage.clear();
-    }
-    private static value_to_string(value: Game_types): string {
-        switch (typeof value) {
-            case "string":
-                return `s${value}`;
-            case "number":
-                return `n${value}`;
-            case "boolean":
-                return value ? "b1" : "b0";
-        }
-    }
-    private static string_to_value(str: string): Game_types {
-        const type = str[0];
-        const value = str.substring(1, str.length);
-        switch (type) {
-            case 's': //string
-                return value;
-            case 'n': //number
-                return parseFloat(value);
-            case 'b': //boolean
-                return value === "1" ? true : false;
-        }
-        throw `invalid value: ${str}`;
-    }
 }
 
 enum Page_availability {
@@ -433,7 +377,7 @@ const replacements: Tag_replacement[] = [
         tag_name: "print",
         replacements: 
         [
-            {name: "variable", replacement: text => Tag_result.from_plaintext(`${Game_variables.get_variable(text.plaintext)}`)},
+            {name: "variable", replacement: text => Tag_result.from_plaintext(`${Variable_storage.get_variable(text.plaintext)}`)},
         ],
     },
     { //select
@@ -492,7 +436,7 @@ function throw_evaluation_error(error: string, context: Evaluation_error_context
         + error;
 }
 
-function evaluate_expression(expression: cyoaeParser.Expression_Context): Game_types | undefined {
+function evaluate_expression(expression: cyoaeParser.Expression_Context): Variable_storage_types | undefined {
     if (expression._operator) {
         switch (expression._operator.text) {
             case "+":
@@ -528,11 +472,11 @@ function evaluate_expression(expression: cyoaeParser.Expression_Context): Game_t
         if (typeof value === "undefined") {
             throw_evaluation_error(`Cannot assign value "${expression._expression.text}" to variable "${expression._identifier.text}" because the expression does not evaluate to a value.`, expression);
         }
-        Game_variables.set_variable(expression._identifier.text, value);
+        Variable_storage.set_variable(expression._identifier.text, value);
     }
     else {
         if (expression._identifier) {
-            const value = Game_variables.get_variable(expression._identifier.text);
+            const value = Variable_storage.get_variable(expression._identifier.text);
             if (typeof value === "undefined") {
                 throw_evaluation_error(`Variable "${expression._identifier.text}" is undefined`, expression);
             }
@@ -559,17 +503,17 @@ function evaluate_expression(expression: cyoaeParser.Expression_Context): Game_t
             function get_operator() {
                 switch (expression._comparator.text) {
                     case "==":
-                        return (lhs: Game_types, rhs: Game_types) => lhs === rhs;
+                        return (lhs: Variable_storage_types, rhs: Variable_storage_types) => lhs === rhs;
                     case "!=":
-                        return (lhs: Game_types, rhs: Game_types) => lhs !== rhs;
+                        return (lhs: Variable_storage_types, rhs: Variable_storage_types) => lhs !== rhs;
                     case "<=":
-                        return (lhs: Game_types, rhs: Game_types) => lhs <= rhs;
+                        return (lhs: Variable_storage_types, rhs: Variable_storage_types) => lhs <= rhs;
                     case ">=":
-                        return (lhs: Game_types, rhs: Game_types) => lhs >= rhs;
+                        return (lhs: Variable_storage_types, rhs: Variable_storage_types) => lhs >= rhs;
                     case "<":
-                        return (lhs: Game_types, rhs: Game_types) => lhs < rhs;
+                        return (lhs: Variable_storage_types, rhs: Variable_storage_types) => lhs < rhs;
                     case ">":
-                        return (lhs: Game_types, rhs: Game_types) => lhs > rhs;
+                        return (lhs: Variable_storage_types, rhs: Variable_storage_types) => lhs > rhs;
                     default:
                         throw_evaluation_error(`Invalid operator ${expression._comparator.text}`, expression._comparator);
                 }
@@ -1097,30 +1041,30 @@ async function tests() {
             test_eval("1/0");
             assert(false, `Zero division error did not produce exception`);
         } catch (e) {}
-        Game_variables.delete_variable("x");
+        Variable_storage.delete_variable("x");
     }
     test_code_evaluation();
 
     function test_game_variables() {
-        assert_equal(typeof Game_variables.get_variable("test"), "undefined");
-        Game_variables.set_variable("test", "yo");
-        assert_equal(typeof Game_variables.get_variable("test"), "string");
-        assert_equal(Game_variables.get_variable("test"), "yo");
-        Game_variables.set_variable("test", 42);
-        assert_equal(typeof Game_variables.get_variable("test"), "number");
-        assert_equal(Game_variables.get_variable("test"), 42);
-        Game_variables.set_variable("test", true);
-        assert_equal(typeof Game_variables.get_variable("test"), "boolean");
-        assert_equal(Game_variables.get_variable("test"), true);
-        Game_variables.delete_variable("test");
-        assert_equal(typeof Game_variables.get_variable("test"), "undefined");
+        assert_equal(typeof Variable_storage.get_variable("test"), "undefined");
+        Variable_storage.set_variable("test", "yo");
+        assert_equal(typeof Variable_storage.get_variable("test"), "string");
+        assert_equal(Variable_storage.get_variable("test"), "yo");
+        Variable_storage.set_variable("test", 42);
+        assert_equal(typeof Variable_storage.get_variable("test"), "number");
+        assert_equal(Variable_storage.get_variable("test"), 42);
+        Variable_storage.set_variable("test", true);
+        assert_equal(typeof Variable_storage.get_variable("test"), "boolean");
+        assert_equal(Variable_storage.get_variable("test"), true);
+        Variable_storage.delete_variable("test");
+        assert_equal(typeof Variable_storage.get_variable("test"), "undefined");
     }
     test_game_variables();
 }
 
 // script entry point, loading the correct state and displays errors
 async function main() {
-    Game_variables.init();
+    Variable_storage.init();
     try {
         await tests();
     }

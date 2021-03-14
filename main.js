@@ -7,6 +7,8 @@ var _cyoaeLexer = require("./cyoaeLexer");
 
 var cyoaeParser = _interopRequireWildcard(require("./cyoaeParser"));
 
+var _storage = require("./storage");
+
 function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
@@ -249,80 +251,6 @@ function get_unique_required_attribute(tag, attribute) {
   return result;
 }
 
-class Game_variables {
-  static init() {
-    window.gv = Game_variables.get_variable;
-    window.sv = Game_variables.set_variable;
-    window.dv = Game_variables.delete_variable;
-  }
-
-  static get_variable(variable_name) {
-    const stored = localStorage.getItem(variable_name);
-
-    if (typeof stored !== "string") {
-      Game_variables.debug && console.log(`Getting variable "${variable_name}" (value: undefined)`);
-      console.error(`Tried to fetch undefined variable ${variable_name}`);
-      return;
-    }
-
-    Game_variables.debug && console.log(`Getting variable "${variable_name}" with value: ${Game_variables.string_to_value(stored)} (encoded: ${stored})`);
-    return Game_variables.string_to_value(stored);
-  }
-
-  static set_variable(variable_name, value) {
-    Game_variables.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${Game_variables.value_to_string(value)})`);
-    localStorage.setItem(variable_name, Game_variables.value_to_string(value));
-    return true;
-  }
-
-  static delete_variable(variable_name) {
-    Game_variables.debug && console.log(`Deleting variable "${variable_name}"`);
-    localStorage.removeItem(variable_name);
-    return true;
-  }
-
-  static clear() {
-    Game_variables.debug && console.log(`Clearing all variables`);
-    localStorage.clear();
-  }
-
-  static value_to_string(value) {
-    switch (typeof value) {
-      case "string":
-        return `s${value}`;
-
-      case "number":
-        return `n${value}`;
-
-      case "boolean":
-        return value ? "b1" : "b0";
-    }
-  }
-
-  static string_to_value(str) {
-    const type = str[0];
-    const value = str.substring(1, str.length);
-
-    switch (type) {
-      case 's':
-        //string
-        return value;
-
-      case 'n':
-        //number
-        return parseFloat(value);
-
-      case 'b':
-        //boolean
-        return value === "1" ? true : false;
-    }
-
-    throw `invalid value: ${str}`;
-  }
-
-}
-
-Game_variables.debug = false;
 var Page_availability;
 
 (function (Page_availability) {
@@ -550,7 +478,7 @@ const replacements = [{
   tag_name: "print",
   replacements: [{
     name: "variable",
-    replacement: text => Tag_result.from_plaintext(`${Game_variables.get_variable(text.plaintext)}`)
+    replacement: text => Tag_result.from_plaintext(`${_storage.Variable_storage.get_variable(text.plaintext)}`)
   }]
 }, {
   tag_name: "select",
@@ -637,10 +565,10 @@ function evaluate_expression(expression) {
       throw_evaluation_error(`Cannot assign value "${expression._expression.text}" to variable "${expression._identifier.text}" because the expression does not evaluate to a value.`, expression);
     }
 
-    Game_variables.set_variable(expression._identifier.text, value);
+    _storage.Variable_storage.set_variable(expression._identifier.text, value);
   } else {
     if (expression._identifier) {
-      const value = Game_variables.get_variable(expression._identifier.text);
+      const value = _storage.Variable_storage.get_variable(expression._identifier.text);
 
       if (typeof value === "undefined") {
         throw_evaluation_error(`Variable "${expression._identifier.text}" is undefined`, expression);
@@ -862,7 +790,7 @@ function evaluate_richtext(ctx) {
 }
 
 function evaluate_select_tag(ctx) {
-  const debug = true;
+  const debug = false;
 
   if (ctx._tag_name.text !== "select") {
     throw_evaluation_error(`Internal logic error: Evaluating "${ctx._tag_name.text}" as a "select" tag`, ctx);
@@ -1273,28 +1201,34 @@ function tests() {
         assert(false, `Zero division error did not produce exception`);
       } catch (e) {}
 
-      Game_variables.delete_variable("x");
+      _storage.Variable_storage.delete_variable("x");
     }
 
     test_code_evaluation();
 
     function test_game_variables() {
-      assert_equal(typeof Game_variables.get_variable("test"), "undefined");
-      Game_variables.set_variable("test", "yo");
-      assert_equal(typeof Game_variables.get_variable("test"), "string");
-      assert_equal(Game_variables.get_variable("test"), "yo");
-      Game_variables.set_variable("test", 42);
-      assert_equal(typeof Game_variables.get_variable("test"), "number");
-      assert_equal(Game_variables.get_variable("test"), 42);
-      Game_variables.set_variable("test", true);
-      assert_equal(typeof Game_variables.get_variable("test"), "boolean");
-      assert_equal(Game_variables.get_variable("test"), true);
-      Game_variables.delete_variable("test");
-      assert_equal(typeof Game_variables.get_variable("test"), "undefined");
+      assert_equal(typeof _storage.Variable_storage.get_variable("test"), "undefined");
+
+      _storage.Variable_storage.set_variable("test", "yo");
+
+      assert_equal(typeof _storage.Variable_storage.get_variable("test"), "string");
+      assert_equal(_storage.Variable_storage.get_variable("test"), "yo");
+
+      _storage.Variable_storage.set_variable("test", 42);
+
+      assert_equal(typeof _storage.Variable_storage.get_variable("test"), "number");
+      assert_equal(_storage.Variable_storage.get_variable("test"), 42);
+
+      _storage.Variable_storage.set_variable("test", true);
+
+      assert_equal(typeof _storage.Variable_storage.get_variable("test"), "boolean");
+      assert_equal(_storage.Variable_storage.get_variable("test"), true);
+
+      _storage.Variable_storage.delete_variable("test");
+
+      assert_equal(typeof _storage.Variable_storage.get_variable("test"), "undefined");
     }
 
-    console.log(Game_variables.get_variable("Restarttest"));
-    Game_variables.set_variable("Restarttest", "Successfully loaded from local storage");
     test_game_variables();
   });
 } // script entry point, loading the correct state and displays errors
@@ -1302,7 +1236,7 @@ function tests() {
 
 function main() {
   return __awaiter(this, void 0, void 0, function* () {
-    Game_variables.init();
+    _storage.Variable_storage.init();
 
     try {
       yield tests();
@@ -1322,7 +1256,7 @@ function main() {
 
 main();
 
-},{"./cyoaeLexer":2,"./cyoaeParser":3,"antlr4ts":119}],2:[function(require,module,exports){
+},{"./cyoaeLexer":2,"./cyoaeParser":3,"./storage":185,"antlr4ts":119}],2:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -30863,4 +30797,88 @@ module.exports = function whichTypedArray(value) {
 };
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"available-typed-arrays":164,"call-bind/callBound":165,"es-abstract/helpers/getOwnPropertyDescriptor":167,"foreach":168,"has-symbols":172,"is-typed-array":178}]},{},[1]);
+},{"available-typed-arrays":164,"call-bind/callBound":165,"es-abstract/helpers/getOwnPropertyDescriptor":167,"foreach":168,"has-symbols":172,"is-typed-array":178}],185:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.Variable_storage = void 0;
+
+class Variable_storage {
+  static init() {
+    window.gv = Variable_storage.get_variable;
+    window.sv = Variable_storage.set_variable;
+    window.dv = Variable_storage.delete_variable;
+  }
+
+  static get_variable(variable_name) {
+    const stored = localStorage.getItem(variable_name);
+
+    if (typeof stored !== "string") {
+      Variable_storage.debug && console.log(`Getting variable "${variable_name}" (value: undefined)`);
+      console.error(`Tried to fetch undefined variable ${variable_name}`);
+      return;
+    }
+
+    Variable_storage.debug && console.log(`Getting variable "${variable_name}" with value: ${Variable_storage.string_to_value(stored)} (encoded: ${stored})`);
+    return Variable_storage.string_to_value(stored);
+  }
+
+  static set_variable(variable_name, value) {
+    Variable_storage.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${Variable_storage.value_to_string(value)})`);
+    localStorage.setItem(variable_name, Variable_storage.value_to_string(value));
+    return true;
+  }
+
+  static delete_variable(variable_name) {
+    Variable_storage.debug && console.log(`Deleting variable "${variable_name}"`);
+    localStorage.removeItem(variable_name);
+    return true;
+  }
+
+  static clear() {
+    Variable_storage.debug && console.log(`Clearing all variables`);
+    localStorage.clear();
+  }
+
+  static value_to_string(value) {
+    switch (typeof value) {
+      case "string":
+        return `s${value}`;
+
+      case "number":
+        return `n${value}`;
+
+      case "boolean":
+        return value ? "b1" : "b0";
+    }
+  }
+
+  static string_to_value(str) {
+    const type = str[0];
+    const value = str.substring(1, str.length);
+
+    switch (type) {
+      case 's':
+        //string
+        return value;
+
+      case 'n':
+        //number
+        return parseFloat(value);
+
+      case 'b':
+        //boolean
+        return value === "1" ? true : false;
+    }
+
+    throw `invalid value: ${str}`;
+  }
+
+}
+
+exports.Variable_storage = Variable_storage;
+Variable_storage.debug = false;
+
+},{}]},{},[1]);
