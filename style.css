@@ -1,4 +1,4 @@
-div.main {
+div.main, div.variables_screen {
     margin: 2%;
 }
 
@@ -25,4 +25,21 @@ span.error {
     -moz-tab-size: 1;
     -o-tab-size: 1;
     color: darkred;
+}
+
+table.variables_screen {
+    border-collapse: collapse;
+    border-style: hidden;
+}
+  
+.variables_screen th, .variables_screen td {
+    border: 1px solid LightSteelBlue;
+    border-collapse: collapse;
+    padding: 3pt;
+    padding-left: 6pt;
+}
+  
+.variables_screen th {
+    font-weight: normal;
+    font-size: small;
 }

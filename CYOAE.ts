@@ -4,6 +4,7 @@ import * as antlr4ts from 'antlr4ts';
 import { cyoaeLexer } from './cyoaeLexer';
 import * as cyoaeParser from './cyoaeParser';
 import {Variable_storage, Variable_storage_types} from './storage';
+import {create_variable_screen} from './variables_screen'
 
 let current_arc = "";
 let current_scene = "";
@@ -884,7 +885,8 @@ async function update_current_scene() {
     debug && console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
         Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
-        document.body.innerHTML = `<div class="main">${parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`)}</div>`;
+        document.body.innerHTML = `<div class="main">${parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`)}</div>`
+            + `<div class="variables_screen">\n${create_variable_screen()}</dev>`;
     }
     catch (err) {
         display_error_document(`${err}`);

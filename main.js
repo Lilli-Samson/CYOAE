@@ -9,6 +9,8 @@ var cyoaeParser = _interopRequireWildcard(require("./cyoaeParser"));
 
 var _storage = require("./storage");
 
+var _variables_screen = require("./variables_screen");
+
 function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
@@ -1024,7 +1026,7 @@ function update_current_scene() {
     try {
       _storage.Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
 
-      document.body.innerHTML = `<div class="main">${parse_source_text(yield download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`)}</div>`;
+      document.body.innerHTML = `<div class="main">${parse_source_text(yield download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`)}</div>` + `<div class="variables_screen">\n${(0, _variables_screen.create_variable_screen)()}</dev>`;
     } catch (err) {
       display_error_document(`${err}`);
     }
@@ -1265,7 +1267,7 @@ function main() {
 
 main();
 
-},{"./cyoaeLexer":2,"./cyoaeParser":3,"./storage":185,"antlr4ts":119}],2:[function(require,module,exports){
+},{"./cyoaeLexer":2,"./cyoaeParser":3,"./storage":185,"./variables_screen":186,"antlr4ts":119}],2:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -30966,4 +30968,41 @@ class Variable_storage {
 exports.Variable_storage = Variable_storage;
 Variable_storage.debug = false;
 
-},{}]},{},[1]);
+},{}],186:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.create_variable_screen = create_variable_screen;
+
+var _storage = require("./storage");
+
+function create_variable_screen() {
+  let result = `
+<table class="variables_screen" style="width:100%">
+    <tr>
+        <th>Variable</th>
+        <th>Value</th>
+        <th>Type</th>
+    </tr>`;
+
+  for (const [name, value] of _storage.Variable_storage.variables) {
+    result += `
+    <tr>
+    <td contenteditable="true">${name}</td>
+    <td contenteditable="true">${value}</td>
+    <td>
+        <select>
+            <option value="string"${typeof value === "string" ? ' selected="true"' : ""}>String</option>
+            <option value="number"${typeof value === "number" ? ' selected="true"' : ""}>Number</option>
+            <option value="boolean"${typeof value === "boolean" ? ' selected="true"' : ""}>Boolean</option>
+        </select>
+    </td>
+    </tr>`;
+  }
+
+  return `${result}\n</table>\n`;
+}
+
+},{"./storage":185}]},{},[1]);
