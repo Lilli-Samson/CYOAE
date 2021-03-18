@@ -3,8 +3,9 @@
 import * as antlr4ts from 'antlr4ts';
 import { cyoaeLexer } from './cyoaeLexer';
 import * as cyoaeParser from './cyoaeParser';
-import {Variable_storage, Variable_storage_types} from './storage';
-import {create_variable_screen} from './variables_screen'
+import { Variable_storage, Variable_storage_types } from './storage';
+import { create_variable_table } from './variables_screen';
+import { createHTML } from './html';
 
 let current_arc = "";
 let current_scene = "";
@@ -885,8 +886,11 @@ async function update_current_scene() {
     debug && console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
         Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
-        document.body.innerHTML = `<div class="main">${parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`)}</div>`
-            + `<div class="variables_screen">\n${create_variable_screen()}</dev>`;
+        const story_container = createHTML([ "div", {class: "main"}]);
+        story_container.innerHTML = parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`);
+        document.body.append(story_container);
+        document.body.append(createHTML(["hr"]));
+        document.body.append(create_variable_table());
     }
     catch (err) {
         display_error_document(`${err}`);
@@ -1063,6 +1067,8 @@ async function tests() {
         assert_equal(typeof Variable_storage.get_variable("test"), "undefined");
     }
     test_game_variables();
+
+    document.body.innerHTML = "";
 }
 
 // script entry point, loading the correct state and displays errors

@@ -43,3 +43,9 @@ table.variables_screen {
     font-weight: normal;
     font-size: small;
 }
+
+button.variable_delete {
+    margin-right: 10pt;
+    padding: 0;
+    border: none;
+}
