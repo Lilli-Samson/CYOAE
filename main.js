@@ -165,11 +165,17 @@ class Tag_result {
   get text() {
     var _a;
 
-    if (this.value instanceof HTMLElement) {
+    let this_text;
+
+    if (this.data instanceof Lazy_evaluated_rich_text) {
+      this_text = this.data.value.text;
+    } else if (this.data instanceof HTMLElement) {
       throw "Plaintext unavailable";
+    } else {
+      this_text = this.data;
     }
 
-    return `${((_a = this.prev) === null || _a === void 0 ? void 0 : _a.text) || ""}${this.value}`;
+    return `${((_a = this.prev) === null || _a === void 0 ? void 0 : _a.current_value) || ""}${this_text}`;
   }
 
   insert_into(element) {
@@ -203,7 +209,7 @@ class Tag_result {
   }
 
   append(other) {
-    const debug = true;
+    const debug = false;
 
     if (other instanceof Tag_result) {
       if (other.prev) {
@@ -473,8 +479,15 @@ const replacements = [{
   required_attributes: ["text"],
   optional_attributes: [],
   replacements: function (tag) {
+    const debug = false;
     const attributes = get_attributes(tag, this);
-    console.log(`${Object.keys(attributes).reduce((curr, el) => `${curr}, ${el}`, attributes["text"].text)}`);
+
+    if (debug) {
+      for (const attribute in attributes) {
+        console.log(`Attribute "${attribute}" with value "${attributes[attribute].current_value}" and text "${attributes[attribute].text}"`);
+      }
+    }
+
     return new Tag_result((0, _html.createHTML)(["a", attributes["text"].text]));
   }
 }, {
@@ -699,13 +712,13 @@ function evaluate_tag(tag) {
 }
 
 function evaluate_richtext(ctx) {
-  const debug = true;
+  const debug = false;
   debug && console.log(`Evaluating richtext "${ctx.text}"`);
   let result = new Tag_result("");
 
   for (let i = 0; i < ctx.childCount; i++) {
     const child = ctx.getChild(i);
-    debug && console.log(`Tag child ${i}: >>>${child.text}<<<`);
+    debug && console.log(`Tag child ${i}: >>>${child.text}<<< with current text "${result.current_value}"`);
 
     if (child instanceof cyoaeParser.Plain_text_Context) {
       debug && console.log(`found plaintext "${child.text}"`);
@@ -742,7 +755,15 @@ function evaluate_richtext(ctx) {
           const child = ctx.getChild(i);
 
           if (child instanceof cyoaeParser.Attribute_Context) {
-            tag.attributes.push([child._attribute_name.text, new Tag_result(child._attribute_value)]);
+            let attribute = tag.attributes.find(attrib => attrib[0] === child._attribute_name.text);
+
+            if (attribute) {
+              attribute[1] = attribute[1].append(new Tag_result(child._attribute_value));
+              debug && console.log(`Found addition attribute child for attribute ${child._attribute_name.text} with value ${child._attribute_value.text}. Full value: ${attribute[1].current_value}`);
+            } else {
+              debug && console.log(`Found first attribute child for attribute ${child._attribute_name.text} with value ${child._attribute_value.text}`);
+              tag.attributes.push([child._attribute_name.text, new Tag_result(child._attribute_value)]);
+            }
           }
         }
 
