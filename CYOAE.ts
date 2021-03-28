@@ -6,7 +6,6 @@ import * as cyoaeParser from './cyoaeParser';
 import { Variable_storage, Variable_storage_types } from './storage';
 import { create_variable_table } from './variables_screen';
 import { createHTML } from './html';
-import { url } from 'inspector';
 
 let current_arc = "";
 let current_scene = "";
@@ -61,6 +60,17 @@ class Lazy_evaluated_rich_text {
     }
 }
 
+function HTMLElement_to_string(who: HTMLElement){
+    let el = document.createElement("div");
+    el.appendChild(who.cloneNode(true));
+    let txt = el.innerHTML;
+    //const ax = txt.indexOf('>') + 1;
+    //txt = txt.substring(0, ax) + who.innerHTML + txt.substring(ax);
+    return txt;
+}
+
+type Tag_types = cyoaeParser.Rich_text_Context | string | HTMLElement;
+
 class Tag_result {
     get text(): string {
         if (this.value instanceof HTMLElement) {
@@ -78,19 +88,36 @@ class Tag_result {
         return typeof this.value === "string" && (this.prev?.is_text_available || true);
     }
     get current_value(): string {
-        return `${this.prev?.current_value || ""}${this.data instanceof Lazy_evaluated_rich_text ? this.data.maybe_unevaluated_value : this.value}`;
+        let this_text: string;
+        if (this.data instanceof Lazy_evaluated_rich_text) {
+            this_text = this.data.maybe_unevaluated_value;
+        }
+        else if (this.data instanceof HTMLElement) {
+            this_text = HTMLElement_to_string(this.data);
+        }
+        else {
+            this_text = this.data;
+        }
+        return `${this.prev?.current_value || ""}${this_text}`;
     }
-    append(other: Tag_result | string | HTMLElement): Tag_result {
+    append(other: Tag_types | Tag_result): Tag_result {
+        const debug = true;
         if (other instanceof Tag_result) {
             if (other.prev) {
+                debug && console.log(`Entering append with other tag_result with children and value ${other.value}`);
                 return new Tag_result(other.data, this.append(other.prev));
             }
             else {
+                debug && console.log(`Entering append with other tag_result without children and value ${other.value}`);
                 return new Tag_result(other.data, this);
             }
         }
         else {
-            return this.append(new Tag_result(other, this));
+            if (typeof other === "string" && other === "") {
+                return this;
+            }
+            debug && console.log(`Entering append with other not tag_result and value ${other}`);
+            return this.append(new Tag_result(other));
         }
     }
     get range(): Iterable<string | HTMLElement> {
@@ -105,7 +132,16 @@ class Tag_result {
     }
     private readonly data: Lazy_evaluated_rich_text | string | HTMLElement;
     private readonly prev?: Tag_result;
-    constructor(initializer: cyoaeParser.Rich_text_Context | string | HTMLElement | Lazy_evaluated_rich_text, prev?: Tag_result) {
+    constructor(initializer: Tag_types | Lazy_evaluated_rich_text | [Tag_types | Lazy_evaluated_rich_text, ...(Tag_types | Lazy_evaluated_rich_text)[]], prev?: Tag_result) {
+        if (Array.isArray(initializer)) {
+            let result = new Tag_result(initializer.shift() || "");
+            for (const object of initializer) {
+                result = result.append(new Tag_result(object));
+            }
+            this.data = result.data;
+            this.prev = result.prev;
+            return;
+        }
         this.prev = prev;
         this.data = initializer instanceof cyoaeParser.Rich_text_Context ? new Lazy_evaluated_rich_text(initializer) : initializer;
     }
@@ -250,12 +286,12 @@ class Delayed_evaluation {
 function get_attributes(tag: Tag, tag_replacement: Tag_replacement) {
     let result: {[key: string]: Tag_result} = {};
     for (const attr of tag_replacement.required_attributes) {
-        result.attr = get_unique_required_attribute(tag, attr);
+        result[attr] = get_unique_required_attribute(tag, attr);
     }
     for (const attr of tag_replacement.optional_attributes) {
         const attribute = get_unique_optional_attribute(tag, attr);
         if (attribute) {
-            result.attr = attribute;
+            result[attr] = attribute;
         }
     }
     return result;
@@ -321,9 +357,13 @@ const replacements: Readonly<Tag_replacement[]> = [
 	},
     { //test
 		tag_name: "test",
-        required_attributes: [],
+        required_attributes: ["text"],
         optional_attributes: [],
-		replacements: function(tag) { return new Tag_result("");},
+		replacements: function(tag) {
+            const attributes = get_attributes(tag, this);
+            console.log(`${Object.keys(attributes).reduce((curr, el) => `${curr}, ${el}`, attributes["text"].text)}`);
+            return new Tag_result(createHTML(["a", attributes["text"].text]));
+        },
 	},
     { //test delayed evaluation
 		tag_name: "test_delayed_evaluation",
@@ -544,7 +584,7 @@ function evaluate_tag(tag: Tag): Tag_result {
 }
 
 function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
-    const debug = false;
+    const debug = true;
     debug && console.log(`Evaluating richtext "${ctx.text}"`);
     let result = new Tag_result("");
     for (let i = 0; i < ctx.childCount; i++) {
@@ -877,9 +917,9 @@ function assert(predicate: any, explanation: string = "") {
     }
 }
 
-function assert_equal(left: any, right: any, explanation?: any) {
-    if (left !== right) {
-        const details = `\n>>Actual: >>>${left}<<<\nExpected: >>>${right}<<<`;
+function assert_equal(actual: any, expected: any, explanation?: any) {
+    if (actual !== expected) {
+        const details = `\n>>Actual: >>>${actual}<<<\nExpected: >>>${expected}<<<`;
         const source = ` in ${(new Error()).stack?.split("\n")[1]}`;
         if (explanation) {
             throw `Assertion fail${source}:${details}${explanation ? "\n" + explanation : ""}`;
@@ -889,6 +929,19 @@ function assert_equal(left: any, right: any, explanation?: any) {
 }
 
 async function tests() {
+    function test_HTMLElement_to_string() {
+        const element = document.createElement("p");
+        assert_equal(HTMLElement_to_string(element), "<p></p>", `test_HTMLElement_to_string <p> tag`);
+        element.append("TestText");
+        assert_equal(HTMLElement_to_string(element), "<p>TestText</p>", `test_HTMLElement_to_string <p> tag with text "TestText"`);
+        const span = document.createElement("span");
+        element.append(span);
+        assert_equal(HTMLElement_to_string(element), "<p>TestText<span></span></p>", `test_HTMLElement_to_string <p> tag with text "TestText" and <span> tag`);
+        span.append("span text");
+        assert_equal(HTMLElement_to_string(element), "<p>TestText<span>span text</span></p>", `test_HTMLElement_to_string <p> tag with text "TestText" and <span> tag`);
+    }
+    test_HTMLElement_to_string();
+
     function test_Tag_result() {
         let text = new Tag_result("111");
         assert_equal(text.text, "111", "Initializing text failed");
@@ -899,16 +952,16 @@ async function tests() {
 
     function test_tag_parsing() {
         let result = parse_source_text("[test {text:test1}]", "test_tag_parsing");
-        let expected = "<a>test1</a>\n";
-        assert_equal(result, expected, `Checking test tag 1. Expected:\n>>>${expected}<<<\nActual:\n>>>${result}<<<`);
+        let expected = new Tag_result(createHTML(["a", "test1"]));
+        assert_equal(result.current_value, expected.current_value, `Checking test tag 1.`);
 
         result = parse_source_text("[test {text:test1}]", "test_tag_parsing");
-        expected = "<a>test1</a>\n";
-        assert_equal(result, expected, `Checking test tag 2. Expected:\n${expected}Actual:\n${result}`);
+        expected = new Tag_result(createHTML(["a", "test1"]));
+        assert_equal(result.current_value, expected.current_value, `Checking test tag 2.`);
 
         result = parse_source_text("[test {text:test1}][test {text:test2}]", "test_tag_parsing");
-        expected = "<a>test1</a>\n<a>test2</a>\n";
-        assert_equal(result, expected, `Checking test tag 3. Expected:\n${expected}Actual:\n${result}`);
+        expected = new Tag_result([createHTML(["a", "test1"]), createHTML(["a", "test2"])]);
+        assert_equal(result.current_value, expected.current_value, `Checking test tag 3.`);
     }
     test_tag_parsing();
 
@@ -978,7 +1031,7 @@ async function main() {
         await tests();
     }
     catch (err) {
-        console.error(`Tests failed: ${err}`);
+        console.error(`Test failed: ${err}`);
         return;
     }
     try {

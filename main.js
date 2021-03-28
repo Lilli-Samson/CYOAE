@@ -135,8 +135,29 @@ class Lazy_evaluated_rich_text {
 
 }
 
+function HTMLElement_to_string(who) {
+  let el = document.createElement("div");
+  el.appendChild(who.cloneNode(true));
+  let txt = el.innerHTML; //const ax = txt.indexOf('>') + 1;
+  //txt = txt.substring(0, ax) + who.innerHTML + txt.substring(ax);
+
+  return txt;
+}
+
 class Tag_result {
   constructor(initializer, prev) {
+    if (Array.isArray(initializer)) {
+      let result = new Tag_result(initializer.shift() || "");
+
+      for (const object of initializer) {
+        result = result.append(new Tag_result(object));
+      }
+
+      this.data = result.data;
+      this.prev = result.prev;
+      return;
+    }
+
     this.prev = prev;
     this.data = initializer instanceof cyoaeParser.Rich_text_Context ? new Lazy_evaluated_rich_text(initializer) : initializer;
   }
@@ -168,18 +189,37 @@ class Tag_result {
   get current_value() {
     var _a;
 
-    return `${((_a = this.prev) === null || _a === void 0 ? void 0 : _a.current_value) || ""}${this.data instanceof Lazy_evaluated_rich_text ? this.data.maybe_unevaluated_value : this.value}`;
+    let this_text;
+
+    if (this.data instanceof Lazy_evaluated_rich_text) {
+      this_text = this.data.maybe_unevaluated_value;
+    } else if (this.data instanceof HTMLElement) {
+      this_text = HTMLElement_to_string(this.data);
+    } else {
+      this_text = this.data;
+    }
+
+    return `${((_a = this.prev) === null || _a === void 0 ? void 0 : _a.current_value) || ""}${this_text}`;
   }
 
   append(other) {
+    const debug = true;
+
     if (other instanceof Tag_result) {
       if (other.prev) {
+        debug && console.log(`Entering append with other tag_result with children and value ${other.value}`);
         return new Tag_result(other.data, this.append(other.prev));
       } else {
+        debug && console.log(`Entering append with other tag_result without children and value ${other.value}`);
         return new Tag_result(other.data, this);
       }
     } else {
-      return this.append(new Tag_result(other, this));
+      if (typeof other === "string" && other === "") {
+        return this;
+      }
+
+      debug && console.log(`Entering append with other not tag_result and value ${other}`);
+      return this.append(new Tag_result(other));
     }
   }
 
@@ -349,14 +389,14 @@ function get_attributes(tag, tag_replacement) {
   let result = {};
 
   for (const attr of tag_replacement.required_attributes) {
-    result.attr = get_unique_required_attribute(tag, attr);
+    result[attr] = get_unique_required_attribute(tag, attr);
   }
 
   for (const attr of tag_replacement.optional_attributes) {
     const attribute = get_unique_optional_attribute(tag, attr);
 
     if (attribute) {
-      result.attr = attribute;
+      result[attr] = attribute;
     }
   }
 
@@ -430,10 +470,12 @@ const replacements = [{
   }
 }, {
   tag_name: "test",
-  required_attributes: [],
+  required_attributes: ["text"],
   optional_attributes: [],
   replacements: function (tag) {
-    return new Tag_result("");
+    const attributes = get_attributes(tag, this);
+    console.log(`${Object.keys(attributes).reduce((curr, el) => `${curr}, ${el}`, attributes["text"].text)}`);
+    return new Tag_result((0, _html.createHTML)(["a", attributes["text"].text]));
   }
 }, {
   tag_name: "test_delayed_evaluation",
@@ -657,7 +699,7 @@ function evaluate_tag(tag) {
 }
 
 function evaluate_richtext(ctx) {
-  const debug = false;
+  const debug = true;
   debug && console.log(`Evaluating richtext "${ctx.text}"`);
   let result = new Tag_result("");
 
@@ -1037,11 +1079,11 @@ function assert(predicate, explanation = "") {
   }
 }
 
-function assert_equal(left, right, explanation) {
+function assert_equal(actual, expected, explanation) {
   var _a;
 
-  if (left !== right) {
-    const details = `\n>>Actual: >>>${left}<<<\nExpected: >>>${right}<<<`;
+  if (actual !== expected) {
+    const details = `\n>>Actual: >>>${actual}<<<\nExpected: >>>${expected}<<<`;
     const source = ` in ${(_a = new Error().stack) === null || _a === void 0 ? void 0 : _a.split("\n")[1]}`;
 
     if (explanation) {
@@ -1054,6 +1096,20 @@ function assert_equal(left, right, explanation) {
 
 function tests() {
   return __awaiter(this, void 0, void 0, function* () {
+    function test_HTMLElement_to_string() {
+      const element = document.createElement("p");
+      assert_equal(HTMLElement_to_string(element), "<p></p>", `test_HTMLElement_to_string <p> tag`);
+      element.append("TestText");
+      assert_equal(HTMLElement_to_string(element), "<p>TestText</p>", `test_HTMLElement_to_string <p> tag with text "TestText"`);
+      const span = document.createElement("span");
+      element.append(span);
+      assert_equal(HTMLElement_to_string(element), "<p>TestText<span></span></p>", `test_HTMLElement_to_string <p> tag with text "TestText" and <span> tag`);
+      span.append("span text");
+      assert_equal(HTMLElement_to_string(element), "<p>TestText<span>span text</span></p>", `test_HTMLElement_to_string <p> tag with text "TestText" and <span> tag`);
+    }
+
+    test_HTMLElement_to_string();
+
     function test_Tag_result() {
       let text = new Tag_result("111");
       assert_equal(text.text, "111", "Initializing text failed");
@@ -1065,14 +1121,14 @@ function tests() {
 
     function test_tag_parsing() {
       let result = parse_source_text("[test {text:test1}]", "test_tag_parsing");
-      let expected = "<a>test1</a>\n";
-      assert_equal(result, expected, `Checking test tag 1. Expected:\n>>>${expected}<<<\nActual:\n>>>${result}<<<`);
+      let expected = new Tag_result((0, _html.createHTML)(["a", "test1"]));
+      assert_equal(result.current_value, expected.current_value, `Checking test tag 1.`);
       result = parse_source_text("[test {text:test1}]", "test_tag_parsing");
-      expected = "<a>test1</a>\n";
-      assert_equal(result, expected, `Checking test tag 2. Expected:\n${expected}Actual:\n${result}`);
+      expected = new Tag_result((0, _html.createHTML)(["a", "test1"]));
+      assert_equal(result.current_value, expected.current_value, `Checking test tag 2.`);
       result = parse_source_text("[test {text:test1}][test {text:test2}]", "test_tag_parsing");
-      expected = "<a>test1</a>\n<a>test2</a>\n";
-      assert_equal(result, expected, `Checking test tag 3. Expected:\n${expected}Actual:\n${result}`);
+      expected = new Tag_result([(0, _html.createHTML)(["a", "test1"]), (0, _html.createHTML)(["a", "test2"])]);
+      assert_equal(result.current_value, expected.current_value, `Checking test tag 3.`);
     }
 
     test_tag_parsing();
@@ -1160,7 +1216,7 @@ function main() {
     try {
       yield tests();
     } catch (err) {
-      console.error(`Tests failed: ${err}`);
+      console.error(`Test failed: ${err}`);
       return;
     }
 
