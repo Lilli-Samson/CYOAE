@@ -6,6 +6,7 @@ import * as cyoaeParser from './cyoaeParser';
 import { Variable_storage, Variable_storage_types } from './storage';
 import { create_variable_table } from './variables_screen';
 import { createHTML } from './html';
+import { url } from 'inspector';
 
 let current_arc = "";
 let current_scene = "";
@@ -60,67 +61,53 @@ class Lazy_evaluated_rich_text {
     }
 }
 
-class Tag_result{
-    static from_plaintext(text: string) {
-        return new Tag_result(undefined, "", text);
-    }
-    static from_html(text: string) {
-        return new Tag_result(undefined, text, "");
-    }
-    static from_ctx(ctx: cyoaeParser.Rich_text_Context) { //evaluating contexts can have side-effects, so it must be done exactly once iff necessary
-        return new Tag_result(ctx, "", "");
-    }
-    get plaintext() {
-        if (this.value.is_plaintext_available) {
-            return this.value.current_plaintext;
+class Tag_result {
+    get text(): string {
+        if (this.value instanceof HTMLElement) {
+            throw "Plaintext unavailable";
         }
-        throw "Plaintext unavailable";
+        return `${this.prev?.text || ""}${this.value}`;
     }
-    get html(): string {
-        return this.value.current_html + Tag_result.plain_to_html(this.value.current_plaintext);
+    insert_into(element: HTMLElement): void {
+        if (this.prev) {
+            element.append(this.prev.value);
+        }
+        element.append(this.value);
     }
-    get is_plaintext_available() {
-        return this.value.current_html.length === 0;
+    get is_text_available(): boolean {
+        return typeof this.value === "string" && (this.prev?.is_text_available || true);
     }
     get current_value(): string {
-        if (this.context_value) {
-            return this.context_value.maybe_unevaluated_value;
+        return `${this.prev?.current_value || ""}${this.data instanceof Lazy_evaluated_rich_text ? this.data.maybe_unevaluated_value : this.value}`;
+    }
+    append(other: Tag_result | string | HTMLElement): Tag_result {
+        if (other instanceof Tag_result) {
+            if (other.prev) {
+                return new Tag_result(other.data, this.append(other.prev));
+            }
+            else {
+                return new Tag_result(other.data, this);
+            }
         }
-        if (this.value.current_html) {
-            return this.value.html;
+        else {
+            return this.append(new Tag_result(other, this));
         }
-        return this.value.plaintext;
     }
-    append(other: Tag_result) {
-        return other.is_plaintext_available ? this.value.append_plaintext(other.plaintext) : this.value.append_html(other.html);
-    }
-    append_plaintext(text: string) {
-        if (text.length === 0) {
-            return this.value;
+    get range(): Iterable<string | HTMLElement> {
+        let data: (string | HTMLElement)[] = [];
+        for (let current: Tag_result | undefined = this; current; current = current.prev) {
+            data.push(current.value);
         }
-        return new Tag_result(undefined, this.value.current_html, this.value.current_plaintext + text);
+        return data.reverse();
     }
-    append_html(text: string) {
-        if (text.length === 0) {
-            return this.value;
-        }
-        return new Tag_result(undefined, this.value.html + text, "");
+    private get value(): string | HTMLElement {
+        return this.data instanceof Lazy_evaluated_rich_text ? this.data.value.value : this.data;
     }
-    private readonly context_value?: Lazy_evaluated_rich_text;
-    private readonly current_html: string;
-    private readonly current_plaintext: string;
-    private static plain_to_html(text: string) {
-        return escape_html(text);
-    }
-    private constructor(ctx: cyoaeParser.Rich_text_Context | undefined, html: string, plaintext: string) {
-        if (ctx) {
-            this.context_value = new Lazy_evaluated_rich_text(ctx);
-        }
-        this.current_plaintext = plaintext;
-        this.current_html = html;
-    }
-    private get value() {
-        return this.context_value?.value || this;
+    private readonly data: Lazy_evaluated_rich_text | string | HTMLElement;
+    private readonly prev?: Tag_result;
+    constructor(initializer: cyoaeParser.Rich_text_Context | string | HTMLElement | Lazy_evaluated_rich_text, prev?: Tag_result) {
+        this.prev = prev;
+        this.data = initializer instanceof cyoaeParser.Rich_text_Context ? new Lazy_evaluated_rich_text(initializer) : initializer;
     }
 }
 
@@ -130,16 +117,11 @@ interface Attribute_replacement {
 	default_value?: Tag_result;
 }
 
-enum Tag_type {
-    allow_duplicate_attributes,
-}
-
 interface Tag_replacement {
     readonly tag_name: string;
-    readonly intro?: Tag_result;
-    readonly replacements: Attribute_replacement[] | ((tag: Tag) => Tag_result);
-    readonly outro?: Tag_result;
-    readonly tag_type?: Tag_type;
+    readonly required_attributes: Readonly<string[]>;
+    readonly optional_attributes: Readonly<string[]>;
+    readonly replacements: (tag: Tag) => Tag_result;
 }
 
 interface Tag {
@@ -233,17 +215,18 @@ class Delayed_evaluation {
     private static active_delayed_evaluations = 0;
 
     //returns a placeholder that will be replaced by the real thing later
-    static evaluate(replacement: Promise<Tag_result>, placeholder_text = Tag_result.from_plaintext("[loading]")): Tag_result {
+    static evaluate(replacement: Promise<Tag_result>, placeholder_text = new Tag_result("[loading]")): Tag_result {
         const placeholder_id = `delayed_evaluation_placeholder_${this.delayed_evaluation_placeholder_number}`;
-        const placeholder = Tag_result.from_html(`<slot class="placeholder" id="${placeholder_id}">${placeholder_text.html}</slot>`);
+        const slot = createHTML(["slot", {class: "placeholder", id: placeholder_id}]);
+        placeholder_text.insert_into(slot);
         this.active_delayed_evaluations += 1;
         const old_promise = this.delay_evaluation_promise;
         this.delay_evaluation_promise = (async () => {
             const result = await replacement;
             let link = document.querySelector(`#${placeholder_id}`);
             if (link) {
-                this.debug && console.log(`Replacement: "${link.outerHTML}" to "${result.html}"`);
-                link.outerHTML = result.html;
+                this.debug && console.log(`Replacement: "${link.outerHTML}" to "${result.current_value}"`);
+                link.replaceWith(...result.range);
             }
             else {
                 console.error(`Failed finding ID "${placeholder_id}" for replacement`);
@@ -252,7 +235,7 @@ class Delayed_evaluation {
             return old_promise;
         })();
         this.delayed_evaluation_placeholder_number += 1;
-        return placeholder;
+        return new Tag_result(slot);
     }
 
     static get has_everything_been_evaluated() {
@@ -264,133 +247,118 @@ class Delayed_evaluation {
     }
 }
 
-function expression_to_html_js(expression: cyoaeParser.Expression_Context): string {
-    if (expression._assignment) {
-        return `sv('${expression._identifier.text}', ${expression_to_html_js(expression._expression)})`;
+function get_attributes(tag: Tag, tag_replacement: Tag_replacement) {
+    let result: {[key: string]: Tag_result} = {};
+    for (const attr of tag_replacement.required_attributes) {
+        result.attr = get_unique_required_attribute(tag, attr);
     }
-    else if (expression._quote) {
-        return `'${expression._string.text}'`;
-    }
-    let result = "";
-    for (let i = 0; i < expression.childCount; i++) {
-        const child = expression.getChild(i);
-        if (child instanceof cyoaeParser.Identifier_Context) { //reading an identifier
-            result += `gv('${child.text}')`;
-        }
-        else {
-            result += child.text;
+    for (const attr of tag_replacement.optional_attributes) {
+        const attribute = get_unique_optional_attribute(tag, attr);
+        if (attribute) {
+            result.attr = attribute;
         }
     }
     return result;
 }
 
-function create_onclick_action(code: string): string | undefined {
-    return run_parser({filename: "onclick evaluator", code: code, evaluator: parser => {
-        return expression_to_html_js(parser.expression_());
-    }});
-}
-
-const replacements: Tag_replacement[] = [
+const replacements: Readonly<Tag_replacement[]> = [
 	{ //img
 		tag_name: "img",
-		intro: Tag_result.from_html("<img"),
-		replacements:
-			[
-				{name: "url", replacement: url => Tag_result.from_html(` src="${url.plaintext}"`)},
-				{name: "alt", replacement: alt => Tag_result.from_html(` alt="${escape_html(alt.plaintext)}"`), default_value: Tag_result.from_plaintext("image")},
-            ],
-		outro: Tag_result.from_html("/>\n"),
+        required_attributes: ["url"],
+        optional_attributes: ["alt"],
+        replacements: function(tag): Tag_result {
+            const attributes = get_attributes(tag, this);
+            return new Tag_result(createHTML(["img", {src: attributes["url"].text, alt: attributes["alt"]?.text ?? "image"}]));
+        },
 	},
 	{ //code
 		tag_name: "code",
-		intro: Tag_result.from_html("<span class='code'>"),
-		replacements:
-			[
-				{name: "text", replacement: text => Tag_result.from_html(escape_html(text.plaintext))},
-            ],
-		outro: Tag_result.from_html("</span>\n"),
+        required_attributes: ["text"],
+        optional_attributes: [],
+        replacements: function(tag): Tag_result {
+            const attributes = get_attributes(tag, this);
+            return new Tag_result(createHTML(["span", {class: "code"}, ...attributes["text"].range]));
+        },
 	},
 	{ //choice
 		tag_name: "choice",
-		replacements: (tag) => {
-            const next = get_unique_required_attribute(tag, "next");
-            const text = get_unique_required_attribute(tag, "text");
-            const onclick = get_unique_optional_attribute(tag, "onclick");
-            const onclick_action = onclick ? create_onclick_action(onclick.plaintext) : undefined;
-            //TODO: assert that tag.attributes has no attributes besides next, text and onclick
+        required_attributes: ["next", "text"],
+        optional_attributes: ["onclick"],
+		replacements: function (tag) {
+            const attributes = get_attributes(tag, this);
             function get_result(page_available: boolean) {
-                //intro
-                let result = Tag_result.from_html("<a");
                 //next
-                result =
+                const result = createHTML(["a",
                     page_available
-                    ? result.append_html(` class='choice' href="#${current_arc}/${next.plaintext}"`)
-                    : result.append_html(` class='dead_choice'`);
+                    ? {class: "choice", href: `#${current_arc}/${attributes["next"].text}`}
+                    : {class: "dead_choice"}]);
                 //onclick
-                result =
-                    onclick_action
-                    ? result.append_html(` onclick="${onclick_action}"`)
-                    : result;
+                const expression_context = run_parser(
+                    {
+                        code: attributes["onclick"].text,
+                        evaluator: (parser) => parser.expression_(),
+                    }
+                );
+                result.addEventListener("click", () => {
+                    evaluate_expression(expression_context);
+                    return true;
+                });
                 //text
-                result = result.append_html(">" + text.plaintext);
-                //outro
-                result = result.append_html("</a>\n");
-                return result;
+                result.append(...attributes["text"].range);
+                return new Tag_result(result);
             }
-            switch (Page_checker.page_available(current_arc, next.plaintext)) {
+            switch (Page_checker.page_available(current_arc, attributes["next"].text)) {
                 case Page_availability.Available:
                     return get_result(true);
                 case Page_availability.Unavailable:
                     return get_result(false);
                 case Page_availability.Unknown:
                     return Delayed_evaluation.evaluate((async () => {
-                        return get_result(await Page_checker.fetch_page_available(current_arc, next.plaintext));
-                    })(), text);
+                        return get_result(await Page_checker.fetch_page_available(current_arc, attributes["next"].text));
+                    })(), attributes["text"]);
             }
         },
 	},
     { //test
 		tag_name: "test",
-        intro: Tag_result.from_html("<a>"),
-		replacements:
-			[
-                {name: "text", replacement: text => {
-                    false && console.log(`Test tag text: ${text.plaintext}`);
-                    return Tag_result.from_html(text.plaintext);
-                }},
-            ],
-        outro: Tag_result.from_html("</a>\n"),
+        required_attributes: [],
+        optional_attributes: [],
+		replacements: function(tag) { return new Tag_result("");},
 	},
     { //test delayed evaluation
 		tag_name: "test_delayed_evaluation",
+        required_attributes: [],
+        optional_attributes: [],
 		replacements: (tag) => {
-            return Delayed_evaluation.evaluate((async () => Tag_result.from_plaintext("test_delayed_evaluation_result"))(), Tag_result.from_plaintext("test_delayed_evaluation_placeholder"));
+            return Delayed_evaluation.evaluate((async () => new Tag_result("test_delayed_evaluation_result"))(), new Tag_result("test_delayed_evaluation_placeholder"));
         }
 	},
 	{ //source
         tag_name: "source",
-        intro: Tag_result.from_html('<hr>'),
+        required_attributes: [],
+        optional_attributes: [],
 		replacements: () => {
             const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
-            return Tag_result.from_html(`<a href="${`${current_url}story arcs/${current_arc}/${current_scene}.txt`}">Source</a><br>\n<p class="source">${escape_html(current_source)}</p>`);
+            const html = new Tag_result(createHTML(["hr"]));
+            html.append(createHTML(["a", {href: `${current_url}story arcs/${current_arc}/${current_scene}.txt`}, "Source"]));
+            html.append(createHTML(["br"]));
+            html.append(createHTML(["p", {class: "source"}, current_source]));
+            return html;
         },
-    },
-    { //print
-        tag_name: "print",
-        replacements: 
-        [
-            {name: "variable", replacement: text => Tag_result.from_plaintext(`${Variable_storage.get_variable(text.plaintext)}`)},
-        ],
     },
     { //select
         tag_name: "select",
+        required_attributes: [],
+        optional_attributes: [],
         replacements: (tag: Tag) => evaluate_select_tag(tag.ctx),
     },
     { //case
         tag_name: "case",
+        required_attributes: [],
+        optional_attributes: [],
         replacements: (tag: Tag) => {throw `"case" tag cannot be outside of "switch" tag`}
     },
-];
+] as const;
 
 function html_comment(content: string) {
 	return `<!-- ${content.replace(/-->/g, "~~>")} -->\n`;
@@ -557,7 +525,7 @@ function evaluate_tag(tag: Tag): Tag_result {
         throw_evaluation_error(`Unknown tag "${tag.name}"`, tag.ctx);
     }
     //check that there are no duplicate attributes
-    if (replacement.tag_type !== Tag_type.allow_duplicate_attributes) {
+    {
         let attribute_names = new Set<string>();
         for (const [attribute_name, ] of tag.attributes) {
             if (attribute_names.has(attribute_name)) {
@@ -566,58 +534,19 @@ function evaluate_tag(tag: Tag): Tag_result {
             attribute_names.add(attribute_name);
         }
     }
-    let result = replacement.intro || Tag_result.from_plaintext("");
-    if (typeof replacement.replacements === "function") {
-        try {
-            result = result.append(replacement.replacements(tag));
-        }
-        catch (error) {
-            throw_evaluation_error(`${error}`, tag.ctx);
-        }
+    //TODO: Check that replacement.required_attributes are there
+    try {
+        return replacement.replacements(tag);
     }
-    else {
-        if (tag.default_value?.current_value) {
-            debug && console.log(`Found default value ${tag.default_value?.current_value}`);
-            tag.attributes.push([replacement.replacements[0].name, tag.default_value]);
-        }
-        const attributes = [...tag.attributes];
-        debug && console.log(`Found attributes that need to be looked up: ${attributes.reduce((curr, [name, ])=>`${curr} ${name}`, "")}`);
-        for (const attribute_replacement of replacement.replacements) {
-            const attribute_value_pos = attributes.findIndex(([attribute_name,]) => attribute_name === attribute_replacement.name);
-
-            let attribute_value = attributes[attribute_value_pos]?.[1];
-            if (!attribute_value) {
-                if (attribute_replacement.default_value !== undefined) {
-                    attribute_value = attribute_replacement.default_value;
-                }
-                else {
-                    throw_evaluation_error(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`, tag.ctx);
-                }
-            }
-            try {
-                result = result.append(attribute_replacement.replacement(attribute_value, tag));
-            }
-            catch (error) {
-                throw_evaluation_error(`${error}`, tag.ctx);
-            }
-            if (attribute_value_pos !== -1) {
-                attributes.splice(attribute_value_pos, 1);
-            }
-        }
-        if (attributes.length > 0) {
-            throw_evaluation_error(`Unknown attribute(s) [${attributes.reduce((curr, [attr_name, ]) => `${curr}${attr_name} `, " ")}] in tag "${tag.name}"`, tag.ctx);
-        }
+    catch (error) {
+        throw_evaluation_error(`${error}`, tag.ctx);
     }
-    if (replacement.outro) {
-        result = result.append(replacement.outro);
-    }
-    return result;
 }
 
 function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
     const debug = false;
     debug && console.log(`Evaluating richtext "${ctx.text}"`);
-    let result = Tag_result.from_plaintext("");
+    let result = new Tag_result("");
     for (let i = 0; i < ctx.childCount; i++) {
         const child = ctx.getChild(i);
         debug && console.log(`Tag child ${i}: >>>${child.text}<<<`);
@@ -629,10 +558,10 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
                     if (grandchild.text.length !== 2) {
                         throw_evaluation_error(`Invalid escape sequence: ${grandchild.text}`, grandchild);
                     }
-                    result = result.append_plaintext(grandchild.text[1]); //cut off the \
+                    result = result.append(grandchild.text[1]); //cut off the \
                 }
                 else {
-                    result = result.append_plaintext(grandchild.text);
+                    result = result.append(grandchild.text);
                 }
             }
         }
@@ -647,13 +576,13 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
 
                 if (ctx._default_value.text) {
                     debug && console.log(`Got a tag default value "${ctx._default_value.text}"`);
-                    tag.default_value = Tag_result.from_ctx(ctx._default_value);
+                    tag.default_value = new Tag_result(ctx._default_value);
                 }
 
                 for (let i = 0; i < ctx.childCount; i++) {
                     const child = ctx.getChild(i);
                     if (child instanceof cyoaeParser.Attribute_Context) {
-                        tag.attributes.push([child._attribute_name.text, Tag_result.from_ctx(child._attribute_value)]);
+                        tag.attributes.push([child._attribute_name.text, new Tag_result(child._attribute_value)]);
                     }
                 }
                 return tag;
@@ -665,18 +594,18 @@ function evaluate_richtext(ctx: cyoaeParser.Rich_text_Context): Tag_result {
             const value = evaluate_code(child);
             debug && console.log(`Result: "${value}"`);
             if (typeof value !== "undefined") {
-                result = result.append_plaintext(`${value}`);
+                result = result.append(`${value}`);
             }
         }
         else if (child instanceof cyoaeParser.Number_Context) {
             debug && console.log(`Found number ${child.text}`);
-            result = result.append_plaintext(child.text);
+            result = result.append(child.text);
         }
         else {
             throw_evaluation_error(`Internal logic error: Found child that is neither a plain text nor a tag nor a number in rich text`, ctx);
         }
     }
-    debug && console.log(`Tag execution result: "${result.current_value}" which is ${result.is_plaintext_available ? "plaintext" : "html"}`);
+    debug && console.log(`Tag execution result: "${result.current_value}" which is ${result.is_text_available ? "plaintext" : "html"}`);
     return result;
 }
 
@@ -722,7 +651,7 @@ function evaluate_select_tag(ctx: cyoaeParser.Tag_Context): Tag_result {
     const total_priority = cases.reduce((curr, case_) => curr + case_.priority, 0);
     debug && console.log(`Total priority: ${total_priority}`);
     if (cases.length === 0) {
-        return Tag_result.from_plaintext("");
+        return new Tag_result("");
     }
     if (cases.length === 1) {
         return cases[0].text;
@@ -785,7 +714,7 @@ function evaluate_case(ctx: cyoaeParser.Tag_Context): Case_result {
             debug && console.log(`Found "${child._attribute_name.text}" attribute with value "${child._attribute_value.text}"`);
             switch (child._attribute_name.text) {
                 case "text":
-                    result.text = Tag_result.from_ctx(child._attribute_value);
+                    result.text = new Tag_result(child._attribute_value);
                     break;
                 case "condition":
                     try {
@@ -803,7 +732,7 @@ function evaluate_case(ctx: cyoaeParser.Tag_Context): Case_result {
                     break;
                 case "priority":
                     try {
-                        const text = evaluate_richtext(child._attribute_value).plaintext;
+                        const text = evaluate_richtext(child._attribute_value).text;
                         const priority = parseFloat(text);
                         if (Number.isNaN(priority)) {
                             throw "NaN";
@@ -823,7 +752,7 @@ function evaluate_case(ctx: cyoaeParser.Tag_Context): Case_result {
         }
     }
     if (!result.text) {
-        result.text = Tag_result.from_ctx(ctx._default_value);
+        result.text = new Tag_result(ctx._default_value);
     }
     debug && console.log(`Result: applicable: ${result.applicable}, priority: ${result.priority}, score: ${result.score}, text: ${result.text.current_value}`);
     return result;
@@ -867,10 +796,10 @@ function parse_source_text(data: string, filename: string) {
         evaluator: parser => {
             const tree = parser.start_();
             if (tree._rich_text) {
-                return evaluate_richtext(tree._rich_text).html;
+                return evaluate_richtext(tree._rich_text);
             }
             //TODO: Put up a proper placeholder page for an empty source
-            return Tag_result.from_plaintext(`Empty file "${filename}"`).html;
+            return new Tag_result(`Empty file "${filename}"`);
         }
     });
 }
@@ -887,7 +816,7 @@ async function update_current_scene() {
     try {
         Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
         const story_container = createHTML([ "div", {class: "main"}]);
-        story_container.innerHTML = parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`);
+        story_container.append(...parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`).range);
         document.body.append(story_container);
         document.body.append(createHTML(["hr"]));
         document.body.append(create_variable_table());
@@ -961,39 +890,10 @@ function assert_equal(left: any, right: any, explanation?: any) {
 
 async function tests() {
     function test_Tag_result() {
-        let text = Tag_result.from_plaintext("111");
-        text = text.append_plaintext("222");
-        assert_equal(text.plaintext, "111222", "First try");
-        let html = text.html;
-        assert_equal(html.split("111").length, 2, html);
-        assert_equal(html.split("222").length, 2, html);
-        assert_equal(text.plaintext, "111222", text.plaintext);
-        text = text.append_html("333");
-        html = text.html;
-        assert_equal(html.split("111").length, 2, html);
-        assert_equal(html.split("222").length, 2, html);
-        assert_equal(html.split("333").length, 2, html);
-        text = text.append_html("444");
-        html = text.html;
-        assert_equal(html.split("111").length, 2, html);
-        assert_equal(html.split("222").length, 2, html);
-        assert_equal(html.split("333").length, 2, html);
-        assert_equal(html.split("444").length, 2, html);
-        text = text.append_plaintext("555");
-        html = text.html;
-        assert_equal(html.split("111").length, 2, html);
-        assert_equal(html.split("222").length, 2, html);
-        assert_equal(html.split("333").length, 2, html);
-        assert_equal(html.split("444").length, 2, html);
-        assert_equal(html.split("555").length, 2, html);
-        text = text.append_plaintext("666");
-        html = text.html;
-        assert_equal(html.split("111").length, 2, html);
-        assert_equal(html.split("222").length, 2, html);
-        assert_equal(html.split("333").length, 2, html);
-        assert_equal(html.split("444").length, 2, html);
-        assert_equal(html.split("555").length, 2, html);
-        assert_equal(html.split("666").length, 2, html);
+        let text = new Tag_result("111");
+        assert_equal(text.text, "111", "Initializing text failed");
+        text = text.append("222");
+        assert_equal(text.text, "111222", "Appending text failed");
     }
     test_Tag_result();
 
@@ -1014,7 +914,7 @@ async function tests() {
 
     async function test_delayed_evaluation() {
         const debug = false;
-        const result = parse_source_text("[test_delayed_evaluation]", "test_delayed_evaluation");
+        const result = parse_source_text("[test_delayed_evaluation]", "test_delayed_evaluation").current_value;
         assert(result.includes("test_delayed_evaluation_placeholder"), `test_delayed_evaluation_placeholder not found: ${result}`);
         assert(!result.includes("test_delayed_evaluation_result"), `test_delayed_evaluation_result found prematurely: ${result}`);
         document.body.innerHTML = result;

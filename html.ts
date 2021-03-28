@@ -1,11 +1,11 @@
 type Tag_name = string;
 type Attributes = {[key: string]: string};
-type HTML_node = [Tag_name, ...(HTML_node | string | Attributes)[]];
+type HTML_node = [Tag_name, ...(HTML_node | HTMLElement | string | Attributes)[]];
 
 export function createHTML(node: HTML_node): HTMLElement {
     const element = document.createElement(node[0]);
-    function handle(parameter: Attributes | HTML_node | string) {
-        if (typeof parameter === "string") {
+    function handle(parameter: Attributes | HTML_node | HTMLElement | string) {
+        if (typeof parameter === "string" || parameter instanceof HTMLElement) {
             element.append(parameter);
         }
         else if (Array.isArray(parameter)) {

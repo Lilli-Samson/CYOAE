@@ -136,92 +136,68 @@ class Lazy_evaluated_rich_text {
 }
 
 class Tag_result {
-  constructor(ctx, html, plaintext) {
-    if (ctx) {
-      this.context_value = new Lazy_evaluated_rich_text(ctx);
+  constructor(initializer, prev) {
+    this.prev = prev;
+    this.data = initializer instanceof cyoaeParser.Rich_text_Context ? new Lazy_evaluated_rich_text(initializer) : initializer;
+  }
+
+  get text() {
+    var _a;
+
+    if (this.value instanceof HTMLElement) {
+      throw "Plaintext unavailable";
     }
 
-    this.current_plaintext = plaintext;
-    this.current_html = html;
+    return `${((_a = this.prev) === null || _a === void 0 ? void 0 : _a.text) || ""}${this.value}`;
   }
 
-  static from_plaintext(text) {
-    return new Tag_result(undefined, "", text);
-  }
-
-  static from_html(text) {
-    return new Tag_result(undefined, text, "");
-  }
-
-  static from_ctx(ctx) {
-    return new Tag_result(ctx, "", "");
-  }
-
-  get plaintext() {
-    if (this.value.is_plaintext_available) {
-      return this.value.current_plaintext;
+  insert_into(element) {
+    if (this.prev) {
+      element.append(this.prev.value);
     }
 
-    throw "Plaintext unavailable";
+    element.append(this.value);
   }
 
-  get html() {
-    return this.value.current_html + Tag_result.plain_to_html(this.value.current_plaintext);
-  }
+  get is_text_available() {
+    var _a;
 
-  get is_plaintext_available() {
-    return this.value.current_html.length === 0;
+    return typeof this.value === "string" && (((_a = this.prev) === null || _a === void 0 ? void 0 : _a.is_text_available) || true);
   }
 
   get current_value() {
-    if (this.context_value) {
-      return this.context_value.maybe_unevaluated_value;
-    }
+    var _a;
 
-    if (this.value.current_html) {
-      return this.value.html;
-    }
-
-    return this.value.plaintext;
+    return `${((_a = this.prev) === null || _a === void 0 ? void 0 : _a.current_value) || ""}${this.data instanceof Lazy_evaluated_rich_text ? this.data.maybe_unevaluated_value : this.value}`;
   }
 
   append(other) {
-    return other.is_plaintext_available ? this.value.append_plaintext(other.plaintext) : this.value.append_html(other.html);
+    if (other instanceof Tag_result) {
+      if (other.prev) {
+        return new Tag_result(other.data, this.append(other.prev));
+      } else {
+        return new Tag_result(other.data, this);
+      }
+    } else {
+      return this.append(new Tag_result(other, this));
+    }
   }
 
-  append_plaintext(text) {
-    if (text.length === 0) {
-      return this.value;
+  get range() {
+    let data = [];
+
+    for (let current = this; current; current = current.prev) {
+      data.push(current.value);
     }
 
-    return new Tag_result(undefined, this.value.current_html, this.value.current_plaintext + text);
-  }
-
-  append_html(text) {
-    if (text.length === 0) {
-      return this.value;
-    }
-
-    return new Tag_result(undefined, this.value.html + text, "");
-  }
-
-  static plain_to_html(text) {
-    return escape_html(text);
+    return data.reverse();
   }
 
   get value() {
-    var _a;
-
-    return ((_a = this.context_value) === null || _a === void 0 ? void 0 : _a.value) || this;
+    return this.data instanceof Lazy_evaluated_rich_text ? this.data.value.value : this.data;
   }
 
 }
-
-var Tag_type;
-
-(function (Tag_type) {
-  Tag_type[Tag_type["allow_duplicate_attributes"] = 0] = "allow_duplicate_attributes";
-})(Tag_type || (Tag_type = {}));
 
 function get_optional_attributes(tag, attribute) {
   let result = [];
@@ -321,9 +297,13 @@ function sleep(ms) {
 
 class Delayed_evaluation {
   //returns a placeholder that will be replaced by the real thing later
-  static evaluate(replacement, placeholder_text = Tag_result.from_plaintext("[loading]")) {
+  static evaluate(replacement, placeholder_text = new Tag_result("[loading]")) {
     const placeholder_id = `delayed_evaluation_placeholder_${this.delayed_evaluation_placeholder_number}`;
-    const placeholder = Tag_result.from_html(`<slot class="placeholder" id="${placeholder_id}">${placeholder_text.html}</slot>`);
+    const slot = (0, _html.createHTML)(["slot", {
+      class: "placeholder",
+      id: placeholder_id
+    }]);
+    placeholder_text.insert_into(slot);
     this.active_delayed_evaluations += 1;
     const old_promise = this.delay_evaluation_promise;
 
@@ -332,8 +312,8 @@ class Delayed_evaluation {
       let link = document.querySelector(`#${placeholder_id}`);
 
       if (link) {
-        this.debug && console.log(`Replacement: "${link.outerHTML}" to "${result.html}"`);
-        link.outerHTML = result.html;
+        this.debug && console.log(`Replacement: "${link.outerHTML}" to "${result.current_value}"`);
+        link.replaceWith(...result.range);
       } else {
         console.error(`Failed finding ID "${placeholder_id}" for replacement`);
       }
@@ -343,7 +323,7 @@ class Delayed_evaluation {
     }))();
 
     this.delayed_evaluation_placeholder_number += 1;
-    return placeholder;
+    return new Tag_result(slot);
   }
 
   static get has_everything_been_evaluated() {
@@ -365,82 +345,77 @@ Delayed_evaluation.delay_evaluation_promise = (() => __awaiter(void 0, void 0, v
 
 Delayed_evaluation.active_delayed_evaluations = 0;
 
-function expression_to_html_js(expression) {
-  if (expression._assignment) {
-    return `sv('${expression._identifier.text}', ${expression_to_html_js(expression._expression)})`;
-  } else if (expression._quote) {
-    return `'${expression._string.text}'`;
+function get_attributes(tag, tag_replacement) {
+  let result = {};
+
+  for (const attr of tag_replacement.required_attributes) {
+    result.attr = get_unique_required_attribute(tag, attr);
   }
 
-  let result = "";
+  for (const attr of tag_replacement.optional_attributes) {
+    const attribute = get_unique_optional_attribute(tag, attr);
 
-  for (let i = 0; i < expression.childCount; i++) {
-    const child = expression.getChild(i);
-
-    if (child instanceof cyoaeParser.Identifier_Context) {
-      //reading an identifier
-      result += `gv('${child.text}')`;
-    } else {
-      result += child.text;
+    if (attribute) {
+      result.attr = attribute;
     }
   }
 
   return result;
 }
 
-function create_onclick_action(code) {
-  return run_parser({
-    filename: "onclick evaluator",
-    code: code,
-    evaluator: parser => {
-      return expression_to_html_js(parser.expression_());
-    }
-  });
-}
-
 const replacements = [{
   tag_name: "img",
-  intro: Tag_result.from_html("<img"),
-  replacements: [{
-    name: "url",
-    replacement: url => Tag_result.from_html(` src="${url.plaintext}"`)
-  }, {
-    name: "alt",
-    replacement: alt => Tag_result.from_html(` alt="${escape_html(alt.plaintext)}"`),
-    default_value: Tag_result.from_plaintext("image")
-  }],
-  outro: Tag_result.from_html("/>\n")
+  required_attributes: ["url"],
+  optional_attributes: ["alt"],
+  replacements: function (tag) {
+    var _a, _b;
+
+    const attributes = get_attributes(tag, this);
+    return new Tag_result((0, _html.createHTML)(["img", {
+      src: attributes["url"].text,
+      alt: (_b = (_a = attributes["alt"]) === null || _a === void 0 ? void 0 : _a.text) !== null && _b !== void 0 ? _b : "image"
+    }]));
+  }
 }, {
   tag_name: "code",
-  intro: Tag_result.from_html("<span class='code'>"),
-  replacements: [{
-    name: "text",
-    replacement: text => Tag_result.from_html(escape_html(text.plaintext))
-  }],
-  outro: Tag_result.from_html("</span>\n")
+  required_attributes: ["text"],
+  optional_attributes: [],
+  replacements: function (tag) {
+    const attributes = get_attributes(tag, this);
+    return new Tag_result((0, _html.createHTML)(["span", {
+      class: "code"
+    }, ...attributes["text"].range]));
+  }
 }, {
   tag_name: "choice",
-  replacements: tag => {
-    const next = get_unique_required_attribute(tag, "next");
-    const text = get_unique_required_attribute(tag, "text");
-    const onclick = get_unique_optional_attribute(tag, "onclick");
-    const onclick_action = onclick ? create_onclick_action(onclick.plaintext) : undefined; //TODO: assert that tag.attributes has no attributes besides next, text and onclick
+  required_attributes: ["next", "text"],
+  optional_attributes: ["onclick"],
+  replacements: function (tag) {
+    const attributes = get_attributes(tag, this);
 
     function get_result(page_available) {
-      //intro
-      let result = Tag_result.from_html("<a"); //next
+      //next
+      const result = (0, _html.createHTML)(["a", page_available ? {
+        class: "choice",
+        href: `#${current_arc}/${attributes["next"].text}`
+      } : {
+        class: "dead_choice"
+      }]); //onclick
 
-      result = page_available ? result.append_html(` class='choice' href="#${current_arc}/${next.plaintext}"`) : result.append_html(` class='dead_choice'`); //onclick
+      const expression_context = run_parser({
+        code: attributes["onclick"].text,
+        evaluator: parser => parser.expression_()
+      });
+      result.addEventListener("click", () => {
+        evaluate_expression(expression_context);
+        return true;
+      }); //text
 
-      result = onclick_action ? result.append_html(` onclick="${onclick_action}"`) : result; //text
-
-      result = result.append_html(">" + text.plaintext); //outro
-
-      result = result.append_html("</a>\n");
-      return result;
+      result.append(...attributes["text"].range);
+      return new Tag_result(result);
     }
 
-    switch (Page_checker.page_available(current_arc, next.plaintext)) {
+    switch (Page_checker.page_available(current_arc, attributes["next"].text)) {
       case Page_availability.Available:
         return get_result(true);
 
@@ -448,47 +423,52 @@ const replacements = [{
         return get_result(false);
 
       case Page_availability.Unknown:
-        return Delayed_evaluation.evaluate((() => __awaiter(void 0, void 0, void 0, function* () {
-          return get_result(yield Page_checker.fetch_page_available(current_arc, next.plaintext));
-        }))(), text);
+        return Delayed_evaluation.evaluate((() => __awaiter(this, void 0, void 0, function* () {
+          return get_result(yield Page_checker.fetch_page_available(current_arc, attributes["next"].text));
+        }))(), attributes["text"]);
     }
   }
 }, {
   tag_name: "test",
-  intro: Tag_result.from_html("<a>"),
-  replacements: [{
-    name: "text",
-    replacement: text => {
-      false && console.log(`Test tag text: ${text.plaintext}`);
-      return Tag_result.from_html(text.plaintext);
-    }
-  }],
-  outro: Tag_result.from_html("</a>\n")
+  required_attributes: [],
+  optional_attributes: [],
+  replacements: function (tag) {
+    return new Tag_result("");
+  }
 }, {
   tag_name: "test_delayed_evaluation",
+  required_attributes: [],
+  optional_attributes: [],
   replacements: tag => {
     return Delayed_evaluation.evaluate((() => __awaiter(void 0, void 0, void 0, function* () {
-      return Tag_result.from_plaintext("test_delayed_evaluation_result");
-    }))(), Tag_result.from_plaintext("test_delayed_evaluation_placeholder"));
+      return new Tag_result("test_delayed_evaluation_result");
+    }))(), new Tag_result("test_delayed_evaluation_placeholder"));
   }
 }, {
   tag_name: "source",
-  intro: Tag_result.from_html('<hr>'),
+  required_attributes: [],
+  optional_attributes: [],
   replacements: () => {
     const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
-    return Tag_result.from_html(`<a href="${`${current_url}story arcs/${current_arc}/${current_scene}.txt`}">Source</a><br>\n<p class="source">${escape_html(current_source)}</p>`);
+    const html = new Tag_result((0, _html.createHTML)(["hr"]));
+    html.append((0, _html.createHTML)(["a", {
+      href: `${current_url}story arcs/${current_arc}/${current_scene}.txt`
+    }, "Source"]));
+    html.append((0, _html.createHTML)(["br"]));
+    html.append((0, _html.createHTML)(["p", {
+      class: "source"
+    }, current_source]));
+    return html;
   }
 }, {
-  tag_name: "print",
-  replacements: [{
-    name: "variable",
-    replacement: text => Tag_result.from_plaintext(`${_storage.Variable_storage.get_variable(text.plaintext)}`)
-  }]
-}, {
   tag_name: "select",
+  required_attributes: [],
+  optional_attributes: [],
   replacements: tag => evaluate_select_tag(tag.ctx)
 }, {
   tag_name: "case",
+  required_attributes: [],
+  optional_attributes: [],
   replacements: tag => {
     throw `"case" tag cannot be outside of "switch" tag`;
   }
@@ -646,7 +626,7 @@ function evaluate_code(code) {
 }
 
 function evaluate_tag(tag) {
-  var _a, _b, _c, _d;
+  var _a;
 
   const debug = false;
   debug && console.log(`Executing tag "${tag.name}" with value "${(_a = tag.default_value) === null || _a === void 0 ? void 0 : _a.current_value}" and attributes [${tag.attributes.length > 0 ? tag.attributes.reduce((curr, [attribute_name, attribute_value]) => `${curr}\t${attribute_name}="${attribute_value.current_value}"\n`, "\n") : ""}]\n`);
@@ -657,7 +637,7 @@ function evaluate_tag(tag) {
   } //check that there are no duplicate attributes
 
 
-  if (replacement.tag_type !== Tag_type.allow_duplicate_attributes) {
+  {
     let attribute_names = new Set();
 
     for (const [attribute_name] of tag.attributes) {
@@ -667,64 +647,19 @@ function evaluate_tag(tag) {
 
       attribute_names.add(attribute_name);
     }
+  } //TODO: Check that replacement.required_attributes are there
+
+  try {
+    return replacement.replacements(tag);
+  } catch (error) {
+    throw_evaluation_error(`${error}`, tag.ctx);
   }
-
-  let result = replacement.intro || Tag_result.from_plaintext("");
-
-  if (typeof replacement.replacements === "function") {
-    try {
-      result = result.append(replacement.replacements(tag));
-    } catch (error) {
-      throw_evaluation_error(`${error}`, tag.ctx);
-    }
-  } else {
-    if ((_b = tag.default_value) === null || _b === void 0 ? void 0 : _b.current_value) {
-      debug && console.log(`Found default value ${(_c = tag.default_value) === null || _c === void 0 ? void 0 : _c.current_value}`);
-      tag.attributes.push([replacement.replacements[0].name, tag.default_value]);
-    }
-
-    const attributes = [...tag.attributes];
-    debug && console.log(`Found attributes that need to be looked up: ${attributes.reduce((curr, [name]) => `${curr} ${name}`, "")}`);
-
-    for (const attribute_replacement of replacement.replacements) {
-      const attribute_value_pos = attributes.findIndex(([attribute_name]) => attribute_name === attribute_replacement.name);
-      let attribute_value = (_d = attributes[attribute_value_pos]) === null || _d === void 0 ? void 0 : _d[1];
-
-      if (!attribute_value) {
-        if (attribute_replacement.default_value !== undefined) {
-          attribute_value = attribute_replacement.default_value;
-        } else {
-          throw_evaluation_error(`Missing attribute "${attribute_replacement.name}" in tag "${tag.name}"`, tag.ctx);
-        }
-      }
-
-      try {
-        result = result.append(attribute_replacement.replacement(attribute_value, tag));
-      } catch (error) {
-        throw_evaluation_error(`${error}`, tag.ctx);
-      }
-
-      if (attribute_value_pos !== -1) {
-        attributes.splice(attribute_value_pos, 1);
-      }
-    }
-
-    if (attributes.length > 0) {
-      throw_evaluation_error(`Unknown attribute(s) [${attributes.reduce((curr, [attr_name]) => `${curr}${attr_name} `, " ")}] in tag "${tag.name}"`, tag.ctx);
-    }
-  }
-
-  if (replacement.outro) {
-    result = result.append(replacement.outro);
-  }
-
-  return result;
 }
 
 function evaluate_richtext(ctx) {
   const debug = false;
   debug && console.log(`Evaluating richtext "${ctx.text}"`);
-  let result = Tag_result.from_plaintext("");
+  let result = new Tag_result("");
 
   for (let i = 0; i < ctx.childCount; i++) {
     const child = ctx.getChild(i);
@@ -741,9 +676,9 @@ function evaluate_richtext(ctx) {
             throw_evaluation_error(`Invalid escape sequence: ${grandchild.text}`, grandchild);
           }
 
-          result = result.append_plaintext(grandchild.text[1]); //cut off the \
+          result = result.append(grandchild.text[1]); //cut off the \
         } else {
-          result = result.append_plaintext(grandchild.text);
+          result = result.append(grandchild.text);
         }
       }
     } else if (child instanceof cyoaeParser.Tag_Context) {
@@ -758,14 +693,14 @@ function evaluate_richtext(ctx) {
 
         if (ctx._default_value.text) {
           debug && console.log(`Got a tag default value "${ctx._default_value.text}"`);
-          tag.default_value = Tag_result.from_ctx(ctx._default_value);
+          tag.default_value = new Tag_result(ctx._default_value);
         }
 
         for (let i = 0; i < ctx.childCount; i++) {
           const child = ctx.getChild(i);
 
           if (child instanceof cyoaeParser.Attribute_Context) {
-            tag.attributes.push([child._attribute_name.text, Tag_result.from_ctx(child._attribute_value)]);
+            tag.attributes.push([child._attribute_name.text, new Tag_result(child._attribute_value)]);
           }
         }
 
@@ -779,17 +714,17 @@ function evaluate_richtext(ctx) {
       debug && console.log(`Result: "${value}"`);
 
       if (typeof value !== "undefined") {
-        result = result.append_plaintext(`${value}`);
+        result = result.append(`${value}`);
       }
     } else if (child instanceof cyoaeParser.Number_Context) {
       debug && console.log(`Found number ${child.text}`);
-      result = result.append_plaintext(child.text);
+      result = result.append(child.text);
     } else {
       throw_evaluation_error(`Internal logic error: Found child that is neither a plain text nor a tag nor a number in rich text`, ctx);
     }
   }
 
-  debug && console.log(`Tag execution result: "${result.current_value}" which is ${result.is_plaintext_available ? "plaintext" : "html"}`);
+  debug && console.log(`Tag execution result: "${result.current_value}" which is ${result.is_text_available ? "plaintext" : "html"}`);
   return result;
 }
 
@@ -841,7 +776,7 @@ function evaluate_select_tag(ctx) {
   debug && console.log(`Total priority: ${total_priority}`);
 
   if (cases.length === 0) {
-    return Tag_result.from_plaintext("");
+    return new Tag_result("");
   }
 
   if (cases.length === 1) {
@@ -921,7 +856,7 @@ function evaluate_case(ctx) {
 
       switch (child._attribute_name.text) {
         case "text":
-          result.text = Tag_result.from_ctx(child._attribute_value);
+          result.text = new Tag_result(child._attribute_value);
           break;
 
         case "condition":
@@ -941,7 +876,7 @@ function evaluate_case(ctx) {
 
         case "priority":
           try {
-            const text = evaluate_richtext(child._attribute_value).plaintext;
+            const text = evaluate_richtext(child._attribute_value).text;
             const priority = parseFloat(text);
 
             if (Number.isNaN(priority)) {
@@ -966,7 +901,7 @@ function evaluate_case(ctx) {
   }
 
   if (!result.text) {
-    result.text = Tag_result.from_ctx(ctx._default_value);
+    result.text = new Tag_result(ctx._default_value);
   }
 
   debug && console.log(`Result: applicable: ${result.applicable}, priority: ${result.priority}, score: ${result.score}, text: ${result.text.current_value}`);
@@ -1003,11 +938,11 @@ function parse_source_text(data, filename) {
       const tree = parser.start_();
 
       if (tree._rich_text) {
-        return evaluate_richtext(tree._rich_text).html;
+        return evaluate_richtext(tree._rich_text);
       } //TODO: Put up a proper placeholder page for an empty source
 
 
-      return Tag_result.from_plaintext(`Empty file "${filename}"`).html;
+      return new Tag_result(`Empty file "${filename}"`);
     }
   });
 } // plays through a story arc
@@ -1031,7 +966,7 @@ function update_current_scene() {
       const story_container = (0, _html.createHTML)(["div", {
         class: "main"
       }]);
-      story_container.innerHTML = parse_source_text(yield download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`);
+      story_container.append(...parse_source_text(yield download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`).range);
       document.body.append(story_container);
       document.body.append((0, _html.createHTML)(["hr"]));
       document.body.append((0, _variables_screen.create_variable_table)());
@@ -1120,39 +1055,10 @@ function assert_equal(left, right, explanation) {
 function tests() {
   return __awaiter(this, void 0, void 0, function* () {
     function test_Tag_result() {
-      let text = Tag_result.from_plaintext("111");
-      text = text.append_plaintext("222");
-      assert_equal(text.plaintext, "111222", "First try");
-      let html = text.html;
-      assert_equal(html.split("111").length, 2, html);
-      assert_equal(html.split("222").length, 2, html);
-      assert_equal(text.plaintext, "111222", text.plaintext);
-      text = text.append_html("333");
-      html = text.html;
-      assert_equal(html.split("111").length, 2, html);
-      assert_equal(html.split("222").length, 2, html);
-      assert_equal(html.split("333").length, 2, html);
-      text = text.append_html("444");
-      html = text.html;
-      assert_equal(html.split("111").length, 2, html);
-      assert_equal(html.split("222").length, 2, html);
-      assert_equal(html.split("333").length, 2, html);
-      assert_equal(html.split("444").length, 2, html);
-      text = text.append_plaintext("555");
-      html = text.html;
-      assert_equal(html.split("111").length, 2, html);
-      assert_equal(html.split("222").length, 2, html);
-      assert_equal(html.split("333").length, 2, html);
-      assert_equal(html.split("444").length, 2, html);
-      assert_equal(html.split("555").length, 2, html);
-      text = text.append_plaintext("666");
-      html = text.html;
-      assert_equal(html.split("111").length, 2, html);
-      assert_equal(html.split("222").length, 2, html);
-      assert_equal(html.split("333").length, 2, html);
-      assert_equal(html.split("444").length, 2, html);
-      assert_equal(html.split("555").length, 2, html);
-      assert_equal(html.split("666").length, 2, html);
+      let text = new Tag_result("111");
+      assert_equal(text.text, "111", "Initializing text failed");
+      text = text.append("222");
+      assert_equal(text.text, "111222", "Appending text failed");
     }
 
     test_Tag_result();
@@ -1174,7 +1080,7 @@ function tests() {
     function test_delayed_evaluation() {
       return __awaiter(this, void 0, void 0, function* () {
         const debug = false;
-        const result = parse_source_text("[test_delayed_evaluation]", "test_delayed_evaluation");
+        const result = parse_source_text("[test_delayed_evaluation]", "test_delayed_evaluation").current_value;
         assert(result.includes("test_delayed_evaluation_placeholder"), `test_delayed_evaluation_placeholder not found: ${result}`);
         assert(!result.includes("test_delayed_evaluation_result"), `test_delayed_evaluation_result found prematurely: ${result}`);
         document.body.innerHTML = result;
@@ -3639,7 +3545,7 @@ function createHTML(node) {
   const element = document.createElement(node[0]);
 
   function handle(parameter) {
-    if (typeof parameter === "string") {
+    if (typeof parameter === "string" || parameter instanceof HTMLElement) {
       element.append(parameter);
     } else if (Array.isArray(parameter)) {
       element.append(createHTML(parameter));
