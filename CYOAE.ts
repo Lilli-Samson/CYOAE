@@ -64,8 +64,6 @@ function HTMLElement_to_string(who: HTMLElement){
     let el = document.createElement("div");
     el.appendChild(who.cloneNode(true));
     let txt = el.innerHTML;
-    //const ax = txt.indexOf('>') + 1;
-    //txt = txt.substring(0, ax) + who.innerHTML + txt.substring(ax);
     return txt;
 }
 
@@ -124,11 +122,14 @@ class Tag_result {
                 return this;
             }
             debug && console.log(`Entering append with other not tag_result and value ${other}`);
+            if (typeof this.data === "string") {
+                return new Tag_result(this.data + other, this.prev);
+            }
             return this.append(new Tag_result(other));
         }
     }
-    get range(): Iterable<string | HTMLElement> {
-        let data: (string | HTMLElement)[] = [];
+    get range(): (string | HTMLElement)[] {
+        const data: (string | HTMLElement)[] = [];
         for (let current: Tag_result | undefined = this; current; current = current.prev) {
             data.push(current.value);
         }
@@ -336,16 +337,18 @@ const replacements: Readonly<Tag_replacement[]> = [
                     ? {class: "choice", href: `#${current_arc}/${attributes["next"].text}`}
                     : {class: "dead_choice"}]);
                 //onclick
-                const expression_context = run_parser(
-                    {
-                        code: attributes["onclick"].text,
-                        evaluator: (parser) => parser.expression_(),
-                    }
-                );
-                result.addEventListener("click", () => {
-                    evaluate_expression(expression_context);
-                    return true;
-                });
+                if (attributes.onclick) {
+                    const expression_context = run_parser(
+                        {
+                            code: attributes["onclick"].text,
+                            evaluator: (parser) => parser.expression_(),
+                        }
+                    );
+                    result.addEventListener("click", () => {
+                        evaluate_expression(expression_context);
+                        return true;
+                    });
+                }
                 //text
                 result.append(...attributes["text"].range);
                 return new Tag_result(result);
@@ -400,7 +403,7 @@ const replacements: Readonly<Tag_replacement[]> = [
     },
     { //select
         tag_name: "select",
-        required_attributes: [],
+        required_attributes: [""],
         optional_attributes: [],
         replacements: (tag: Tag) => evaluate_select_tag(tag.ctx),
     },
@@ -586,7 +589,21 @@ function evaluate_tag(tag: Tag): Tag_result {
             attribute_names.add(attribute_name);
         }
     }
+
     //TODO: Check that replacement.required_attributes are there
+
+    //handle default value
+    if (tag.default_value) {
+        if (replacement.required_attributes.length === 0) {
+            throw_evaluation_error(`Tag "${tag.name}" does not take arguments`, tag.ctx);
+        }
+        for (const attribute of tag.attributes) {
+            if (attribute[0] === replacement.required_attributes[0]) {
+                throw_evaluation_error(`Attribute "${attribute[0]}" of tag "${tag.name}" has been specified both as the default value and explicitly`, tag.ctx);
+            }
+        }
+        tag.attributes.push([replacement.required_attributes[0], tag.default_value]);
+    }
     try {
         return replacement.replacements(tag);
     }
@@ -877,6 +894,7 @@ async function update_current_scene() {
         Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
         const story_container = createHTML([ "div", {class: "main"}]);
         story_container.append(...parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`).range);
+        document.body.textContent = "";
         document.body.append(story_container);
         document.body.append(createHTML(["hr"]));
         document.body.append(create_variable_table());
@@ -899,13 +917,6 @@ async function url_hash_change () {
 
 window.onhashchange = url_hash_change;
 
-// escapes HTML tags
-function escape_html(str: string) {
-    let element = document.createElement('p');
-    element.innerText = str;
-    return element.innerHTML;
-}
-
 // downloads a local resource given its path/filename
 async function download(url: string) {
     const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
@@ -923,7 +934,7 @@ async function download(url: string) {
 }
 
 function display_error_document(error: string) {
-    document.body.innerHTML = `<span class='error'>${escape_html(error)}</span>`;
+    document.body.append(createHTML(["span", { class: 'error'}, error]));
 }
 
 function assert(predicate: any, explanation: string = "") {
@@ -938,13 +949,31 @@ function assert(predicate: any, explanation: string = "") {
 }
 
 function assert_equal(actual: any, expected: any, explanation?: any) {
-    if (actual !== expected) {
-        const details = `\n>>Actual: >>>${actual}<<<\nExpected: >>>${expected}<<<`;
+    function throw_error() {
+        const details = `\n  Actual: "${actual}"\nExpected: "${expected}"`;
         const source = ` in ${(new Error()).stack?.split("\n")[1]}`;
         if (explanation) {
             throw `Assertion fail${source}:${details}${explanation ? "\n" + explanation : ""}`;
         }
         throw `Assertion fail${source}: ${details}`;
+    }
+    if (Array.isArray(actual) && Array.isArray(expected)) {
+        if (actual.length !== expected.length) {
+            throw_error();
+        }
+        for (const i in actual) {
+            try {
+                assert_equal(actual[i], expected[i])
+            }
+            catch (err) {
+                explanation = `${err}\n${explanation}`;
+                throw_error();
+            }
+            return;
+        }
+    }
+    if (actual !== expected) {
+        throw_error();
     }
 }
 
@@ -962,11 +991,19 @@ async function tests() {
     }
     test_HTMLElement_to_string();
 
+    function test_creatHTML() {
+        assert_equal(HTMLElement_to_string(createHTML(["p", "test", "bla", "blup"])), "<p>testblablup</p>");
+        assert_equal(HTMLElement_to_string(createHTML(["p", {class: "foo"}, "test", "bla", "blup"])), '<p class="foo">testblablup</p>');
+        assert_equal(HTMLElement_to_string(createHTML(["p", {class: "foo"}, ["a", {href: "inter.net"}, "link"]])), '<p class="foo"><a href="inter.net">link</a></p>');
+    }
+    test_creatHTML();
+
     function test_Tag_result() {
         let text = new Tag_result("111");
         assert_equal(text.text, "111", "Initializing text failed");
         text = text.append("222");
         assert_equal(text.text, "111222", "Appending text failed");
+        assert_equal(text.range.join(), "111222");
     }
     test_Tag_result();
 

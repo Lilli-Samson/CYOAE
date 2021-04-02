@@ -2,6 +2,10 @@ div.main, div.variables_screen {
     margin: 2%;
 }
 
+div.main {
+    white-space: pre-wrap;
+}
+
 a.dead_choice {
     color: darkred;
 }

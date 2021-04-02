@@ -138,9 +138,7 @@ class Lazy_evaluated_rich_text {
 function HTMLElement_to_string(who) {
   let el = document.createElement("div");
   el.appendChild(who.cloneNode(true));
-  let txt = el.innerHTML; //const ax = txt.indexOf('>') + 1;
-  //txt = txt.substring(0, ax) + who.innerHTML + txt.substring(ax);
-
+  let txt = el.innerHTML;
   return txt;
 }
 
@@ -225,12 +223,17 @@ class Tag_result {
       }
 
       debug && console.log(`Entering append with other not tag_result and value ${other}`);
+
+      if (typeof this.data === "string") {
+        return new Tag_result(this.data + other, this.prev);
+      }
+
       return this.append(new Tag_result(other));
     }
   }
 
   get range() {
-    let data = [];
+    const data = [];
 
     for (let current = this; current; current = current.prev) {
       data.push(current.value);
@@ -448,14 +451,17 @@ const replacements = [{
         class: "dead_choice"
       }]); //onclick
 
-      const expression_context = run_parser({
-        code: attributes["onclick"].text,
-        evaluator: parser => parser.expression_()
-      });
-      result.addEventListener("click", () => {
-        evaluate_expression(expression_context);
-        return true;
-      }); //text
+      if (attributes.onclick) {
+        const expression_context = run_parser({
+          code: attributes["onclick"].text,
+          evaluator: parser => parser.expression_()
+        });
+        result.addEventListener("click", () => {
+          evaluate_expression(expression_context);
+          return true;
+        });
+      } //text
+
 
       result.append(...attributes["text"].range);
       return new Tag_result(result);
@@ -517,7 +523,7 @@ const replacements = [{
   }
 }, {
   tag_name: "select",
-  required_attributes: [],
+  required_attributes: [""],
   optional_attributes: [],
   replacements: tag => evaluate_select_tag(tag.ctx)
 }, {
@@ -703,6 +709,21 @@ function evaluate_tag(tag) {
       attribute_names.add(attribute_name);
     }
   } //TODO: Check that replacement.required_attributes are there
+  //handle default value
+
+  if (tag.default_value) {
+    if (replacement.required_attributes.length === 0) {
+      throw_evaluation_error(`Tag "${tag.name}" does not take arguments`, tag.ctx);
+    }
+
+    for (const attribute of tag.attributes) {
+      if (attribute[0] === replacement.required_attributes[0]) {
+        throw_evaluation_error(`Attribute "${attribute[0]}" of tag "${tag.name}" has been specified both as the default value and explicitly`, tag.ctx);
+      }
+    }
+
+    tag.attributes.push([replacement.required_attributes[0], tag.default_value]);
+  }
 
   try {
     return replacement.replacements(tag);
@@ -1030,6 +1051,7 @@ function update_current_scene() {
         class: "main"
       }]);
       story_container.append(...parse_source_text(yield download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`).range);
+      document.body.textContent = "";
       document.body.append(story_container);
       document.body.append((0, _html.createHTML)(["hr"]));
       document.body.append((0, _variables_screen.create_variable_table)());
@@ -1053,14 +1075,7 @@ function url_hash_change() {
   });
 }
 
-window.onhashchange = url_hash_change; // escapes HTML tags
-
-function escape_html(str) {
-  let element = document.createElement('p');
-  element.innerText = str;
-  return element.innerHTML;
-} // downloads a local resource given its path/filename
-
+window.onhashchange = url_hash_change; // downloads a local resource given its path/filename
 
 function download(url) {
   return __awaiter(this, void 0, void 0, function* () {
@@ -1082,7 +1097,9 @@ function download(url) {
 }
 
 function display_error_document(error) {
-  document.body.innerHTML = `<span class='error'>${escape_html(error)}</span>`;
+  document.body.append((0, _html.createHTML)(["span", {
+    class: 'error'
+  }, error]));
 }
 
 function assert(predicate, explanation = "") {
@@ -1101,10 +1118,10 @@ function assert(predicate, explanation = "") {
 }
 
 function assert_equal(actual, expected, explanation) {
-  var _a;
+  function throw_error() {
+    var _a;
 
-  if (actual !== expected) {
-    const details = `\n>>Actual: >>>${actual}<<<\nExpected: >>>${expected}<<<`;
+    const details = `\n  Actual: "${actual}"\nExpected: "${expected}"`;
     const source = ` in ${(_a = new Error().stack) === null || _a === void 0 ? void 0 : _a.split("\n")[1]}`;
 
     if (explanation) {
@@ -1112,6 +1129,27 @@ function assert_equal(actual, expected, explanation) {
     }
 
     throw `Assertion fail${source}: ${details}`;
+  }
+
+  if (Array.isArray(actual) && Array.isArray(expected)) {
+    if (actual.length !== expected.length) {
+      throw_error();
+    }
+
+    for (const i in actual) {
+      try {
+        assert_equal(actual[i], expected[i]);
+      } catch (err) {
+        explanation = `${err}\n${explanation}`;
+        throw_error();
+      }
+
+      return;
+    }
+  }
+
+  if (actual !== expected) {
+    throw_error();
   }
 }
 
@@ -1131,11 +1169,26 @@ function tests() {
 
     test_HTMLElement_to_string();
 
+    function test_creatHTML() {
+      assert_equal(HTMLElement_to_string((0, _html.createHTML)(["p", "test", "bla", "blup"])), "<p>testblablup</p>");
+      assert_equal(HTMLElement_to_string((0, _html.createHTML)(["p", {
+        class: "foo"
+      }, "test", "bla", "blup"])), '<p class="foo">testblablup</p>');
+      assert_equal(HTMLElement_to_string((0, _html.createHTML)(["p", {
+        class: "foo"
+      }, ["a", {
+        href: "inter.net"
+      }, "link"]])), '<p class="foo"><a href="inter.net">link</a></p>');
+    }
+
+    test_creatHTML();
+
     function test_Tag_result() {
       let text = new Tag_result("111");
       assert_equal(text.text, "111", "Initializing text failed");
       text = text.append("222");
       assert_equal(text.text, "111222", "Appending text failed");
+      assert_equal(text.range.join(), "111222");
     }
 
     test_Tag_result();

@@ -1,6 +1,6 @@
 Both links on the previous page point to this page. The difference in choice is only if the [code weapon] variable has been set, so we better make use of it.
 
-In you story a scene with a goblin might come up which you can write like this:
+In your story a scene with a goblin might come up which you can write like this:
 
 [code
 Before you stands an ugly vicious goblin, malice in its eyes, ready to devour you.
