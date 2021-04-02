@@ -1,10 +1,10 @@
-type Tag_name = string;
+type Tag_name = keyof HTMLElementTagNameMap;
 type Attributes = {[key: string]: string};
-type HTML_node = [Tag_name, ...(HTML_node | HTMLElement | string | Attributes)[]];
+type HTML_node<T extends Tag_name> = [T, ...(HTML_node<Tag_name> | HTMLElement | string | Attributes)[]];
 
-export function createHTML(node: HTML_node): HTMLElement {
+export function createHTML<T extends Tag_name>(node: HTML_node<T>): HTMLElementTagNameMap[T] {
     const element = document.createElement(node[0]);
-    function handle(parameter: Attributes | HTML_node | HTMLElement | string) {
+    function handle(parameter: Attributes | HTML_node<Tag_name> | HTMLElement | string) {
         if (typeof parameter === "string" || parameter instanceof HTMLElement) {
             element.append(parameter);
         }
