@@ -31061,12 +31061,13 @@ function create_variable_table() {
     style: "width:100%"
   }, ["tr", ["th", "Variable"], ["th", "Value"], ["th", "type"]]]);
 
-  for (const [name, value] of _storage.Variable_storage.variables) {
-    table.append((0, _html.createHTML)(["tr", ["td", {
-      contenteditable: "true"
-    }, ["button", {
+  function add_row(name, value) {
+    const button = (0, _html.createHTML)(["button", {
       class: "variable_delete"
-    }, "🗑"], name], ["td", {
+    }, "🗑"]);
+    const row = (0, _html.createHTML)(["tr", ["td", {
+      contenteditable: "true"
+    }, button, name], ["td", {
       contenteditable: "true"
     }, `${value}`], ["td", ["select", ["option", {
       value: "string"
@@ -31080,9 +31081,28 @@ function create_variable_table() {
       value: "boolean"
     }, typeof value === "boolean" ? {
       selected: "true"
-    } : {}, "Boolean"]]]]));
+    } : {}, "Boolean"]]]]);
+    button.addEventListener("click", () => {
+      _storage.Variable_storage.delete_variable(name);
+
+      table.removeChild(row);
+    });
+    table.append(row);
   }
 
+  for (const [name, value] of _storage.Variable_storage.variables) {
+    add_row(name, value);
+  }
+
+  const add_var_button = (0, _html.createHTML)(["button", {
+    class: "variable_add"
+  }, "+"]);
+  add_var_button.addEventListener("click", () => {
+    table.removeChild(add_var_button);
+    add_row("", "");
+    table.append(add_var_button);
+  });
+  table.append(add_var_button);
   return table;
 }
 
