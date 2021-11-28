@@ -4,9 +4,12 @@ import { Variable_storage, Variable_storage_types } from './storage';
 
 export function create_variable_table() {
     const table = createHTML(
-        ["table", {class: "variables_screen", style: "width:100%"},
-            ["tr", 
-                ["th", "Variable"],
+        ["table", { class: "variables_screen", style: "width:100%" },
+            ["col", { style: "width:1em" }],
+            ["col"],
+            ["col"],
+            ["tr",
+                ["th", { colspan: "2", width: "1em" }, "Variable"],
                 ["th", "Value"],
                 ["th", "type"],
             ]
@@ -14,16 +17,17 @@ export function create_variable_table() {
     );
 
     function add_row(name: string, value: Variable_storage_types) {
-        const button = createHTML(["button", {class: "variable_delete"}, "🗑"]);
+        const button = createHTML(["button", { class: "variable_delete" }, "🗑"]);
         const row = createHTML(
             ["tr",
-                ["td", {contenteditable: "true"}, button, name],
-                ["td", {contenteditable: "true"}, `${value}`],
+                ["td", button],
+                ["td", { contenteditable: "true" }, name],
+                ["td", { contenteditable: "true" }, `${value}`],
                 ["td",
                     ["select",
-                        ["option", {value: "string"}, typeof value === "string" ? {selected: "true"} : {}, "String"],
-                        ["option", {value: "number"}, typeof value === "number" ? {selected: "true"} : {}, "Number"],
-                        ["option", {value: "boolean"}, typeof value === "boolean" ? {selected: "true"} : {}, "Boolean"],
+                        ["option", { value: "string" }, typeof value === "string" ? { selected: "true" } : {}, "String"],
+                        ["option", { value: "number" }, typeof value === "number" ? { selected: "true" } : {}, "Number"],
+                        ["option", { value: "boolean" }, typeof value === "boolean" ? { selected: "true" } : {}, "Boolean"],
                     ]
                 ],
             ]
@@ -38,7 +42,7 @@ export function create_variable_table() {
     for (const [name, value] of Variable_storage.variables) {
         add_row(name, value);
     }
-    const add_var_button = createHTML(["button", {class: "variable_add"}, "+"]);
+    const add_var_button = createHTML(["button", { class: "variable_add" }, "+"]);
     add_var_button.addEventListener("click", () => {
         table.removeChild(add_var_button);
         add_row("", "");
