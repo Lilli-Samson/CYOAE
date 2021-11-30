@@ -16,11 +16,41 @@ export function create_variable_table() {
         ]
     );
 
+    //Delete button for variables
+    table.addEventListener("click", (event: MouseEvent) => {
+        const cell = event.target;
+        if (!(cell instanceof HTMLTableCellElement)) {
+            return;
+        }
+        const row = cell.parentElement;
+        if (!(row instanceof HTMLTableRowElement)) {
+            return;
+        }
+        if (!(cell === row.cells[0])) {
+            return;
+        }
+        const var_name_cell = row.cells[1];
+        if (var_name_cell.textContent === null) {
+            return;
+        }
+        if (var_name_cell.textContent !== "") {
+            Variable_storage.delete_variable(var_name_cell.textContent);
+        }
+        table.removeChild(row);
+    });
+
+    table.addEventListener("input", (event: Event) => {
+        //TODO
+    });
+
+    function save_row(row: number) {
+        //TODO
+    }
+
     function add_row(name: string, value: Variable_storage_types) {
-        const button_cell = createHTML(["td", { class: "unselectable" }, "🗑"]);
         const row = createHTML(
             ["tr",
-                button_cell,
+                ["td", { class: "unselectable" }, "🗑"],
                 ["td", { contenteditable: "true" }, name],
                 ["td", { contenteditable: "true" }, `${value}`],
                 ["td",
@@ -32,10 +62,6 @@ export function create_variable_table() {
                 ],
             ]
         );
-        button_cell.addEventListener("click", () => {
-            Variable_storage.delete_variable(name);
-            table.removeChild(row);
-        });
         table.append(row);
     }
 
