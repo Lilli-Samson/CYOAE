@@ -53,3 +53,7 @@ button.variable_delete {
     padding: 0;
     border: none;
 }
+
+.unselectable {
+    user-select: none;
+}

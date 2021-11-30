@@ -17,10 +17,10 @@ export function create_variable_table() {
     );
 
     function add_row(name: string, value: Variable_storage_types) {
-        const button = createHTML(["button", { class: "variable_delete" }, "🗑"]);
+        const button_cell = createHTML(["td", { class: "unselectable" }, "🗑"]);
         const row = createHTML(
             ["tr",
-                ["td", button],
+                button_cell,
                 ["td", { contenteditable: "true" }, name],
                 ["td", { contenteditable: "true" }, `${value}`],
                 ["td",
@@ -32,7 +32,7 @@ export function create_variable_table() {
                 ],
             ]
         );
-        button.addEventListener("click", () => {
+        button_cell.addEventListener("click", () => {
             Variable_storage.delete_variable(name);
             table.removeChild(row);
         });
