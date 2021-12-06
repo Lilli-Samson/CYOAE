@@ -1063,18 +1063,18 @@ async function tests() {
     test_code_evaluation();
 
     function test_game_variables() {
-        assert_equal(typeof Variable_storage.get_variable("test"), "undefined");
-        Variable_storage.set_variable("test", "yo");
-        assert_equal(typeof Variable_storage.get_variable("test"), "string");
-        assert_equal(Variable_storage.get_variable("test"), "yo");
-        Variable_storage.set_variable("test", 42);
-        assert_equal(typeof Variable_storage.get_variable("test"), "number");
-        assert_equal(Variable_storage.get_variable("test"), 42);
-        Variable_storage.set_variable("test", true);
-        assert_equal(typeof Variable_storage.get_variable("test"), "boolean");
-        assert_equal(Variable_storage.get_variable("test"), true);
-        Variable_storage.delete_variable("test");
-        assert_equal(typeof Variable_storage.get_variable("test"), "undefined");
+        assert_equal(typeof Variable_storage.get_variable("internal test variable"), "undefined");
+        Variable_storage.set_variable("internal test variable", "yo");
+        assert_equal(typeof Variable_storage.get_variable("internal test variable"), "string");
+        assert_equal(Variable_storage.get_variable("internal test variable"), "yo");
+        Variable_storage.set_variable("internal test variable", 42);
+        assert_equal(typeof Variable_storage.get_variable("internal test variable"), "number");
+        assert_equal(Variable_storage.get_variable("internal test variable"), 42);
+        Variable_storage.set_variable("internal test variable", true);
+        assert_equal(typeof Variable_storage.get_variable("internal test variable"), "boolean");
+        assert_equal(Variable_storage.get_variable("internal test variable"), true);
+        Variable_storage.delete_variable("internal test variable");
+        assert_equal(typeof Variable_storage.get_variable("internal test variable"), "undefined");
     }
     test_game_variables();
 
