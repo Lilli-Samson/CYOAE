@@ -1,6 +1,6 @@
 export type Variable_storage_types = number | string | boolean;
 
-type Storage_value = `${"s"|"n"|"b"}${string}`;
+type Storage_value = `${"s" | "n" | "b"}${string}`;
 
 function variable_to_string(value: Variable_storage_types): Storage_value {
     switch (typeof value) {
@@ -52,6 +52,9 @@ export class Variable_storage {
         }
         Variable_storage.debug && console.log(`Getting variable "${variable_name}" with value: ${string_to_variable(stored)} (encoded: ${stored})`);
         return string_to_variable(stored);
+    }
+    static has_variable(variable_name: string) {
+        return typeof localStorage.getItem(`v${variable_name}`) === "string";
     }
     static set_variable(variable_name: string, value: Variable_storage_types) {
         Variable_storage.debug && console.log(`Setting variable "${variable_name}" to value ${value} (encoded: ${variable_to_string(value)})`);
