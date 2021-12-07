@@ -12,21 +12,21 @@ let current_scene = "";
 let current_source = "";
 
 class ParserErrorListener implements antlr4ts.ANTLRErrorListener<antlr4ts.Token> {
-    constructor(private parser: antlr4ts.Parser) {}
+    constructor(private parser: antlr4ts.Parser) { }
     syntaxError(recognizer: antlr4ts.Recognizer<antlr4ts.Token, any>, offendingSymbol: antlr4ts.Token | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
-        throw_evaluation_error(`Parser error: ${msg}${e ? `: ${e.context?.toStringTree(this.parser)}` : ""}`, {start: {line: line, charPositionInLine: charPositionInLine}, sourceInterval: {length: offendingSymbol?.text?.length || 0}}, current_source);
+        throw_evaluation_error(`Parser error: ${msg}${e ? `: ${e.context?.toStringTree(this.parser)}` : ""}`, { start: { line: line, charPositionInLine: charPositionInLine }, sourceInterval: { length: offendingSymbol?.text?.length || 0 } }, current_source);
     }
 }
 
 class LexerErrorListener implements antlr4ts.ANTLRErrorListener<number> {
     syntaxError(recognizer: antlr4ts.Recognizer<number, any>, offendingSymbol: number | undefined, line: number, charPositionInLine: number, msg: string, e: antlr4ts.RecognitionException | undefined) {
-        throw_evaluation_error(`Lexer error: ${msg}`, {start: {line: line, charPositionInLine: charPositionInLine}, sourceInterval: {length: 1}}, current_source);
+        throw_evaluation_error(`Lexer error: ${msg}`, { start: { line: line, charPositionInLine: charPositionInLine }, sourceInterval: { length: 1 } }, current_source);
     }
 }
 
 class Lazy_evaluated<T> {
     private _value: T | undefined;
-    constructor(private init: () => T) {}
+    constructor(private init: () => T) { }
     get value() {
         if (!this.is_evaluated) {
             this._value = this.init();
@@ -60,7 +60,7 @@ class Lazy_evaluated_rich_text {
     }
 }
 
-function HTMLElement_to_string(who: HTMLElement){
+function HTMLElement_to_string(who: HTMLElement) {
     let el = document.createElement("div");
     el.appendChild(who.cloneNode(true));
     let txt = el.innerHTML;
@@ -156,9 +156,9 @@ class Tag_result {
 }
 
 interface Attribute_replacement {
-	name: string;
-	replacement(value: Tag_result, tag: Tag): Tag_result;
-	default_value?: Tag_result;
+    name: string;
+    replacement(value: Tag_result, tag: Tag): Tag_result;
+    default_value?: Tag_result;
 }
 
 interface Tag_replacement {
@@ -169,10 +169,10 @@ interface Tag_replacement {
 }
 
 interface Tag {
-	ctx: cyoaeParser.Tag_Context;
-	name: string;
-	default_value?: Tag_result;
-	attributes: [string, Tag_result][];
+    ctx: cyoaeParser.Tag_Context;
+    name: string;
+    default_value?: Tag_result;
+    attributes: [string, Tag_result][];
 }
 
 function get_optional_attributes(tag: Tag, attribute: string) {
@@ -185,7 +185,7 @@ function get_optional_attributes(tag: Tag, attribute: string) {
     return result;
 }
 
-function get_unique_optional_attribute(tag: Tag, attribute: string) : Tag_result | undefined {
+function get_unique_optional_attribute(tag: Tag, attribute: string): Tag_result | undefined {
     const result = get_optional_attributes(tag, attribute);
     if (result.length > 1) {
         throw_evaluation_error(`Duplicate attribute "${attribute}" in tag "${tag.name}" which doesn't allow duplicate attributes`, tag.ctx);
@@ -255,13 +255,13 @@ function sleep(ms: number) {
 class Delayed_evaluation {
     private static debug = false;
     private static delayed_evaluation_placeholder_number = 0;
-    private static delay_evaluation_promise = (async () => {})();
+    private static delay_evaluation_promise = (async () => { })();
     private static active_delayed_evaluations = 0;
 
     //returns a placeholder that will be replaced by the real thing later
     static evaluate(replacement: Promise<Tag_result>, placeholder_text = new Tag_result("[loading]")): Tag_result {
         const placeholder_id = `delayed_evaluation_placeholder_${this.delayed_evaluation_placeholder_number}`;
-        const slot = createHTML(["slot", {class: "placeholder", id: placeholder_id}]);
+        const slot = createHTML(["slot", { class: "placeholder", id: placeholder_id }]);
         placeholder_text.insert_into(slot);
         this.active_delayed_evaluations += 1;
         const old_promise = this.delay_evaluation_promise;
@@ -292,7 +292,7 @@ class Delayed_evaluation {
 }
 
 function get_attributes(tag: Tag, tag_replacement: Tag_replacement) {
-    let result: {[key: string]: Tag_result} = {};
+    let result: { [key: string]: Tag_result } = {};
     for (const attr of tag_replacement.required_attributes) {
         result[attr] = get_unique_required_attribute(tag, attr);
     }
@@ -306,36 +306,36 @@ function get_attributes(tag: Tag, tag_replacement: Tag_replacement) {
 }
 
 const replacements: Readonly<Tag_replacement[]> = [
-	{ //img
-		tag_name: "img",
+    { //img
+        tag_name: "img",
         required_attributes: ["url"],
         optional_attributes: ["alt"],
-        replacements: function(tag): Tag_result {
+        replacements: function (tag): Tag_result {
             const attributes = get_attributes(tag, this);
-            return new Tag_result(createHTML(["img", {src: attributes["url"].text, alt: attributes["alt"]?.text ?? "image"}]));
+            return new Tag_result(createHTML(["img", { src: attributes["url"].text, alt: attributes["alt"]?.text ?? "image" }]));
         },
-	},
-	{ //code
-		tag_name: "code",
+    },
+    { //code
+        tag_name: "code",
         required_attributes: ["text"],
         optional_attributes: [],
-        replacements: function(tag): Tag_result {
+        replacements: function (tag): Tag_result {
             const attributes = get_attributes(tag, this);
-            return new Tag_result(createHTML(["span", {class: "code"}, ...attributes["text"].range]));
+            return new Tag_result(createHTML(["span", { class: "code" }, ...attributes["text"].range]));
         },
-	},
-	{ //choice
-		tag_name: "choice",
+    },
+    { //choice
+        tag_name: "choice",
         required_attributes: ["next", "text"],
         optional_attributes: ["onclick"],
-		replacements: function (tag) {
+        replacements: function (tag) {
             const attributes = get_attributes(tag, this);
             function get_result(page_available: boolean) {
                 //next
                 const result = createHTML(["a",
                     page_available
-                    ? {class: "choice", href: `#${current_arc}/${attributes["next"].text}`}
-                    : {class: "dead_choice"}]);
+                        ? { class: "choice", href: `#${current_arc}/${attributes["next"].text}` }
+                        : { class: "dead_choice" }]);
                 //onclick
                 if (attributes.onclick) {
                     const expression_context = run_parser(
@@ -364,12 +364,12 @@ const replacements: Readonly<Tag_replacement[]> = [
                     })(), attributes["text"]);
             }
         },
-	},
+    },
     { //test
-		tag_name: "test",
+        tag_name: "test",
         required_attributes: ["text"],
         optional_attributes: [],
-		replacements: function(tag) {
+        replacements: function (tag) {
             const debug = false;
             const attributes = get_attributes(tag, this);
             if (debug) {
@@ -379,25 +379,25 @@ const replacements: Readonly<Tag_replacement[]> = [
             }
             return new Tag_result(createHTML(["a", attributes["text"].text]));
         },
-	},
+    },
     { //test delayed evaluation
-		tag_name: "test_delayed_evaluation",
+        tag_name: "test_delayed_evaluation",
         required_attributes: [],
         optional_attributes: [],
-		replacements: (tag) => {
+        replacements: (tag) => {
             return Delayed_evaluation.evaluate((async () => new Tag_result("test_delayed_evaluation_result"))(), new Tag_result("test_delayed_evaluation_placeholder"));
         }
-	},
-	{ //source
+    },
+    { //source
         tag_name: "source",
         required_attributes: [],
         optional_attributes: [],
-		replacements: () => {
+        replacements: () => {
             const current_url = window.location.toString().replace(/\/[^\/]*$/, `/`).replace(/#.*/, "");
             const html = new Tag_result(createHTML(["hr"]));
-            html.append(createHTML(["a", {href: `${current_url}story arcs/${current_arc}/${current_scene}.txt`}, "Source"]));
+            html.append(createHTML(["a", { href: `${current_url}story arcs/${current_arc}/${current_scene}.txt` }, "Source"]));
             html.append(createHTML(["br"]));
-            html.append(createHTML(["p", {class: "source"}, current_source]));
+            html.append(createHTML(["p", { class: "source" }, current_source]));
             return html;
         },
     },
@@ -411,15 +411,15 @@ const replacements: Readonly<Tag_replacement[]> = [
         tag_name: "case",
         required_attributes: [],
         optional_attributes: [],
-        replacements: (tag: Tag) => {throw `"case" tag cannot be outside of "switch" tag`}
+        replacements: (tag: Tag) => { throw `"case" tag cannot be outside of "switch" tag` }
     },
 ] as const;
 
 function html_comment(content: string) {
-	return `<!-- ${content.replace(/-->/g, "~~>")} -->\n`;
+    return `<!-- ${content.replace(/-->/g, "~~>")} -->\n`;
 }
 
-function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value_type>, reducer: {(current_value: Accumulator_type, key_value: [Key_type, Value_type]): Accumulator_type}, accumulator: Accumulator_type) {
+function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value_type>, reducer: { (current_value: Accumulator_type, key_value: [Key_type, Value_type]): Accumulator_type }, accumulator: Accumulator_type) {
     for (const key_value of map) {
         accumulator = reducer(accumulator, key_value);
     }
@@ -427,11 +427,11 @@ function reduce<Key_type, Value_type, Accumulator_type>(map: Map<Key_type, Value
 }
 
 interface Evaluation_error_context {
-    readonly start: {line: number, charPositionInLine: number};
-    readonly sourceInterval: {length: number};
+    readonly start: { line: number, charPositionInLine: number };
+    readonly sourceInterval: { length: number };
 }
-type Extends<Class, Interface, Message = "">  = Class extends Interface ? true : Message;
-function static_assert<T extends true>() {}
+type Extends<Class, Interface, Message = ""> = Class extends Interface ? true : Message;
+function static_assert<T extends true>() { }
 static_assert<Extends<antlr4ts.ParserRuleContext, Evaluation_error_context, "antlr4ts.ParserRuleContext doesn't implement Evaluation_error_context anymore, need to change Evaluation_error_context so it does again">>();
 
 interface Case_result {
@@ -456,9 +456,9 @@ function throw_evaluation_error(error: string, context: Evaluation_error_context
     const length = min(context.sourceInterval.length, source_line.length - character);
 
     throw `Error evaluating source in line ${line}:\n`
-        +`${source_line}\n`
-        + `${" ".repeat(character) + "^" + (length > 1 ? "~".repeat(length - 1) : "")}\n`
-        + error;
+    + `${source_line}\n`
+    + `${" ".repeat(character) + "^" + (length > 1 ? "~".repeat(length - 1) : "")}\n`
+    + error;
 }
 
 function evaluate_expression(expression: cyoaeParser.Expression_Context): Variable_storage_types | undefined {
@@ -483,7 +483,7 @@ function evaluate_expression(expression: cyoaeParser.Expression_Context): Variab
                                 throw_evaluation_error(`Zero division error: "${expression.text}" evaluated to ${lhs} / ${rhs}`, expression);
                             }
                             return lhs / rhs;
-                        }
+                    }
                 }
                 if (typeof lhs === "string" && typeof rhs === "string" && expression._operator.text === "+") {
                     return lhs + rhs;
@@ -570,11 +570,10 @@ function evaluate_code(code: cyoaeParser.Code_Context) {
 
 function evaluate_tag(tag: Tag): Tag_result {
     const debug = false;
-    debug && console.log(`Executing tag "${tag.name}" with value "${tag.default_value?.current_value}" and attributes [${
-        tag.attributes.length > 0
-        ? tag.attributes.reduce((curr, [attribute_name, attribute_value]) => `${curr}\t${attribute_name}="${attribute_value.current_value}"\n`, "\n")
-        : ""
-    }]\n`);
+    debug && console.log(`Executing tag "${tag.name}" with value "${tag.default_value?.current_value}" and attributes [${tag.attributes.length > 0
+            ? tag.attributes.reduce((curr, [attribute_name, attribute_value]) => `${curr}\t${attribute_name}="${attribute_value.current_value}"\n`, "\n")
+            : ""
+        }]\n`);
     const replacement = replacements.find((repl) => repl.tag_name === tag.name);
     if (replacement === undefined) {
         throw_evaluation_error(`Unknown tag "${tag.name}"`, tag.ctx);
@@ -582,7 +581,7 @@ function evaluate_tag(tag: Tag): Tag_result {
     //check that there are no duplicate attributes
     {
         let attribute_names = new Set<string>();
-        for (const [attribute_name, ] of tag.attributes) {
+        for (const [attribute_name,] of tag.attributes) {
             if (attribute_names.has(attribute_name)) {
                 throw_evaluation_error(`Found duplicate attribute ${attribute_name} in tag ${tag.name} which doesn't support that`, tag.ctx);
             }
@@ -748,7 +747,7 @@ function evaluate_select_tag(ctx: cyoaeParser.Tag_Context): Tag_result {
 function evaluate_case_code(ctx: cyoaeParser.Case_code_Context): Case_code_result {
     const debug = false;
     debug && console.log(`Entered case code evaluation with "${ctx.childCount}" expressions to evaluate`);
-    let result = {applicable: true, score: 0};
+    let result = { applicable: true, score: 0 };
     for (let i = 0; i < ctx.childCount; i++) {
         const child = ctx.getChild(i);
         if (child instanceof cyoaeParser.Expression_Context) {
@@ -836,12 +835,12 @@ function evaluate_case(ctx: cyoaeParser.Tag_Context): Case_result {
 }
 
 function run_parser<T>(parameters: {
-        readonly code: string;
-        readonly filename?: string;
-        lexer_error_listener?: antlr4ts.ANTLRErrorListener<number>;
-        parser_error_listener?: antlr4ts.ANTLRErrorListener<antlr4ts.Token>;
-        evaluator: (parser: cyoaeParser.cyoaeParser) => T;
-    }) {
+    readonly code: string;
+    readonly filename?: string;
+    lexer_error_listener?: antlr4ts.ANTLRErrorListener<number>;
+    parser_error_listener?: antlr4ts.ANTLRErrorListener<antlr4ts.Token>;
+    evaluator: (parser: cyoaeParser.cyoaeParser) => T;
+}) {
     const old_source = current_source;
     current_source = parameters.code;
     try {
@@ -892,7 +891,7 @@ async function update_current_scene() {
     debug && console.log(`updating scene to ${current_arc}/${current_scene}`);
     try {
         Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
-        const story_container = createHTML([ "div", {class: "main"}]);
+        const story_container = createHTML(["div", { class: "main" }]);
         story_container.append(...parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`).range);
         document.body.textContent = "";
         document.body.append(story_container);
@@ -904,7 +903,7 @@ async function update_current_scene() {
     }
 }
 
-async function url_hash_change () {
+async function url_hash_change() {
     const debug = false;
     const [, arc, scene] = window.location.hash.match(/#([^\/]*)\/(.*)/) || [];
     debug && console.log(`URL changed to ${arc}/${scene}`);
@@ -934,7 +933,7 @@ async function download(url: string) {
 }
 
 function display_error_document(error: string) {
-    document.body.append(createHTML(["span", { class: 'error'}, error]));
+    document.body.append(createHTML(["span", { class: 'error' }, error]));
 }
 
 function assert(predicate: any, explanation: string = "") {
@@ -993,8 +992,8 @@ async function tests() {
 
     function test_creatHTML() {
         assert_equal(HTMLElement_to_string(createHTML(["p", "test", "bla", "blup"])), "<p>testblablup</p>");
-        assert_equal(HTMLElement_to_string(createHTML(["p", {class: "foo"}, "test", "bla", "blup"])), '<p class="foo">testblablup</p>');
-        assert_equal(HTMLElement_to_string(createHTML(["p", {class: "foo"}, ["a", {href: "inter.net"}, "link"]])), '<p class="foo"><a href="inter.net">link</a></p>');
+        assert_equal(HTMLElement_to_string(createHTML(["p", { class: "foo" }, "test", "bla", "blup"])), '<p class="foo">testblablup</p>');
+        assert_equal(HTMLElement_to_string(createHTML(["p", { class: "foo" }, ["a", { href: "inter.net" }, "link"]])), '<p class="foo"><a href="inter.net">link</a></p>');
     }
     test_creatHTML();
 
@@ -1057,7 +1056,7 @@ async function tests() {
         try {
             test_eval("1/0");
             assert(false, `Zero division error did not produce exception`);
-        } catch (e) {}
+        } catch (e) { }
         Variable_storage.delete_variable("x");
     }
     test_code_evaluation();
