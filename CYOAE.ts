@@ -571,8 +571,8 @@ function evaluate_code(code: cyoaeParser.Code_Context) {
 function evaluate_tag(tag: Tag): Tag_result {
     const debug = false;
     debug && console.log(`Executing tag "${tag.name}" with value "${tag.default_value?.current_value}" and attributes [${tag.attributes.length > 0
-            ? tag.attributes.reduce((curr, [attribute_name, attribute_value]) => `${curr}\t${attribute_name}="${attribute_value.current_value}"\n`, "\n")
-            : ""
+        ? tag.attributes.reduce((curr, [attribute_name, attribute_value]) => `${curr}\t${attribute_name}="${attribute_value.current_value}"\n`, "\n")
+        : ""
         }]\n`);
     const replacement = replacements.find((repl) => repl.tag_name === tag.name);
     if (replacement === undefined) {
@@ -893,10 +893,21 @@ async function update_current_scene() {
         Variable_storage.set_internal("current_scene", `${current_arc}/${current_scene}`);
         const story_container = createHTML(["div", { class: "main" }]);
         story_container.append(...parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`).range);
+        const debug_container = createHTML(["div", { class: "debug" }]);
+        const debug_button = createHTML(["button", "🐛"]);
+        const variable_table = createHTML(["div"]);
+        variable_table.append(createHTML(["hr"]), create_variable_table());
+        debug_container.append(debug_button);
+        debug_button.onclick = () => {
+            if (debug_container.contains(variable_table)) {
+                debug_container.removeChild(variable_table);
+            }
+            else {
+                debug_container.append(variable_table);
+            }
+        };
         document.body.textContent = "";
-        document.body.append(story_container);
-        document.body.append(createHTML(["hr"]));
-        document.body.append(create_variable_table());
+        document.body.append(story_container, debug_container);
     }
     catch (err) {
         display_error_document(`${err}`);
