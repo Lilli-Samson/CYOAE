@@ -28,7 +28,7 @@ class Lazy_evaluated<T> {
     private _value: T | undefined;
     constructor(private init: () => T) { }
     get value() {
-        if (!this.is_evaluated) {
+        if (typeof this._value === "undefined") {
             this._value = this.init();
         }
         return this._value;
@@ -895,10 +895,14 @@ async function update_current_scene() {
         story_container.append(...parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`).range);
         const debug_container = createHTML(["div", { class: "debug" }]);
         const debug_button = createHTML(["button", "🐛"]);
-        const variable_table = createHTML(["div"]);
-        variable_table.append(createHTML(["hr"]), create_variable_table());
+        const lazy_variable_table = new Lazy_evaluated(()=>{
+            const result = createHTML(["div"]);
+            result.append(createHTML(["hr"]), create_variable_table());
+            return result;
+        });
         debug_container.append(debug_button);
         debug_button.onclick = () => {
+            const variable_table = lazy_variable_table.value;
             if (debug_container.contains(variable_table)) {
                 debug_container.removeChild(variable_table);
             }
