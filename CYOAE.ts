@@ -6,6 +6,7 @@ import * as cyoaeParser from './cyoaeParser';
 import { Variable_storage, Variable_storage_types } from './storage';
 import { create_variable_table } from './variables_screen';
 import { createHTML } from './html';
+import { get_undo_update_code } from './undo';
 
 let current_arc = "";
 let current_scene = "";
@@ -895,7 +896,7 @@ async function update_current_scene() {
         story_container.append(...parse_source_text(await download(`${current_arc}/${current_scene}.txt`), `${current_arc}/${current_scene}.txt`).range);
         const debug_container = createHTML(["div", { class: "debug" }]);
         const debug_button = createHTML(["button", "🐛"]);
-        const lazy_variable_table = new Lazy_evaluated(()=>{
+        const lazy_variable_table = new Lazy_evaluated(() => {
             const result = createHTML(["div"]);
             result.append(createHTML(["hr"]), create_variable_table());
             return result;
@@ -1091,6 +1092,22 @@ async function tests() {
         assert_equal(typeof Variable_storage.get_variable("internal test variable"), "undefined");
     }
     test_game_variables();
+
+    function test_variable_undo() {
+        let old_values = new Map<string, Variable_storage_types>([["oldname", "oldvalue"]]);
+        let new_values = new Map<string, Variable_storage_types>();
+        assert_equal(get_undo_update_code(old_values, old_values), '');
+        assert_equal(get_undo_update_code(new_values, new_values), '');
+        assert_equal(get_undo_update_code(old_values, new_values), 'oldname="oldvalue";');
+        //assert_equal(old_values, new_values);
+        old_values = new Map<string, Variable_storage_types>([["name", "oldvalue"]]);
+        new_values = new Map<string, Variable_storage_types>([["name", "newvalue"]]);
+        assert_equal(get_undo_update_code(old_values, new_values), 'name="oldvalue";');
+        old_values = new Map<string, Variable_storage_types>();
+        new_values = new Map<string, Variable_storage_types>([["name", "newvalue"]]);
+        assert_equal(get_undo_update_code(old_values, new_values), 'delete name;');
+    }
+    test_variable_undo();
 
     document.body.innerHTML = "";
 }
